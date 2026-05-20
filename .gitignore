@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local env and generated demo data
+.env
+.env.local
+smart_bin.db
+*.sqlite
+*.sqlite3
+
+# IDE / editor
+.vscode/
+.idea/
