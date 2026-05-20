@@ -156,7 +156,7 @@
 
 == Ausgangslage bei Projektübergabe
 
-Das Projekt "Smarte Mülltonne" wurde aus einer Vorarbeit des Wintersemesters 2025/26 übernommen. Diese Vorarbeit bildet den technischen Startpunkt, wird in dieser Dokumentation aber nur als Ausgangslage beschrieben. Der Schwerpunkt dieser Dokumentation liegt auf der Weiterentwicklung im aktuellen Semester: bessere Fahreigenschaften, stabilere Mechanik, überarbeitete Sensorik, Energie- und Sicherheitsfunktionen sowie eine ergänzende Flottenmanagement-Web-App im Ordner `smart-bin`.
+Das Projekt "Smarte Mülltonne" wurde aus einer Vorarbeit des Wintersemesters 2025/26 übernommen. Diese Vorarbeit bildet den technischen Startpunkt, wird in dieser Dokumentation aber nur als Ausgangslage beschrieben. Der Schwerpunkt dieser Dokumentation liegt auf der Weiterentwicklung im aktuellen Semester: bessere Fahreigenschaften, stabilere Mechanik, überarbeitete Sensorik, Energie- und Sicherheitsfunktionen sowie eine ergänzende Flottenmanagement-Web-App.
 
 Bei der Übergabe lag bereits ein funktionsorientierter Prototyp mit Hardware- und Softwareanteilen vor. Die vorhandene Software außerhalb von `smart-bin` enthielt unter anderem MicroPython-Code für einen Raspberry Pi Pico beziehungsweise Pico W, Module für DC-Motoren, Linienverfolgung, Ultraschallmessung, Buttons, Buzzer, LEDs, Netzwerkkommunikation und eine einfache serverseitige Missionslogik. Zusätzlich waren Schaltpläne, 3D-Druckteile, Rechnungen, Fotos, Videos und eine ältere Dokumentation vorhanden.
 
