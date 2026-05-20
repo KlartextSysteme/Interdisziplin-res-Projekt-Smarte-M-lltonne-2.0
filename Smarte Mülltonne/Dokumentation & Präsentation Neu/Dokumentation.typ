@@ -158,7 +158,7 @@
 
 Das Projekt "Smarte Mülltonne" wurde aus einer Vorarbeit des Wintersemesters 2025/26 übernommen. Diese Vorarbeit bildet den technischen Startpunkt, wird in dieser Dokumentation aber nur als Ausgangslage beschrieben. Der Schwerpunkt dieser Dokumentation liegt auf der Weiterentwicklung im aktuellen Semester: bessere Fahreigenschaften, stabilere Mechanik, überarbeitete Sensorik, Energie- und Sicherheitsfunktionen sowie eine ergänzende Flottenmanagement-Web-App.
 
-Bei der Übergabe lag bereits ein funktionsorientierter Prototyp mit Hardware- und Softwareanteilen vor. Die vorhandene Software außerhalb von `smart-bin` enthielt unter anderem MicroPython-Code für einen Raspberry Pi Pico beziehungsweise Pico 2W, Module für DC-Motoren, Linienverfolgung, Ultraschallmessung, Buttons, Buzzer, LEDs, Netzwerkkommunikation und eine einfache serverseitige Missionslogik. Zusätzlich waren Schaltpläne, 3D-Druckteile, Rechnungen, Fotos, Videos und eine ältere Dokumentation vorhanden.
+Bei der Übergabe lag bereits ein funktionsorientierter Prototyp mit Hardware- und Softwareanteilen vor. Die vorhandene Software außerhalb enthielt unter anderem MicroPython-Code für einen Raspberry Pi Pico beziehungsweise Pico 2W, Module für DC-Motoren, Linienverfolgung, Ultraschallmessung, Buttons, Buzzer, LEDs, Netzwerkkommunikation und eine einfache serverseitige Missionslogik. Zusätzlich waren Schaltpläne, 3D-Druckteile, Rechnungen, Fotos, Videos und eine ältere Dokumentation vorhanden.
 
 #infobox[
   *Kurzfassung des Ist-Zustands:* Die vorherige Gruppe hatte eine einzelne smarte Mülltonne als Prototyp vorbereitet. Die Tonne konnte grundsätzlich fahren und war mit Sensorik, Motorsteuerung und lokalen Zuständen gedacht; softwareseitig existierten Pico-Client-Code und ein einfacher Serveransatz. Offen waren vor allem robuste Fahreigenschaften, zuverlässige Mechanik, verbesserter Antrieb, saubere Integration neuer Hardwarekomponenten, Energie- und Sicherheitskonzept sowie ein modernes Managementsystem für mehrere Tonnen.
@@ -176,7 +176,7 @@ Die eigene Weiterentwicklung konzentriert sich auf folgende Bereiche:
 - Hardware-, Mechanik- und Antriebskonzeption als zentrale Weiterentwicklung
 - Verbesserung von Fahrverhalten, Traktion, Rädern, Kettenführung und Sensorintegration
 - Energie-, Sicherheits- und Bedienkonzept
-- Konzeption und Implementierung der Flottenmanagement-Web-App `smart-bin` als digitale Erweiterung
+- Konzeption und Implementierung der Flottenmanagement-Web-App als digitale Erweiterung
 - Schnittstellen zwischen Hardware, App, Backend und Simulation
 
 = Zielbild
