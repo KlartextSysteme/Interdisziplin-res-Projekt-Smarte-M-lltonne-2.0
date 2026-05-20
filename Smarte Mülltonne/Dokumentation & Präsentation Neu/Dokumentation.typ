@@ -1,7 +1,7 @@
 // ============================================================
 //  SEMESTERPROJEKTDOKUMENTATION
 //  Smarte Muelltonne 2.0
-//  Stand: 03. Mai 2026
+//  Stand: 06. Mai 2026
 // ============================================================
 
 #set document(
@@ -196,7 +196,7 @@ Die Projektvision beschreibt die Transformation einer passiven Mülltonne zu ein
     columns: (0.8fr, 1.8fr, 3fr),
     [*Nr.*], [*Säule*], [*Bedeutung im Projekt*],
     [1], [Intelligente Flottensteuerung], [Verwaltung mehrerer Tonnen, Planung von Abholrouten, zentrale Statusübersicht und bidirektionale Kommunikation.],
-    [2], [Autarkie und Energie], [Solar-Integration, Ladestation beziehungsweise Docking-Konzept und Monitoring von Akku- und Ladezuständen.],
+    [2], [Autarkie und Energie], [Ladestation beziehungsweise Docking-Konzept und Monitoring von Akku- und Ladezuständen.],
     [3], [Mobilität und Interaktion], [Verbesserte Fahrdynamik, Liniennavigation, Hindernisreaktion, Bedienung über Touchpanel und klare Nutzerfeedbacks.],
   ),
   caption: [Pflichtenheft-Säulen der Smarten Mülltonne 2.0],
@@ -210,7 +210,7 @@ Der wichtigste konzeptionelle Schritt war nicht nur der Wechsel von einer isolie
 
 == Sprint 0: Orientierung und Sichtung
 
-Sprint 0 war als Setup- und Alignment-Phase vom 14. April 2026 bis 19. April 2026 geplant. In dieser Phase standen die Sichtung der Vorarbeiten, die Rollenklärung, die Projektvision, die Tool-Auswahl und die Definition erster Use Cases im Vordergrund.
+Sprint 0 war zunächst als Setup- und Alignment-Phase vom 14. April 2026 bis 19. April 2026 geplant. In dieser Phase standen die Sichtung der Vorarbeiten, die Rollenklärung, die Projektvision, die Tool-Auswahl und die Definition erster Use Cases im Vordergrund.
 
 #figure(
   table(
@@ -303,7 +303,7 @@ Für die Weiterentwicklung werden deshalb neue Räder beziehungsweise Antriebsel
     [Neue Räder drucken], [Bessere Passung zum Fahrwerk, stabilere Kraftübertragung und reproduzierbarere Bewegung.],
     [Ketten erweitern/anpassen], [Mehr Traktion, weniger Durchrutschen und stabileres Fahrverhalten auf dem Testuntergrund.],
     [Kettenführung verbessern], [Abspringen oder Verkanten reduzieren, besonders bei Kurven und Drehungen.],
-    [Fahrwerk überarbeiten], [Einbaupositionen für Motoren, Sensorik, Akku, Touchpanel und Solarfläche sauber festlegen.],
+    [Fahrwerk überarbeiten], [Einbaupositionen für Motoren, Sensorik, Akku, Touchpanel und Hardbutton sauber festlegen.],
     [Gewichtsverteilung prüfen], [Kippen, Schleifen und einseitige Belastung vermeiden.],
   ),
   caption: [Mechanische Schwerpunkte zur Verbesserung der Fahreigenschaften],
@@ -344,7 +344,7 @@ Als mögliche Schrittmotor-Optionen wurden ein NEMA17 42BYGHM809 und ein stärke
 
 == Sensorik und Bedienung
 
-Für die Weiterentwicklung wurden zusätzliche oder überarbeitete Sensorik- und Bedienkomponenten geplant. Dazu gehören Magnetschalter für Deckelöffnung beziehungsweise Fremdnutzung, ein Touchdisplay als lokale Schnittstelle, Not-Aus, Buzzer, Akkuüberwachung, ein Spannungswandler und eine Solar- beziehungsweise Ladeinfrastruktur.
+Für die Weiterentwicklung wurden zusätzliche oder überarbeitete Sensorik- und Bedienkomponenten geplant. Dazu gehören Magnetschalter für Deckelöffnung beziehungsweise Fremdnutzung, ein Touchdisplay als lokale Schnittstelle, Not-Aus, Buzzer, ggf. eine Akkuüberwachung, ein Spannungswandler und eine Ladeinfrastruktur.
 
 Die Notion-Materialliste führt außerdem vorhandene Grundkomponenten wie Kettenroboterchassis, Mülltonnenkorpus, Motoren, Motortreiber und Bleiakku. Als Randbedingung wurde unter anderem ein Gesamtbudget und die verfügbare GPIO-Anzahl betrachtet; in der Materialliste ist festgehalten, dass 34 GPIO-Ports benötigt werden.
 
@@ -363,13 +363,13 @@ Die wichtigsten fahrtechnischen Ziele sind:
 
 == Energie, Sicherheit und Elektrik
 
-Neben dem Fahrwerk werden auch Energieversorgung und Sicherheit weitergedacht. Die geplante Solar-Integration und eine Dockingstation sollen langfristig ermöglichen, dass die Tonne ohne manuelles Laden einsatzfähig bleibt. Gleichzeitig sind Magnetschalter, Not-Aus, Buzzer und Statusanzeigen relevant, weil die Tonne im öffentlichen oder halböffentlichen Raum zuverlässig und nachvollziehbar reagieren muss.
+Neben dem Fahrwerk werden auch Energieversorgung und Sicherheit weitergedacht. Die geplante Dockingstation soll langfristig ermöglichen, dass die Tonne ohne manuelles Laden einsatzfähig bleibt. Gleichzeitig sind Magnetschalter, Not-Aus, Buzzer und Statusanzeigen relevant, weil die Tonne im öffentlichen oder halböffentlichen Raum zuverlässig und nachvollziehbar reagieren muss.
 
 #figure(
   table(
     columns: (1.8fr, 3.2fr),
     [*Bereich*], [*Geplante Funktion*],
-    [Solar und Akku], [Betriebsdauer erhöhen, Ladestand messen und in App beziehungsweise Display anzeigen.],
+    [Ladung und Akku], [Betriebsdauer erhöhen, Ladestand messen und in App beziehungsweise Display anzeigen.],
     [Dockingstation], [Automatisches Laden über Kontaktflächen als Zukunftsschritt.],
     [Magnetschalter], [Deckelöffnung erkennen und Fremdnutzung melden.],
     [Not-Aus], [Physischer, hardwareunabhängiger Sicherheitsstopp.],
@@ -387,11 +387,11 @@ Die Hardwareentwicklung ist der entscheidende Erfolgsfaktor des Projekts. Routen
   *Technische Risiken:* Die wichtigsten Risiken liegen in der sauberen Linienverfolgung, der Kettenführung, der mechanischen Passung gedruckter Räder, der stabilen Stromversorgung, der Anzahl benötigter GPIOs, der zuverlässigen WLAN-Kommunikation und der Synchronisation zwischen lokaler Fahrlogik und zentralen Serverbefehlen.
 ]
 
-= Digitale Erweiterung: Flottenmanagement-Web-App `smart-bin`
+= Digitale Erweiterung: Flottenmanagement-Web-App 
 
 == Rolle der Web-App im Gesamtprojekt
 
-Die Web-App wurde als ergänzender Prototyp im Ordner `smart-bin` entwickelt. Sie ist ein wichtiges Zusatzmodul, aber nicht die einzige Projektleistung. Während Hardware, Mechanik und Fahreigenschaften die Grundlage bilden, zeigt die App, wie die Tonne später in ein größeres System eingebunden werden kann: mit mehreren Tonnen, Füllstand, Akku, Solarleistung, Sicherheitsstatus, Position, Routenplanung und Live-Visualisierung.
+Die Web-App wurde als ergänzender Prototyp im Ordner `smart-bin` entwickelt. Sie ist ein wichtiges Zusatzmodul, aber nicht die einzige Projektleistung. Während Hardware, Mechanik und Fahreigenschaften die Grundlage bilden, zeigt die App, wie die Tonne später in ein größeres System eingebunden werden kann: mit mehreren Tonnen, Füllstand, Akku, Ladeleistung, Sicherheitsstatus, Position, Routenplanung und Live-Visualisierung.
 
 Die App dient damit als Demonstrator, Testumgebung und spätere Integrationsschicht zur Hardware. Sie ist gewissermaßen das sichtbare Management-Layer über dem eigentlichen mechatronischen System.
 
@@ -438,7 +438,7 @@ Aus dem Vergleich der betrachteten Systeme wurde deutlich, dass sich unabhängig
 
 Ein zentrales Muster der Benchmark-Systeme ist die Kombination aus Kartenansicht und Flottenliste. Position und Status einzelner Einheiten werden meist über Marker auf einer Karte beziehungsweise einer räumlichen Oberfläche sowie ergänzend in Listen, Statuskarten oder Panels dargestellt. Diese Beobachtung war direkt anschlussfähig an die eigene Web-App, in der FleetPanel, MapView, Route, Depot und Truck bewusst nebeneinander gedacht wurden.
 
-Ein weiteres Ergebnis war die hohe Bedeutung verdichteter Betriebs- und Zustandsdaten. In Smart-Waste-Systemen stehen Füllstände, Batterie- oder Energiezustände, Konnektivität und Sammelstatus im Vordergrund. In Robot-Fleet-Systemen treten Health-Indikatoren wie Batterie, Verfügbarkeit, Incident-Status oder Netzwerkzustände an ihre Stelle. Für das eigene Projekt bestätigte dies die Konzentration auf Füllstand, Akku, Solarleistung, Sicherheitszustand und Sperrstatus als zentrale Telemetriedaten.
+Ein weiteres Ergebnis war die hohe Bedeutung verdichteter Betriebs- und Zustandsdaten. In Smart-Waste-Systemen stehen Füllstände, Batterie- oder Energiezustände, Konnektivität und Sammelstatus im Vordergrund. In Robot-Fleet-Systemen treten Health-Indikatoren wie Batterie, Verfügbarkeit, Incident-Status oder Netzwerkzustände an ihre Stelle. Für das eigene Projekt bestätigte dies die Konzentration auf Füllstand, Akku, Ladeleistung, Sicherheitszustand und Sperrstatus als zentrale Telemetriedaten.
 
 Auch Routen- und Einsatzplanung erscheinen in professionellen Systemen als Kernfunktion. Für das eigene Projekt war dabei weniger entscheidend, welcher konkrete Optimierungsalgorithmus in der frühen Prototypenphase genutzt wird. Wichtiger war die Erkenntnis, dass Routing grundsätzlich datengetrieben, dynamisch und erweiterbar gedacht werden sollte. Die aktuelle Tourenlogik ist daher als funktionaler Prototyp zu verstehen. Perspektivisch sind stärkere Optimierungsverfahren wie 2-Opt, verbesserte Tourenheuristiken oder Python-basierte Routing-Frameworks anschlussfähig und wurden auch im Austausch mit dem betreuenden Professor als sinnvoller Entwicklungspfad diskutiert.
 
@@ -453,7 +453,7 @@ Besonders relevant war zudem die Rolle von Simulation und Demo-Betrieb. Viele pr
     columns: (1.25fr, 2.2fr, 2.4fr),
     [*Vergleichsdimension*], [*Beobachtung in Benchmark-Systemen*], [*Relevanz für das Projekt*],
     [Flottenübersicht], [Zentrale Kombination aus Karte, Flottenliste und Statusanzeige.], [Bestätigung der eigenen Dashboard-Struktur mit FleetPanel und MapView.],
-    [Telemetrie], [Echtzeitdarstellung von Füllstand, Batterie, Status und Konnektivität.], [Bestätigung der Fokussierung auf Füllstand, Akku, Solar und Sicherheitsstatus.],
+    [Telemetrie], [Echtzeitdarstellung von Füllstand, Batterie, Status und Konnektivität.], [Bestätigung der Fokussierung auf Füllstand, Akku, Ladeleistung und Sicherheitsstatus.],
     [Routenplanung], [Routing und Einsatzplanung sind Kernbestandteil professioneller Systeme.], [Routing wurde früh als ausbaufähige Kernfunktion integriert.],
     [Sicherheitslogik], [Alerts, Incidents und Ereignismanagement gehören zum Standard.], [Bestätigung von Sicherheitsereignissen, Sperren und Quittierungen.],
     [Simulation / Historie], [Historisierung, Testumgebungen und Playback-Funktionen sind verbreitet.], [Bestätigung der Strategie "Simulation vor Hardwareintegration".],
@@ -467,6 +467,120 @@ Besonders relevant war zudem die Rolle von Simulation und Demo-Betrieb. Viele pr
 Aus Sicht der Projektgruppe hatte das Benchmarking vor allem drei Funktionen. Erstens half es dabei, die Web-App nicht nur als projektspezifische Einzelentwicklung zu betrachten, sondern als Teil eines größeren Musters digitaler Flottenmanagementsysteme. Zweitens zeigte es, dass Flottenübersicht, Statusdarstellung, Routenlogik, Sicherheitsereignisse und Simulation keine isolierten Ideen sind, sondern sich eng an wiederkehrenden Strukturen realer Systeme orientieren. Drittens machte das Benchmarking sichtbar, an welchen Stellen der Prototyp langfristig weiterentwickelt werden kann: stärkere Tourenoptimierung, Rollenmodelle, historische Auswertungen, Replay-Funktionen und vertiefte agentische Unterstützung.
 
 Das Benchmarking war damit kein Mittel zur nachträglichen Bewertung der eigenen Lösung, sondern ein konzeptionelles Werkzeug zur Orientierung und Einordnung. Es positioniert die Web-App als nachvollziehbaren Prototyp innerhalb eines professionellen Systemkontexts und zeigt zugleich Entwicklungsperspektiven für den weiteren Ausbau.
+
+#pagebreak() 
+
+== Zielgruppe und User Persona
+
+=== Methodisches Vorgehen
+
+Bevor konkrete Bildschirmlayouts oder Interaktionsmuster entworfen wurden, erfolgte eine bewusste Verortung der Web-App auf Seiten der Anwendenden. Das Benchmarking hatte gezeigt, welche Funktionen professionelle Flottenmanagementsysteme bereitstellen, beantwortete aber nicht die Frage, für wen diese Funktionen im konkreten Einsatzkontext der Smarten Mülltonne tatsächlich zugeschnitten sein müssen. Die Bildung einer User Persona dient deshalb nicht der Marktforschung, sondern als Designwerkzeug: Sie macht implizite Annahmen über Nutzungssituation, technische Vorerfahrung und Aufgaben sichtbar und prüfbar.
+
+Die Persona wurde aus drei Quellen abgeleitet. Erstens aus den Use-Case-Anforderungen, die im vorangegangenen Kapitel formuliert wurden, insbesondere dem Disponieren der Tonnen-Abholung, dem Reagieren auf Sicherheits- und Akku-Ereignisse sowie dem Bedienen des Fahrzeugs. Zweitens aus realistischen Berufsbildern in kommunalen Entsorgungsbetrieben, in denen Fahrerinnen und Fahrer zunehmend Aufgaben übernehmen, die früher in einer separaten Leitstelle abgewickelt wurden. Drittens aus den Beschränkungen des Einsatzkontexts: laute Umgebung, Witterung, Handschuhe, kurze Aufmerksamkeitsfenster zwischen Tonnen-Stops, mobile Nutzung im Fahrzeug.
+
+=== Primärpersona: Fahrer und Systemoperator in einer Person
+
+#figure(
+  grid(
+    columns: (1fr, 1.9fr),
+    column-gutter: 1em,
+    rows: (auto),
+    align: (center + top, left + top),
+    [
+      #box(
+        clip: true,
+        radius: 10pt,
+        stroke: 0.5pt + rgb("#e2e8f0"),
+        image("Persona.png", height: 6.6cm, fit: "cover"),
+      )
+    ],
+    [
+      #table(
+        columns: (1fr, 2fr),
+        [*Eigenschaft*], [*Beschreibung*],
+        [*Name*], [Stefan Krüger],
+        [*Alter*], [42 Jahre],
+        [*Rolle*], [Müllwagenfahrer und Tour-Disponent eines kommunalen Entsorgungsbetriebs],
+        [*Erfahrung*], [16 Jahre Berufserfahrung im Entsorgungswesen, davon 4 Jahre als Tourenverantwortlicher],
+        [*Arbeitsplatz*], [Mobil im Fahrerhaus eines Entsorgungsfahrzeugs, ergänzt durch ein Tablet im Fahrzeug und einen Desktop-Arbeitsplatz im Betriebshof],
+        [*Technikaffinität*], [Mittel — alltäglicher Smartphone-Nutzer, vertraut mit Navigations- und Auftragssystemen, Chatbots, aber kein IT-Fachmann],
+        [*Bezug zum System*], [Bedient die Web-App primär als operativer Disponent vor und während der Tour],
+      )
+    ],
+  ),
+  caption: [Steckbrief der Primärpersona Stefan Krüger],
+)
+
+#pagebreak()
+=== Hintergrund und Arbeitskontext
+
+Stefan beginnt seinen Arbeitstag um sechs Uhr am Betriebshof. Während er auf Kollegen wartet, prüft er auf einem Bildschirm die Übersicht der heute relevanten Tonnen. Er sieht auf einen Blick, welche Behälter besonders hohe Füllstände aufweisen, ob in der Nacht Sicherheitsereignisse aufgetreten sind und ob Tonnen aufgrund von Manipulationsverdacht gesperrt werden müssen. Auf Basis dieser Informationen entscheidet er, welche Touren heute zuerst gefahren werden und ob das Fahrzeug zusätzlich beladen werden muss.
+
+Sobald die Tour beginnt, wechselt Stefans Rolle. Er sitzt am Steuer eines schweren Fahrzeugs, trägt Arbeitshandschuhe und hat regelmäßig keine freie Hand. Komplexe Eingaben sind in dieser Situation nicht möglich. Er möchte stattdessen schnell sehen, wo die nächste Tonne steht, ob sich der Status seit Tour-Beginn geändert hat und ob er zwischendurch auf Ereignisse reagieren muss. Während er das Fahrzeug bewegt, dient die Web-App eher als Informations-Cockpit denn als Eingabewerkzeug.
+
+Am Ende der Tour kehrt Stefan zum Betriebshof zurück und schließt die Tour ab. In Ausnahmefällen muss er zusätzliche Sicherheitsereignisse dokumentieren, etwa wenn eine Tonne vor Ort beschädigt wurde oder eine Sperrung notwendig ist. Auch hier nutzt er die Web-App primär, um den Zustand der Tonnen für die nächste Schicht oder für Kollegen sauber abzubilden.
+
+=== Ziele
+
+Stefans übergeordnetes Ziel ist eine effiziente, vollständige und sichere Abholung der ihm zugewiesenen Tonnen. Daraus ergeben sich konkrete Teilziele.
+
+#figure(
+  table(
+    columns: (1.5fr, 3.5fr),
+    [*Ziel*], [*Bedeutung im Alltag*],
+    [Schneller Überblick über volle Tonnen], [Reduziert Leerfahrten und ermöglicht das Setzen klarer Prioritäten zu Schichtbeginn.],
+    [Verlässliche Routenplanung], [Spart Zeit, Treibstoff und reduziert kognitive Last während der Fahrt.],
+    [Klare Reaktion auf Sicherheitsereignisse], [Schützt vor Eskalation bei Manipulation, Brandverdacht oder Vandalismus.],
+    [Aktueller Energie- und Akkustatus], [Vermeidet Ausfälle einzelner Tonnen mitten in der Tour.],
+    [Übergabefähige Dokumentation], [Sichert reibungslose Schichtwechsel und nachvollziehbare Tour-Berichte.],
+  ),
+  caption: [Operative Ziele der Primärpersona],
+)
+
+=== Frustrationen und Herausforderungen
+
+Aus seiner Erfahrung mit bestehenden Systemen im Betrieb und im privaten Umfeld bringt Stefan eine Reihe von Erwartungen mit, die zugleich seine typischen Frustrationen markieren. Bestehende Branchensoftware empfindet er häufig als überladen. Häufig sind zentrale Statusinformationen tief in Untermenüs verborgen, was unter Zeitdruck im Fahrerhaus nicht praktikabel ist. Außerdem erlebt er häufig Brüche zwischen Disposition, Fahrzeug und Tonne: Informationen, die im Büro vorliegen, erreichen ihn auf der Tour erst verspätet oder gar nicht.
+
+=== Technische Voraussetzungen und Endgeräte
+
+Stefan ist kein passionierter Anwender komplexer Software, aber routinierter Nutzer alltagstauglicher digitaler Werkzeuge. Sein Smartphone bedient er sicher, mit Touch-Geräten im Fahrzeug ist er vertraut, da viele moderne Entsorgungsfahrzeuge bereits mit ähnlichen Bordsystemen ausgestattet sind. Komplexe Konfigurationsmenüs vermeidet er hingegen — sie kosten Zeit und führen aus seiner Erfahrung selten zu spürbaren Vorteilen. Er erwartet stattdessen eine klare, intuitive Oberfläche, die ihm die wichtigsten Informationen auf einen Blick liefert und einfache, sichere Interaktionen ermöglicht. Das Tablet im Fahrzeug ist sein primäres Endgerät für die Web-App, da es mobil, gut sichtbar und mit dem Fahrzeug verbunden ist. Ein Desktop-Arbeitsplatz im Betriebshof dient ergänzend für die Planung und Dokumentation.
+
+=== Beispielhafter Interaktionsablauf
+
+Ein typischer Schichtbeginn verläuft folgendermaßen. Stefan öffnet die Web-App auf seinem Tablet, sieht auf einer Karte alle 35 Tonnen seines Reviers eingefärbt nach Füllstand. Auffällig sind drei rot markierte Tonnen mit Werten über neunzig Prozent. Er klickt auf "Route planen" und erhält in unter einer Sekunde eine kompakte Tour mit acht Tonnen, die einen Füllstand über 60 Prozent aufweisen.
+
+Während der Fahrt verfolgt Stefan auf der Karte die Bewegung des Fahrzeugs. Kurz vor dem Eintreffen an die Abholposition sendet der Server ein Signal an die angesteuerte Tonne, um diese an die Straße zu rufen. Die Tonne setzt sich darufhin in Bewegung, der Füllstand wird nach erfolgter Leerung durch den Müllwagen automatisch zurückgesetzt und das Fahrzeug fährt zur nächsten Position weiter. Mitten in der Tour erscheint im Sicherheits-Panel ein Hinweis auf einen mutmaßlichen Manipulationsversuch an einer noch nicht angefahrenen Tonne. Stefan öffnet kurz den Chat-Bereich, fragt: „Sperre Tonne 22 wegen Manipulationsverdacht." Der Agent quittiert die Aktion, das Fleet-Panel markiert die Tonne grau, und sie wird automatisch aus der weiteren Routenplanung ausgeschlossen.
+
+=== Konsequenzen für das Interaktionsdesign der Web-App
+
+Aus dem Profil von Stefan und seinem Arbeitsablauf lassen sich konkrete Designentscheidungen ableiten, die die Web-App spürbar prägen. Sie erklären, warum die Oberfläche bestimmten Prinzipien folgt und an welchen Stellen bewusst auf Komplexität verzichtet wurde.
+
+#figure(
+  table(
+    columns: (1.5fr, 3.5fr),
+    [*Persona-Eigenschaft*], [*Designkonsequenz*],
+    [Geringe Toleranz gegenüber Fehlbedienung], [Aktionen mit echten Auswirkungen, etwa Sperren oder Fahrzeugbefehle, werden klar zurückgemeldet und sind reversibel.],
+    [Schneller Überblick gefordert], [Drei-Spalten-Layout aus Fleet-Panel, Karte und Chat erlaubt simultanes Erfassen von Status, Räumlichkeit und aktuellen Aktionen ohne Navigationsschritte.],
+    [Wechsel zwischen Disposition und Fahrt], [Karte und Liste sind die zentralen, jederzeit sichtbaren Elemente; Sekundärfunktionen wie Energie und Sicherheit sind als Tabs in einem Panel zusammengefasst.],
+    [Reagieren auf Live-Ereignisse], [WebSocket-basierte Echtzeit-Updates, Alert-Banner für aktive Sicherheitsereignisse, sofortige Spiegelung von Aktionen in allen offenen Sichten.],
+    [Begrenzte Technikaffinität], [Natürlichsprachliche Eingabe über den Chat-Agenten als alternativer Bedienpfad zu klassischen Schaltflächen.],
+    [Realistische Tourenplanung], [Automatische Optimierung über 2-opt-Heuristik mit nachvollziehbarer Anzeige der Strecken-Ersparnis.],
+    [Demo- und Schulungsszenario], [Simulationssteuerung mit Zeitraffer-Funktion, damit Tour-Abläufe in wenigen Minuten erlebbar werden.],
+  ),
+  caption: [Übersetzung der Persona-Eigenschaften in Designentscheidungen],
+)
+
+=== Sekundäre Anwender und Abgrenzung
+
+Neben Stefan als Primärpersona profitieren weitere Rollen von der Web-App, ohne dass sie deren primäre Adressaten wären. Eine Werkstatt-Technikerin, die einzelne Tonnen wartet, kann das Energie-Panel nutzen, um Akku- und Solar-Daten zu prüfen. Ein Schichtleiter im Betriebshof verwendet die Übersicht primär für die Personal- und Touren-Planung. Anwohnerinnen und Anwohner sind keine direkten Anwender der Flottenmanagement-Web-App; ihre Interaktion mit dem System erfolgt ausschließlich über das Touch-Display an der Tonne selbst, das in einem späteren Kapitel separat betrachtet wird.
+
+Diese Abgrenzung ist wichtig, weil sie verhindert, dass die Web-App versucht, alle möglichen Anwendergruppen gleichzeitig zu adressieren. Stattdessen folgt sie konsequent dem Bedarf des operativen Disponenten und Fahrers — alle weiteren Rollen werden über separate Schnittstellen oder zusätzliche, klar abgegrenzte Ansichten abgebildet.
+
+#decision[
+  *Entscheidung:* Die Flottenmanagement-Web-App ist primär für eine Person gestaltet, die gleichzeitig disponiert und fährt. Alle weiteren Rollen werden bewusst als sekundäre Anwender behandelt, um die Oberfläche fokussiert und mobil-tauglich zu halten.
+]
+
+#pagebreak()
 
 == Monorepo-Struktur
 
@@ -493,7 +607,7 @@ Eine zentrale Entscheidung war, auf GPS-Ortung zu verzichten. Mülltonnen stehen
 
 == Architekturentscheidung: Simulation vor Hardwareintegration
 
-Da die echte Hardware nicht durchgehend verfügbar beziehungsweise noch nicht vollständig integriert ist, simuliert `smart-bin` mehrere Systemteile. Die Simulation ist kein Ersatz für echte Tests, aber sie erlaubt eine frühzeitige Entwicklung der App-Logik: Live-Daten, Routen, Truck-Bewegung, Füllstandsdynamik, Solarwerte und Sicherheitsalerts können ohne angeschlossene Tonne geprüft werden.
+Da die echte Hardware nicht durchgehend verfügbar beziehungsweise noch nicht vollständig integriert ist, simuliert `smart-bin` mehrere Systemteile. Die Simulation ist kein Ersatz für echte Tests, aber sie erlaubt eine frühzeitige Entwicklung der App-Logik: Live-Daten, Routen, Truck-Bewegung, Füllstandsdynamik, Ladeleistungen und Sicherheitsalerts können ohne angeschlossene Tonne geprüft werden.
 
 = Backend
 
@@ -523,7 +637,7 @@ Das Datenmodell ist bewusst klein gehalten, deckt aber die Kernobjekte des Syste
   table(
     columns: (1.4fr, 3.4fr),
     [*Tabelle*], [*Inhalt*],
-    [`bins`], [Name, Adresse, Koordinaten, Füllstand, Akku, Solarleistung, Ladezustand, Status, Sperrstatus und letztes Update.],
+    [`bins`], [Name, Adresse, Koordinaten, Füllstand, Akku, Ladeleistung- und Zustand, Status, Sperrstatus und letztes Update.],
     [`routes`], [Route mit geordneten Tonnen-IDs, Distanz, Dauer, GeoJSON-Geometrie, Abschlussstatus und optionaler Agentenbegründung.],
     [`security_events`], [Manipulations- oder Fremdnutzungsereignisse mit Tonne, Typ, Zeitstempel und Quittierungsstatus.],
     [`commands`], [Warteschlange für Kommandos an einzelne Tonnen, inklusive Parametern und ACK-Zeitpunkt.],
@@ -542,7 +656,7 @@ Die REST-API ist so aufgebaut, dass sie sowohl vom Frontend als auch später von
     [`/bins`], [Alle Tonnen abrufen, einzelne Tonne abrufen, partielle Statusupdates schreiben.],
     [`/routes`], [Route planen, letzte Route abrufen und Route als abgeschlossen markieren.],
     [`/security`], [Sicherheitsereignisse abrufen oder erzeugen, Tonne sperren, entsperren und Alerts quittieren.],
-    [`/energy`], [Akku-, Solar- und Ladezustände abrufen, Docking-Status setzen.],
+    [`/energy`], [Akku- und Ladezustände abrufen, Docking-Status setzen.],
     [`/truck`], [Simulierten Truck-Status lesen, Position schreiben und Start/Pause/Stop setzen.],
     [`/bins/{id}/command`], [Kommandos an eine Tonne einreihen, pending Commands pollen und ACKs zurückmelden.],
     [`/agent/chat`], [Server-Sent-Events-Streaming für den Chat-Agenten.],
@@ -577,10 +691,10 @@ Das Frontend basiert auf Next.js 15, React 19, TypeScript, Tailwind CSS 4, React
     [*Bereich*], [*Funktion*],
     [Header], [Titel, Live-Status, Simulationsgeschwindigkeit und Button zur Routenplanung.],
     [AlertBanner], [Roter Warnbereich bei offenen Sicherheitsereignissen.],
-    [FleetPanel], [Liste aller Tonnen sortiert nach Füllstand mit Akku, Solar und Sperrstatus.],
+    [FleetPanel], [Liste aller Tonnen sortiert nach Füllstand mit Akku- und Ladezustandsanzeige und Sperrstatus.],
     [MapView], [OpenStreetMap-Karte mit Tonnenmarkern, Depot, Route und animiertem Truck.],
     [Chat], [Streaming-Chat mit Tool-Call-Anzeige und Quick Prompts.],
-    [Energie], [Gesamtsolarleistung, durchschnittlicher Akku und Detailwerte je Tonne.],
+    [Energie], [Gesamt Ladeleistung, durchschnittlicher Akkustand und Detailwerte je Tonne.],
     [Sicherheit], [Offene Ereignisse, Sperren und Quittieren.],
   ),
   caption: [Frontend-Komponenten],
@@ -613,8 +727,8 @@ Die Simulatoren ermöglichen eine vollständige Demo ohne angeschlossene Hardwar
     columns: (1.7fr, 3.1fr),
     [*Script*], [*Simuliertes Verhalten*],
     [`mock_bins.py`], [Füllstände steigen langsam an und skalieren mit der Demo-Geschwindigkeit.],
-    [`mock_energy.py`], [Solarleistung folgt einer Tageszeit-Sinuskurve, Akkus laden oder entladen sich.],
-    [`mock_security.py`], [Erzeugt zufällige Manipulations- oder Fremdnutzungsereignisse.],
+    [`mock_energy.py`], [Ladeleistung folgt einer Sinuskurve, Akkus laden oder entladen sich.],
+    [`mock_security.py`], [Erzeugt zufällige Öffnungs- oder Fremdnutzungsereignisse.],
     [`mock_truck.py`], [Fährt entlang der letzten OSRM-Route, leert Tonnen beim Erreichen und markiert die Route als abgeschlossen.],
   ),
   caption: [Simulationsbausteine],
@@ -640,13 +754,13 @@ Beispielhafte Statusdaten:
 }
 ```
 
-Optionale Energiedaten können Solarleistung und Ladezustand ergänzen:
+Optionale Energiedaten können Ladeleistung und Ladezustand ergänzen:
 
 ```json
 {
   "fill_level": 87,
   "battery": 64,
-  "solar_output_w": 11.4,
+  "charging_output_w": 11.4,
   "is_charging": true
 }
 ```
@@ -675,7 +789,7 @@ Die Notion-Koordination teilt das Projekt in vier Arbeitsbereiche:
   table(
     columns: (1.7fr, 2.4fr, 2fr),
     [*Team*], [*Aufgaben*], [*Personen laut Board*],
-    [Hardware & Mechanik], [Antrieb, Konstruktion, Sensoren, Solar, Elektronik.], [Jan-Lukas, Theresa, Alaeddine],
+    [Hardware & Mechanik], [Antrieb, Konstruktion, Sensoren, Akku, Elektronik.], [Jan-Lukas, Theresa, Alaeddine],
     [Software & System], [Pico-Code, Kommunikation, Backend, Datenverarbeitung, Navigation.], [Jan-Lukas, Jonas, Theresa, Alaeddine],
     [App & UX/UI], [App-Design, User Flows, Touchpanel, Feedbacksysteme, Usability.], [Fulya, Jonas],
     [Konzept & Produktstrategie], [Use Cases, Vision, Flottenmanagement-Konzept, Storytelling.], [Fulya, Jonas],
