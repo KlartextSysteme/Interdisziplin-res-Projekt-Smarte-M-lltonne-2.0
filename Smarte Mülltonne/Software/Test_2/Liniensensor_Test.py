@@ -2,17 +2,24 @@ from machine import Pin
 from time import sleep
 
 # GPIO-Pin des Liniensensors anpassen
-sensor = Pin(28, Pin.IN)
+sensor_1 = Pin(28, Pin.IN)
+sensor_2 = Pin(27, Pin.IN)
 
 print("Starte Liniensensor-Test...")
 
 while True:
-    wert = sensor.value()
+    wert_1 = sensor_1.value()
+    wert_2 = sensor_2.value()
 
-    print("Sensorwert:", wert)
+    print("Sensorwert 1:", wert_1)
+    print("Sensorwert 2:", wert_2)
 
-    if wert == 1:
-        print("Linie erkannt")
+    if wert_1 == 1 and wert_2 == 1:
+        print("Linie 1+2 erkannt")
+    elif wert_1 == 1:
+        print("Linie 1 erkannt")
+    elif wert_2 == 1:
+        print("Linie 2 erkannt")
     else:
         print("keine Linie erkannt")
 
