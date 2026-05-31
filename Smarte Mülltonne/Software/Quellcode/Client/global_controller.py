@@ -47,10 +47,13 @@ class GlobalController:
         motor_A=None,
         motor_B=None,
         base_speed=60,
+        # --------------------------------- können raus ---------------------------------
         btn_red=None,
         btn_green=None,
         network_manager=None,
-        obstacle_sensor=None,
+        obstacle_sensor_front=None,
+        obstacle_sensor_left=None,
+        obstacle_sensor_right=None,
         buzzer=None,
         pivot_use_line_counter=True,
         pivot_center_count_target=3
@@ -72,12 +75,25 @@ class GlobalController:
         self._default_trim_A = motor_A.trim_factor if motor_A else 1.0
         self._default_trim_B = motor_B.trim_factor if motor_B else 1.0
 
+        # --------------------------------- können raus ---------------------------------
         # Buttons
         self.btn_red = btn_red
         self.btn_green = btn_green
 
-        # Hinderniserkennung
-        self.obstacle_sensor = obstacle_sensor
+        # Hinderniserkennung vorne
+        self.obstacle_sensor_front = obstacle_sensor_front
+        self.previous_state_before_obstacle = None # Um nach Hindernis in alten Zustand zurückzukehren
+        self.obstacle_clear_counter = 0
+        self.OBSTACLE_CLEAR_NEEDED = 30 # Anzahl Samples ohne Hindernis, bis weitergefahren wird
+
+        # Hinderniserkennung links
+        self.obstacle_sensor_left = obstacle_sensor_left
+        self.previous_state_before_obstacle = None # Um nach Hindernis in alten Zustand zurückzukehren
+        self.obstacle_clear_counter = 0
+        self.OBSTACLE_CLEAR_NEEDED = 30 # Anzahl Samples ohne Hindernis, bis weitergefahren wird
+
+        # Hinderniserkennung rechts
+        self.obstacle_sensor_right = obstacle_sensor_right
         self.previous_state_before_obstacle = None # Um nach Hindernis in alten Zustand zurückzukehren
         self.obstacle_clear_counter = 0
         self.OBSTACLE_CLEAR_NEEDED = 30 # Anzahl Samples ohne Hindernis, bis weitergefahren wird
@@ -861,16 +877,16 @@ class GlobalController:
     # SENSOREN / LOGIK
     # =========================================================================
 
-    def _check_obstacle(self):
+    def _check_obstacle_front(self):
         """
-        Prüft den Ultraschallsensor auf Hindernisse in Fahrtrichtung.
+        Prüft den Ultraschallsensor vorne auf Hindernisse in Fahrtrichtung.
         Löst bei < 30cm den OBSTACLE-Zustand aus.
         """
-        if not self.obstacle_sensor:
+        if not self.obstacle_sensor_front:
             return False
 
-        self.obstacle_sensor.run() # Trigger Messung
-        dist = self.obstacle_sensor.read_distance_cm()
+        self.obstacle_sensor_front.run() # Trigger Messung
+        dist = self.obstacle_sensor_front.read_distance_cm()
         if dist is not None and dist < 30.0:
             self.previous_state_before_obstacle = self.state
             self.obstacle_clear_counter = 0
@@ -1196,7 +1212,7 @@ class GlobalController:
         """Logik während der Fahrt auf der Linie."""
         
         # 1. Priorität: Hindernisse?
-        if self._check_obstacle():
+        if self._check_obstacle_front():
             return
 
         # 2. Priorität: Ziel erreicht? (Alle Sensoren aktiv -> Querlinie)
@@ -1241,7 +1257,7 @@ class GlobalController:
 
     def _logic_line_lost(self):
         """Logik wenn die Linie verloren wurde (Suchmodus)."""
-        if self._check_obstacle():
+        if self._check_obstacle_front():
             return
 
         # Linie wieder da -> zurück in Regelbetrieb
@@ -1271,15 +1287,15 @@ class GlobalController:
         """Logik wenn ein Hindernis erkannt wurde."""
         self._stop_motors() # Erstmal stehen bleiben
 
-        if not self.obstacle_sensor:
+        if not self.obstacle_sensor_front:
             self.set_pico_state(self.STATE_LINE_FOLLOWING)
             return
 
-        self.obstacle_sensor.run()
+        self.obstacle_sensor_front.run()
 
         # Prüfen, ob Weg wieder frei ist
-        if self.obstacle_sensor.has_new_sample():
-            dist = self.obstacle_sensor.read_distance_cm()
+        if self.obstacle_sensor_front.has_new_sample():
+            dist = self.obstacle_sensor_front.read_distance_cm()
             if dist is None or dist > 35.0:
                 self.obstacle_clear_counter += 1 # Zähler hochzählen (Entprellung)
             else:

@@ -70,7 +70,7 @@ enable_B.freq(FREQUENCY)
 motor_A = DCMotor(pin1_A, pin2_A, enable_A, MINDUTY_A, 65535, TRIM_MOTOR_A, name="MOTOR_A", debug=False)
 motor_B = DCMotor(pin1_B, pin2_B, enable_B, MINDUTY_B, 65535, TRIM_MOTOR_B, name="MOTOR_B", debug=False)
 
-
+# --------------------------------- können raus ---------------------------------
 # Buttons
 btn_red = Button(0)     # Roter Button (GPIO 0) für Pause/Reset
 btn_green = Button(1)   # Grüner Button (GPIO 1) für Start/Resume
@@ -80,6 +80,7 @@ sensor_array = Liniensensor(8, 9, 10, 11, 12, pull=Pin.PULL_UP)
 # PD-Regler für die Linienverfolgung initialisieren
 pd_controller = PDController(KP_WERT, KD_WERT, max_correction=55)
 
+# --------------------------------- können raus ---------------------------------
 # LEDs
 server_led = LED(16, 17, 18)   # RGB-LED für Server-Status
 pico_led = LED(19, 20, 21)     # RGB-LED für Pico-Status
@@ -87,9 +88,11 @@ pico_led_sm = LEDStateMachine(pico_led)              # Zustandsmaschine für Pic
 connection_led_sm = ConnectionLEDStateMachine(server_led) # Zustandsmaschine für Netzwerk-LED
 
 # Ultraschall-Sensoren
-# HCSR04P ist eine angepasste Klasse für den Sensor
+# HCSR04P ist eine angepasste Klasse für die Sensoren
 ultra = HCSR04P(trigger_pin=22, echo_pin=26, interval_ms=250, timeout_us=30_000) # Füllstand
-obstacle_sensor = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis
+obstacle_sensor_front = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis vorne
+obstacle_sensor_right = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis rechts
+obstacle_sensor_left = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis links
 
 # Wrapper für den Füllstandssensor (berechnet Prozentwerte)
 fuell = FuellstandSensor(
@@ -115,9 +118,12 @@ global_controller = GlobalController(
     motor_A=motor_A,
     motor_B=motor_B,
     base_speed=BASE_SPEED,
+    # --------------------------------- kann raus ---------------------------------
     btn_red=btn_red,
     btn_green=btn_green,
-    obstacle_sensor=obstacle_sensor,
+    obstacle_sensor_front=obstacle_sensor_front,
+    obstacle_sensor_left=obstacle_sensor_left,
+    obstacle_sensor_right=obstacle_sensor_right,
     buzzer=buzzer,
     pivot_use_line_counter=PIVOT_LINE_COUNTER_ENABLED,
     pivot_center_count_target=PIVOT_TARGET_CENTER_COUNT
