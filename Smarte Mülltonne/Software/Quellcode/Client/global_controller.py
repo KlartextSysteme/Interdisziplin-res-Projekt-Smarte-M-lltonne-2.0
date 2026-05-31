@@ -14,6 +14,10 @@ class GlobalController:
     STATE_LINE_FOLLOWING = "LINE_FOLLOWING"
     STATE_OBSTACLE = "OBSTACLE"
     STATE_USER_PAUSED = "USER_PAUSED"
+    STATE_AVOID_SEARCH_RIGHT = "AVOID_SEARCH_RIGHT"
+    STATE_AVOID_SEARCH_LEFT = "AVOID_SEARCH_LEFT"
+    STATE_AVOID_NOT_POSSIBLE = "AVOID_NOT_POSSIBLE"
+    STATE_AVOID_START = "AVOID_START"
     STATE_LINE_LOST = "LINE_LOST"
     STATE_ARRIVED = "ARRIVED"            # Kurzzeitiger Zustand beim Erreichen eines Ziels (Drehung)
     STATE_WAIT_AT_STREET = "WAIT_AT_STREET"
@@ -97,6 +101,12 @@ class GlobalController:
         self.previous_state_before_obstacle = None # Um nach Hindernis in alten Zustand zurückzukehren
         self.obstacle_clear_counter = 0
         self.OBSTACLE_CLEAR_NEEDED = 30 # Anzahl Samples ohne Hindernis, bis weitergefahren wird
+
+        self.avoid_direction = None
+        self.avoid_clear_counter = 0
+        self.AVOID_CLEAR_NEEDED = 3
+        self.avoid_blocked_counter = 0
+        self.AVOID_BLOCKED_NEEDED = 3
 
         # Füllstandssensorik
         self.fuellstand_sensor = None
@@ -890,9 +900,41 @@ class GlobalController:
         if dist is not None and dist < 30.0:
             self.previous_state_before_obstacle = self.state
             self.obstacle_clear_counter = 0
-            self.set_pico_state(self.STATE_OBSTACLE)
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter = 0
+            self.set_pico_state(self.STATE_AVOID_SEARCH_LEFT)
             return True
         return False
+    
+    def _read_ultrasonic_once(self, sensor):
+        """
+        Ruft einen Ultraschallsensor zyklisch auf und gibt einen neuen Messwert zurück.
+        Rückgabe:
+        - Zahl in cm: gültige Messung
+        - None: kein neuer Messwert oder Timeout
+        """
+        if not sensor:
+            return None
+
+        sensor.run()
+
+        if not sensor.has_new_sample():
+            return None
+
+        return sensor.read_distance_cm()
+
+    def _is_side_clear(self, sensor, clear_distance_cm=35.0):
+        """
+        Prüft, ob eine Seite frei ist.
+        True bedeutet: Sensor misst nichts oder Abstand ist größer als Grenzwert.
+        False bedeutet: Hindernis ist zu nah.
+        """
+        dist = self._read_ultrasonic_once(sensor)
+
+        if dist is None:
+            return False
+
+        return dist > clear_distance_cm
 
     def _check_all_sensors_active(self):
         """
@@ -1191,6 +1233,14 @@ class GlobalController:
             self._logic_line_lost()
         elif self.state == self.STATE_OBSTACLE:
             self._logic_obstacle()
+        elif self.state == self.STATE_AVOID_SEARCH_RIGHT:
+            self._logic_avoid_search_right()
+        elif self.state == self.STATE_AVOID_SEARCH_LEFT:
+            self._logic_avoid_search_left()
+        elif self.state == self.STATE_AVOID_NOT_POSSIBLE:
+            self._logic_avoid_not_possible()
+        elif self.state == self.STATE_AVOID_START:
+            self._logic_avoid_start()
         elif self.state == self.STATE_ARRIVED:
             self._logic_arrived()
         elif self.state == self.STATE_STANDBY:
@@ -1282,6 +1332,67 @@ class GlobalController:
                 self._stop_motors()
                 self.set_pico_state(self.STATE_STANDBY)
 
+    def _logic_avoid_search_right(self):
+        self._stop_motors()
+
+        if self._is_side_clear(self.obstacle_sensor_right):
+            self.avoid_clear_counter += 1
+            self.avoid_blocked_counter = 0
+        else:
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter += 1
+
+        if self.avoid_clear_counter >= self.AVOID_CLEAR_NEEDED:
+            self.avoid_direction = "RIGHT"
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter = 0
+            print("[AVOID] Weg rechts frei")
+            self.set_pico_state(self.STATE_AVOID_START)
+            return
+
+        if self.avoid_blocked_counter >= self.AVOID_BLOCKED_NEEDED:
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter = 0
+            self.set_pico_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
+
+    def _logic_avoid_search_left(self):
+        self._stop_motors()
+
+        if self._is_side_clear(self.obstacle_sensor_left):
+            self.avoid_clear_counter += 1
+            self.avoid_blocked_counter = 0
+        else:
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter += 1
+
+        if self.avoid_clear_counter >= self.AVOID_CLEAR_NEEDED:
+            self.avoid_direction = "LEFT"
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter = 0
+            print("[AVOID] Weg links frei")
+            self.set_pico_state(self.STATE_AVOID_START)
+            return
+
+        if self.avoid_blocked_counter >= self.AVOID_BLOCKED_NEEDED:
+            self.avoid_clear_counter = 0
+            self.avoid_blocked_counter = 0
+            self.set_pico_state(self.STATE_AVOID_SEARCH_RIGHT)
+            return
+
+    def _logic_avoid_not_possible(self):
+        self._stop_motors()
+
+    def _logic_avoid_start(self):
+        self._stop_motors()
+
+        if self.avoid_direction == "LEFT":
+            print("[AVOID] Starte Umfahrung links")
+        elif self.avoid_direction == "RIGHT":
+            print("[AVOID] Starte Umfahrung rechts")
+        else:
+            self.set_pico_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
 
     def _logic_obstacle(self):
         """Logik wenn ein Hindernis erkannt wurde."""
