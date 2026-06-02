@@ -17,10 +17,10 @@ class Stepper:
 
     # -------- ENABLE / DISABLE --------
     def enable_motor(self):
-        self.enable.value(0)   # A4988: LOW = ON
+        self.enable.value(1)   # A4988: LOW = ON
 
     def disable(self):
-        self.enable.value(1)   # A4988: HIGH = OFF
+        self.enable.value(0)   # A4988: HIGH = OFF
 
     # -------- STEP --------
     def step_once(self):
@@ -37,6 +37,9 @@ class Stepper:
         if self.debug:
             print(self.name, "dir:", direction, "steps:", steps)
 
+        # while True:
+        #     self.step(200)
+        #     sleep(1)
         for _ in range(steps):
             self.step_once()
 
@@ -45,16 +48,16 @@ class Stepper:
 
 # ---------------- TEST ----------------
 
-motor1 = Stepper(dir_pin=10, step_pin=11, enable_pin=12, delay_us=2000, name="Motor 1")
+motor1 = Stepper(dir_pin=10, step_pin=11, enable_pin=12, delay_us=2, name="Motor 1")
 motor2 = Stepper(dir_pin=13, step_pin=14, enable_pin=15, delay_us=2000, name="Motor 2")
 
 while True:
     print("Motor 1 forward")
-    motor1.move(200, 1)
+    motor1.move(2000, 0)
     sleep(1)
 
     print("Motor 1 backward")
-    motor1.move(200, 0)
+    motor1.move(2000, 0)
     sleep(1)
 
     print("Motor 2 forward")
