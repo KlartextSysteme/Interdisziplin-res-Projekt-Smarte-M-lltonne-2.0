@@ -67,3 +67,5 @@ while True:
     print("Motor 2 backward")
     motor2.move(200, 0)
     sleep(1)
+
+    #PWM Objekt hinzufügen für delay, um genauer arbeiten zu können
