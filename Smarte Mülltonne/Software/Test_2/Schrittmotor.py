@@ -50,9 +50,9 @@ motor1 = Stepper(dir_pin=10, step_pin=11, enable_pin=12, delay_us=2, name="Motor
 motor2 = Stepper(dir_pin=13, step_pin=14, enable_pin=15, delay_us=2, name="Motor 2")
 
 while True:
-    print("Motor 1 forward")
-    motor1.move(40000, 1)
-    sleep(1)
+    # print("Motor 1 forward")
+    # motor1.move(40000, 1)
+    # sleep(1)
 
     # print("Motor 1 backward")
     # motor1.move(20000, 0)

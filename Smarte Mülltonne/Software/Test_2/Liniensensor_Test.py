@@ -2,7 +2,7 @@ from machine import Pin
 from time import sleep
 
 # GPIO-Pin des Liniensensors anpassen
-sensor_1 = Pin(28, Pin.IN)
+sensor_1 = Pin(15, Pin.IN)
 sensor_2 = Pin(27, Pin.IN)
 
 print("Starte Liniensensor-Test...")
