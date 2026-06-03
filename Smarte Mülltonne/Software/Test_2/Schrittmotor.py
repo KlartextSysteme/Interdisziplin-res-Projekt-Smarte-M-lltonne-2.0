@@ -37,35 +37,33 @@ class Stepper:
         if self.debug:
             print(self.name, "dir:", direction, "steps:", steps)
 
-        # while True:
-        #     self.step(200)
-        #     sleep(1)
         for _ in range(steps):
             self.step_once()
 
         self.disable()          # Motor wieder ausschalten
 
 
+
 # ---------------- TEST ----------------
 
 motor1 = Stepper(dir_pin=10, step_pin=11, enable_pin=12, delay_us=2, name="Motor 1")
-motor2 = Stepper(dir_pin=13, step_pin=14, enable_pin=15, delay_us=2000, name="Motor 2")
+motor2 = Stepper(dir_pin=13, step_pin=14, enable_pin=15, delay_us=2, name="Motor 2")
 
 while True:
     print("Motor 1 forward")
-    motor1.move(2000, 0)
+    motor1.move(40000, 1)
     sleep(1)
 
-    print("Motor 1 backward")
-    motor1.move(2000, 0)
-    sleep(1)
+    # print("Motor 1 backward")
+    # motor1.move(20000, 0)
+    # sleep(1)
 
     print("Motor 2 forward")
-    motor2.move(200, 1)
+    motor2.move(16550, 1)
     sleep(1)
 
-    print("Motor 2 backward")
-    motor2.move(200, 0)
-    sleep(1)
+    # print("Motor 2 backward")
+    # motor2.move(20000, 0)
+    # sleep(1)
 
     #PWM Objekt hinzufügen für delay, um genauer arbeiten zu können
