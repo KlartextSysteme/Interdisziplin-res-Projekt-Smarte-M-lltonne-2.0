@@ -1,13 +1,18 @@
+from steppermotor import DualStepper
+# --------------------------------- kann raus ---------------------------------
 from dcmotor import DCMotor
+# --------------------------------- kann raus ---------------------------------
 from button import Button
 from liniensensor import Liniensensor
 from PDcontroller import PDController
 from network_manager import NetworkManager
 from network_controller import NetworkController
+# --------------------------------- kann raus ---------------------------------
 from led import LED, LEDStateMachine, ConnectionLEDStateMachine
 from ultraschallsensor import HCSR04P, FuellstandSensor
 from global_controller import GlobalController
 from machine import Pin, PWM
+# --------------------------------- kann raus ---------------------------------
 from buzzer import Buzzer
 
 from time import sleep
@@ -51,6 +56,8 @@ PIVOT_TARGET_CENTER_COUNT = 3
 # HARDWARE SETUP
 # ===================================================================
 
+# --------------------------------- können raus ---------------------------------
+
 MINDUTY_A = 29500    # Minimaler Duty-Cycle, damit Motor A sich dreht (Totzone)
 MINDUTY_B = 27500    # Minimaler Duty-Cycle für Motor B
 
@@ -69,6 +76,20 @@ enable_B.freq(FREQUENCY)
 # Motoren-Objekte erstellen (mit MinDuty-Kalibrierung und Trim)
 motor_A = DCMotor(pin1_A, pin2_A, enable_A, MINDUTY_A, 65535, TRIM_MOTOR_A, name="MOTOR_A", debug=False)
 motor_B = DCMotor(pin1_B, pin2_B, enable_B, MINDUTY_B, 65535, TRIM_MOTOR_B, name="MOTOR_B", debug=False)
+
+
+
+
+drive = DualStepper(
+    left_dir_pin=10,
+    left_step_pin=11,
+    left_enable_pin=12,
+    right_dir_pin=13,
+    right_step_pin=14,
+    right_enable_pin=15,
+    delay_us=2,
+    enable_active_value=1
+)
 
 # --------------------------------- können raus ---------------------------------
 # Buttons

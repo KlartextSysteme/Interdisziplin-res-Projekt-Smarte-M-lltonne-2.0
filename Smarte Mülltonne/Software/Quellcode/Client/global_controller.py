@@ -18,6 +18,7 @@ class GlobalController:
     STATE_AVOID_SEARCH_LEFT = "AVOID_SEARCH_LEFT"
     STATE_AVOID_NOT_POSSIBLE = "AVOID_NOT_POSSIBLE"
     STATE_AVOID_START = "AVOID_START"
+    STATE_AVOID_AFTER_TURN_OUT = "AVOID_AFTER_TURN_OUT"
     STATE_LINE_LOST = "LINE_LOST"
     STATE_ARRIVED = "ARRIVED"            # Kurzzeitiger Zustand beim Erreichen eines Ziels (Drehung)
     STATE_WAIT_AT_STREET = "WAIT_AT_STREET"
@@ -50,6 +51,7 @@ class GlobalController:
         pd_controller=None,
         motor_A=None,
         motor_B=None,
+        drive = None,
         base_speed=60,
         # --------------------------------- können raus ---------------------------------
         btn_red=None,
@@ -71,6 +73,7 @@ class GlobalController:
         self.pd_controller = pd_controller
         self.motor_A = motor_A
         self.motor_B = motor_B
+        self.drive = drive
         self.base_speed = base_speed
         self.buzzer = buzzer
 
@@ -78,6 +81,7 @@ class GlobalController:
         # damit follow_line() den korrekten Wert wiederherstellen kann.
         self._default_trim_A = motor_A.trim_factor if motor_A else 1.0
         self._default_trim_B = motor_B.trim_factor if motor_B else 1.0
+        self.AVOID_STEPS_90 = 16550 # Anzahl Schritte noch anpassen!!!!!!!!!!!!!
 
         # --------------------------------- können raus ---------------------------------
         # Buttons
@@ -774,6 +778,8 @@ class GlobalController:
             self.motor_A.stop()
         if self.motor_B:
             self.motor_B.stop()
+        if self.drive:
+            self.drive.stop()
 
     def _pivot_right_non_blocking(self):
         """
@@ -1241,6 +1247,8 @@ class GlobalController:
             self._logic_avoid_not_possible()
         elif self.state == self.STATE_AVOID_START:
             self._logic_avoid_start()
+        elif self.state == self.STATE_AVOID_AFTER_TURN_OUT:
+            self._logic_avoid_after_turn_out()
         elif self.state == self.STATE_ARRIVED:
             self._logic_arrived()
         elif self.state == self.STATE_STANDBY:
@@ -1386,13 +1394,26 @@ class GlobalController:
     def _logic_avoid_start(self):
         self._stop_motors()
 
-        if self.avoid_direction == "LEFT":
-            print("[AVOID] Starte Umfahrung links")
-        elif self.avoid_direction == "RIGHT":
-            print("[AVOID] Starte Umfahrung rechts")
-        else:
+        if not self.drive:
             self.set_pico_state(self.STATE_AVOID_NOT_POSSIBLE)
             return
+
+        if self.avoid_direction == "LEFT":
+            print("[AVOID] 90 Grad links")
+            self.drive.drehung_90_links(self.AVOID_STEPS_90)
+            self.set_pico_state(self.STATE_AVOID_AFTER_TURN_OUT)
+            return
+
+        if self.avoid_direction == "RIGHT":
+            print("[AVOID] 90 Grad rechts")
+            self.drive.drehung_90_rechts(self.AVOID_STEPS_90)
+            self.set_pico_state(self.STATE_AVOID_AFTER_TURN_OUT)
+            return
+
+        self.set_pico_state(self.STATE_AVOID_NOT_POSSIBLE)
+    
+    def _logic_avoid_after_turn_out(self):
+        self._stop_motors()
 
     def _logic_obstacle(self):
         """Logik wenn ein Hindernis erkannt wurde."""
