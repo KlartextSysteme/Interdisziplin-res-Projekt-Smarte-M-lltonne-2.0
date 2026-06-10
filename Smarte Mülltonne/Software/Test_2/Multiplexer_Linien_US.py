@@ -19,7 +19,10 @@ mux_signal = machine.Pin(15, machine.Pin.IN)
 LINE_CHANNELS = [0, 1, 2, 3, 4]
 US_CHANNELS = [5, 6, 7, 8]
 
-
+# Auswahl des Multiplexer-Kanals
+# Bit-Zahl bilden
+# &1    -> nur erstes Bit von rechts betrachten
+# >>1   -> Binärzahl um 1 nach rechts verschieben
 def select_channel(channel):
     s0.value(channel & 1)
     s1.value((channel >> 1) & 1)
