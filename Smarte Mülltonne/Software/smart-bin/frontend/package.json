@@ -20,6 +20,7 @@
     "react-dom": "19.0.0",
     "react-leaflet": "^5.0.0",
     "recharts": "^2.15.3",
+    "serve": "14.2.6",
     "tailwind-merge": "^3.3.0"
   },
   "devDependencies": {
