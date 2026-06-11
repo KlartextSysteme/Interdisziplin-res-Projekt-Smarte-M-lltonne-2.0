@@ -4,8 +4,8 @@ services:
     runtime: python
     plan: free
     region: frankfurt
-    buildCommand: cd "Smarte Mülltonne/Software/smart-bin/backend" && pip install -r requirements.txt
-    startCommand: cd "Smarte Mülltonne/Software/smart-bin/backend" && uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: cd Smarte*/Software/smart-bin/backend && pip install -r requirements.txt
+    startCommand: cd Smarte*/Software/smart-bin/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
@@ -35,8 +35,8 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: cd "Smarte Mülltonne/Software/smart-bin/frontend" && npm ci && npm run build
-    startCommand: cd "Smarte Mülltonne/Software/smart-bin/frontend" && npm start -- -p $PORT
+    buildCommand: cd Smarte*/Software/smart-bin/frontend && npm ci && npm run build
+    startCommand: cd Smarte*/Software/smart-bin/frontend && npm start -- -p $PORT
     autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
