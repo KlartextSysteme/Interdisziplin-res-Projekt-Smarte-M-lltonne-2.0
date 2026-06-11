@@ -8,6 +8,7 @@
     "start": "node ./node_modules/next/dist/bin/next start"
   },
   "dependencies": {
+    "@next/react-refresh-utils": "15.4.10",
     "@types/leaflet": "^1.9.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
