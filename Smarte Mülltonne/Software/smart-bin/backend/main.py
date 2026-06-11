@@ -5,12 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import init_db
 from routers import bins, routes, security, energy, ws, truck, commands, agent, sim
+from services.truck_simulator import start_truck_simulator, stop_truck_simulator
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    yield
+    truck_task = start_truck_simulator()
+    try:
+        yield
+    finally:
+        await stop_truck_simulator(truck_task)
 
 
 app = FastAPI(
