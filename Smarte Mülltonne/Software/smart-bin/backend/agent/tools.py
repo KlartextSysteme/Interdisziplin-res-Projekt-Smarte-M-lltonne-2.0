@@ -3,7 +3,7 @@ import os
 import httpx
 from langchain_core.tools import tool
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("AGENT_BASE_URL") or f"http://127.0.0.1:{os.getenv('PORT', '8000')}"
 
 
 def _admin_headers() -> dict[str, str]:
@@ -12,13 +12,25 @@ def _admin_headers() -> dict[str, str]:
 
 @tool
 def get_bins() -> str:
-    """Alle Tonnen mit Füllstand, Akku, Solar und Sicherheitsstatus."""
+    """Alle Tonnen mit Füllstand, Akku und Sicherheitsstatus."""
     resp = httpx.get(f"{BASE_URL}/bins", timeout=10)
     resp.raise_for_status()
     data = resp.json()
     if not data:
         return "Keine Tonnen registriert."
-    return json.dumps(data, ensure_ascii=False)
+    cleaned = [
+        {
+            "id": b["id"],
+            "name": b["name"],
+            "address": b["address"],
+            "fill_level": b["fill_level"],
+            "battery": b["battery"],
+            "status": b["status"],
+            "locked": b["locked"],
+        }
+        for b in data
+    ]
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 @tool
@@ -108,12 +120,12 @@ def get_security_events() -> str:
 
 @tool
 def get_energy_status() -> str:
-    """Solar-Ertrag und Akkustände aller Tonnen."""
+    """Akkustände aller Tonnen."""
     resp = httpx.get(f"{BASE_URL}/energy", timeout=10)
     resp.raise_for_status()
     data = resp.json()
     if not data:
-        return "Keine Energiedaten verfügbar."
+        return "Keine Akkudaten verfügbar."
     return json.dumps(data, ensure_ascii=False)
 
 

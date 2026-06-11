@@ -6,8 +6,6 @@ export interface Bin {
   lng: number;
   fill_level: number;       // 0–100 %
   battery: number;          // 0–100 %
-  solar_output_w: number;
-  is_charging: boolean;
   status: "idle" | "en_route" | "emptied" | "locked";
   locked: boolean;
   last_seen: string;        // ISO datetime
@@ -45,8 +43,6 @@ export interface EnergyStatus {
   bin_id: number;
   name: string;
   battery: number;
-  solar_output_w: number;
-  is_charging: boolean;
 }
 
 export interface TruckPosition {

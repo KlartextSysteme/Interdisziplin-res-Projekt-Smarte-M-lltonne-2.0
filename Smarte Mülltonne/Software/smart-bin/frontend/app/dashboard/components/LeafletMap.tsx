@@ -211,7 +211,7 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
               <p className="font-semibold text-slate-900">{bin.name}</p>
               <p className="text-xs text-slate-500">{bin.address}</p>
               <p className="text-xs">Füllstand: <span className="font-medium">{bin.fill_level}%</span></p>
-              <p className="text-xs">Akku: {bin.battery}% · Solar: {bin.solar_output_w.toFixed(1)} W</p>
+              <p className="text-xs">Akku: {bin.battery}%</p>
               <p className="text-xs text-slate-500">Status: {bin.status}{bin.locked ? " · gesperrt" : ""}</p>
             </div>
           </Popup>

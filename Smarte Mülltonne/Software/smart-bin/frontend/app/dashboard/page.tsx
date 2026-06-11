@@ -94,8 +94,6 @@ export default function DashboardPage() {
     bin_id: b.id,
     name: b.name,
     battery: b.battery,
-    solar_output_w: b.solar_output_w,
-    is_charging: b.is_charging,
   }));
 
   const securityEvents = alerts.map((a) => ({ ...a, resolved: false as const }));
@@ -219,7 +217,7 @@ export default function DashboardPage() {
                 {tab === "chat"
                   ? "Chat"
                   : tab === "energy"
-                  ? "Energie"
+                  ? "Akku"
                   : `Sicherheit${alerts.length ? ` (${alerts.length})` : ""}`}
               </button>
             ))}

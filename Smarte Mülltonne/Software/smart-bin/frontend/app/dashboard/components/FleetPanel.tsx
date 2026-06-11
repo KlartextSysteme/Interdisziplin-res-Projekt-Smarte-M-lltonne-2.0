@@ -1,6 +1,6 @@
 "use client";
 
-import { Battery, BatteryLow, Sun, Lock, Trash2 } from "lucide-react";
+import { Battery, BatteryLow, Lock, Trash2 } from "lucide-react";
 import type { Bin } from "@/types";
 
 interface Props {
@@ -60,18 +60,13 @@ export default function FleetPanel({ bins }: Props) {
             </div>
           </div>
 
-          {/* Battery + Solar row */}
+          {/* Battery row */}
           <div className="flex items-center justify-between text-xs text-slate-600">
             <div className="flex items-center gap-1">
               {batteryIcon(b.battery)}
-              <span>{b.battery}%</span>
+              <span>Akku {b.battery}%</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Sun
-                className={`w-3.5 h-3.5 ${b.is_charging ? "text-amber-500" : "text-slate-300"}`}
-              />
-              <span>{b.solar_output_w.toFixed(1)} W</span>
-            </div>
+            <span className="capitalize text-slate-500">{b.status}</span>
           </div>
         </div>
       ))}

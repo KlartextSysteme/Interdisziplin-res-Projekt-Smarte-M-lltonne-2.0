@@ -44,7 +44,6 @@ def _build_live_payload() -> dict:
                 {
                     "id": b.id, "name": b.name, "lat": b.lat, "lng": b.lng,
                     "fill_level": b.fill_level, "battery": b.battery,
-                    "solar_output_w": b.solar_output_w, "is_charging": b.is_charging,
                     "status": b.status, "locked": b.locked,
                 }
                 for b in bins

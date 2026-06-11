@@ -15,8 +15,6 @@ def get_energy(db: Session = Depends(get_db)):
             "bin_id": b.id,
             "name": b.name,
             "battery": b.battery,
-            "solar_output_w": b.solar_output_w,
-            "is_charging": b.is_charging,
         }
         for b in bins
     ]
