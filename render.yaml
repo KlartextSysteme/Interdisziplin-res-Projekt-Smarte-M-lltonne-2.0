@@ -35,7 +35,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: cd Smarte*/Software/smart-bin/frontend && rm -rf node_modules && npm cache clean --force && npm ci --cache /tmp/npm-cache && mkdir -p node_modules/next/dist/compiled/@next/react-refresh-utils && cp -R node_modules/@next/react-refresh-utils/. node_modules/next/dist/compiled/@next/react-refresh-utils/ && node -e "console.log(require.resolve('next/dist/compiled/@next/react-refresh-utils/dist/runtime'))" && npm run build
+    buildCommand: cd Smarte*/Software/smart-bin/frontend && rm -rf node_modules && npm cache clean --force && npm ci --cache /tmp/npm-cache && mkdir -p node_modules/next/dist/compiled/@next/react-refresh-utils node_modules/next/dist/compiled/@babel/runtime && cp -R node_modules/@next/react-refresh-utils/. node_modules/next/dist/compiled/@next/react-refresh-utils/ && cp -R node_modules/@babel/runtime/. node_modules/next/dist/compiled/@babel/runtime/ && node -e "console.log(require.resolve('next/dist/compiled/@next/react-refresh-utils/dist/runtime')); console.log(require.resolve('next/dist/compiled/@babel/runtime/package.json'))" && npm run build
     startCommand: cd Smarte*/Software/smart-bin/frontend && npm start -- -p $PORT
     autoDeployTrigger: commit
     envVars:
