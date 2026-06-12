@@ -4,7 +4,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./smart_bin.db"
     admin_token: str = "changeme"
-    anthropic_api_key: str = ""
     groq_api_key: str = ""
     cors_origins: list[str] = ["*"]
 

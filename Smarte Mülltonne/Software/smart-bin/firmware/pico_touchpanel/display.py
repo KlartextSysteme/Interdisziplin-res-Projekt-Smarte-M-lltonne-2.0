@@ -7,6 +7,7 @@ from config import (
     PIN_DISPLAY_CS,
     PIN_DISPLAY_DC,
     PIN_DISPLAY_RST,
+    PIN_MISO,
     PIN_MOSI,
     PIN_SCK,
     SPI_BAUDRATE,
@@ -23,6 +24,11 @@ BLACK = color565(0, 0, 0)
 WHITE = color565(255, 255, 255)
 GRAY = color565(170, 170, 170)
 DARK = color565(35, 35, 35)
+BG_TOP = color565(57, 57, 57)
+BG_BOTTOM = color565(107, 107, 107)
+PANEL = color565(96, 96, 96)
+PANEL_DARK = color565(70, 70, 70)
+YELLOW = color565(248, 196, 35)
 GREEN = color565(46, 125, 50)
 ORANGE = color565(230, 126, 0)
 RED = color565(198, 40, 40)
@@ -34,6 +40,9 @@ FONT = {
     "%": (17, 2, 4, 8, 17),
     "/": (1, 2, 4, 8, 16),
     "-": (0, 0, 14, 0, 0),
+    ":": (0, 4, 0, 0, 4),
+    "*": (0, 21, 14, 21, 0),
+    "#": (10, 31, 10, 31, 10),
     ".": (0, 0, 0, 0, 4),
     "0": (14, 17, 19, 21, 14),
     "1": (4, 12, 4, 4, 14),
@@ -67,6 +76,7 @@ FONT = {
     "U": (17, 17, 17, 17, 14),
     "V": (17, 17, 17, 10, 4),
     "W": (17, 17, 21, 27, 17),
+    "X": (17, 10, 4, 10, 17),
     "Y": (17, 10, 4, 4, 4),
     "Z": (31, 2, 4, 8, 31),
 }
@@ -81,6 +91,7 @@ class ILI9341:
             phase=0,
             sck=Pin(PIN_SCK),
             mosi=Pin(PIN_MOSI),
+            miso=Pin(PIN_MISO),
         )
         self.cs = Pin(PIN_DISPLAY_CS, Pin.OUT, value=1)
         self.dc = Pin(PIN_DISPLAY_DC, Pin.OUT, value=1)

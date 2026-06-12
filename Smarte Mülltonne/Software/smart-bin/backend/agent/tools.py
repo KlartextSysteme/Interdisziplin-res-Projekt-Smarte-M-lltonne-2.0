@@ -3,7 +3,26 @@ import os
 import httpx
 from langchain_core.tools import tool
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("AGENT_BASE_URL") or f"http://127.0.0.1:{os.getenv('PORT', '8000')}"
+
+
+def _bin_status_label(status: str, locked: bool = False) -> str:
+    if locked:
+        return "Gesperrt"
+    return {
+        "idle": "Bereit",
+        "en_route": "Unterwegs",
+        "emptied": "Geleert",
+        "locked": "Gesperrt",
+    }.get(status, status)
+
+
+def _security_event_label(event_type: str) -> str:
+    return {
+        "tamper": "Manipulationsalarm",
+        "theft_attempt": "Diebstahlversuch",
+        "unauthorized_open": "Unbefugtes Öffnen",
+    }.get(event_type, event_type)
 
 
 def _admin_headers() -> dict[str, str]:
@@ -12,13 +31,25 @@ def _admin_headers() -> dict[str, str]:
 
 @tool
 def get_bins() -> str:
-    """Alle Tonnen mit Füllstand, Akku, Solar und Sicherheitsstatus."""
+    """Alle Tonnen mit Füllstand, Akku und Sicherheitsstatus."""
     resp = httpx.get(f"{BASE_URL}/bins", timeout=10)
     resp.raise_for_status()
     data = resp.json()
     if not data:
         return "Keine Tonnen registriert."
-    return json.dumps(data, ensure_ascii=False)
+    cleaned = [
+        {
+            "id": b["id"],
+            "name": b["name"],
+            "adresse": b["address"],
+            "fuellstand_prozent": b["fill_level"],
+            "akku_prozent": b["battery"],
+            "status": _bin_status_label(b["status"], b["locked"]),
+            "gesperrt": b["locked"],
+        }
+        for b in data
+    ]
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 @tool
@@ -103,18 +134,36 @@ def get_security_events() -> str:
     events = resp.json()
     if not events:
         return "Keine offenen Sicherheitsmeldungen."
-    return json.dumps(events, ensure_ascii=False)
+    cleaned = [
+        {
+            "id": e["id"],
+            "tonne_id": e["bin_id"],
+            "meldung": _security_event_label(e["event_type"]),
+            "zeitpunkt": e["timestamp"],
+            "quittiert": e.get("resolved", False),
+        }
+        for e in events
+    ]
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 @tool
 def get_energy_status() -> str:
-    """Solar-Ertrag und Akkustände aller Tonnen."""
+    """Akkustände aller Tonnen."""
     resp = httpx.get(f"{BASE_URL}/energy", timeout=10)
     resp.raise_for_status()
     data = resp.json()
     if not data:
-        return "Keine Energiedaten verfügbar."
-    return json.dumps(data, ensure_ascii=False)
+        return "Keine Akkudaten verfügbar."
+    cleaned = [
+        {
+            "tonne_id": e["bin_id"],
+            "name": e["name"],
+            "akku_prozent": e["battery"],
+        }
+        for e in data
+    ]
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 ALL_TOOLS = [

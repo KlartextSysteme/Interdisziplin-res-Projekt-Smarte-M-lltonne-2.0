@@ -1,24 +1,33 @@
+import time
+
 from config import MAINTENANCE_PIN
-from display import BLACK, BLUE, DARK, GRAY, GREEN, ORANGE, RED, WHITE
+from display import color565
+from wireframe import WireframeRenderer
 
 
 SCREEN_STATUS = "status"
-SCREEN_OPEN = "open"
-SCREEN_LID_OPEN = "lid_open"
-SCREEN_REPORT = "report"
-SCREEN_MAINTENANCE = "maintenance"
-SCREEN_REPORTED = "reported"
 SCREEN_PIN = "pin"
-SCREEN_LOCKED = "locked"
+SCREEN_MENU_1 = "menu_1"
+SCREEN_MENU_2 = "menu_2"
+SCREEN_SUBMENU = "submenu"
+SCREEN_DIAGNOSE = "diagnose"
+SCREEN_CONFIRM = "confirm"
+
+CONFIRM_MS = 1_500
+SCREEN_W = 320
+SCREEN_H = 240
+
+BIN_BODY = color565(104, 106, 102)
+BIN_LABEL = color565(204, 204, 200)
+ASSET_KEY = color565(255, 0, 255)
 
 
 class Button:
-    def __init__(self, x, y, w, h, label, action):
+    def __init__(self, x, y, w, h, action):
         self.x = x
         self.y = y
         self.w = w
         self.h = h
-        self.label = label
         self.action = action
 
     def contains(self, x, y):
@@ -26,24 +35,60 @@ class Button:
 
 
 class TouchUi:
-    def __init__(self, display):
+    def __init__(self, display, action_handler=None):
         self.d = display
-        self.screen = SCREEN_STATUS
-        self.fill_level = 68
-        self.battery = 92
-        self.locked = False
-        self.pin = ""
+        self.r = WireframeRenderer(display)
+        self.action_handler = action_handler
         self.buttons = []
 
-    def set_status(self, fill_level=None, battery=None, locked=None):
+        self.screen = SCREEN_STATUS
+        self.pin = ""
+        self.menu_page = 1
+        self.submenu = None
+        self.confirm_asset = "confirm_generic"
+        self.confirm_return = SCREEN_MENU_1
+        self.confirm_until = 0
+
+        self.status_kind = "full_home"
+        self.location = "home"
+        self.connected = True
+        self.locked = False
+        self.fill_level = 54
+        self.line_ok = True
+        self.obstacle_cm = None
+        self.light_mode = False
+
+    def set_status(
+        self,
+        fill_level=None,
+        connected=None,
+        location=None,
+        locked=None,
+        line_ok=None,
+        obstacle_cm=None,
+        status_kind=None,
+        light_mode=None,
+        **_unused
+    ):
         if fill_level is not None:
             self.fill_level = max(0, min(100, int(fill_level)))
-        if battery is not None:
-            self.battery = max(0, min(100, int(battery)))
+        if connected is not None:
+            self.connected = bool(connected)
+        if location is not None:
+            self.location = location
         if locked is not None:
             self.locked = bool(locked)
-        if self.locked:
-            self.screen = SCREEN_LOCKED
+        if line_ok is not None:
+            self.line_ok = bool(line_ok)
+        if obstacle_cm is not None:
+            self.obstacle_cm = obstacle_cm
+        if status_kind is not None:
+            self.status_kind = status_kind
+        if light_mode is not None:
+            self.light_mode = bool(light_mode)
+
+        if self.screen in (SCREEN_STATUS, SCREEN_DIAGNOSE):
+            self.draw()
 
     def go(self, screen):
         self.screen = screen
@@ -51,7 +96,18 @@ class TouchUi:
             self.pin = ""
         self.draw()
 
+    def tick(self):
+        if self.screen == SCREEN_CONFIRM and self.confirm_until:
+            if time.ticks_diff(time.ticks_ms(), self.confirm_until) >= 0:
+                self.confirm_until = 0
+                self.go(self.confirm_return)
+
     def handle_touch(self, x, y):
+        if self.screen == SCREEN_CONFIRM:
+            self.confirm_until = 0
+            self.go(self.confirm_return)
+            return True
+
         for button in self.buttons:
             if button.contains(x, y):
                 self.handle_action(button.action)
@@ -59,189 +115,220 @@ class TouchUi:
         return False
 
     def handle_action(self, action):
-        if action == "next_from_status":
-            self.go(SCREEN_OPEN)
-        elif action == "back_status":
-            self.go(SCREEN_STATUS)
-        elif action == "open_lid":
-            # Servo action will be connected in main.py.
-            self.go(SCREEN_LID_OPEN)
-        elif action == "close_lid_confirm":
-            self.go(SCREEN_STATUS)
-        elif action == "report":
-            self.go(SCREEN_REPORT)
-        elif action == "maintenance":
+        if action == "pin":
             self.go(SCREEN_PIN)
-        elif action == "report_damaged":
-            self.go(SCREEN_REPORTED)
-        elif action == "report_hygiene":
-            self.go(SCREEN_REPORTED)
-        elif action == "pin_back":
-            self.go(SCREEN_OPEN)
-        elif action == "pin_ok":
+        elif action == "status":
+            self.go(SCREEN_STATUS)
+        elif action == "toggle_theme":
+            self.light_mode = not self.light_mode
+            self.draw()
+        elif action == "menu_1":
+            self.menu_page = 1
+            self.go(SCREEN_MENU_1)
+        elif action == "menu_2":
+            self.menu_page = 2
+            self.go(SCREEN_MENU_2)
+        elif action == "diag":
+            self.go(SCREEN_DIAGNOSE)
+        elif action.startswith("submenu:"):
+            self.submenu = action.split(":", 1)[1]
+            self.go(SCREEN_SUBMENU)
+        elif action.startswith("pin_"):
+            self._handle_pin_action(action[4:])
+        elif action.startswith("do:"):
+            self._perform_action(action.split(":", 1)[1])
+
+    def _handle_pin_action(self, key):
+        if key == "back":
+            self.go(SCREEN_STATUS)
+            return
+        if key == "clear":
+            self.pin = ""
+            self.draw_pin()
+            return
+        if key == "ok":
             if self.pin == MAINTENANCE_PIN:
-                self.go(SCREEN_MAINTENANCE)
+                self.menu_page = 1
+                self.go(SCREEN_MENU_1)
             else:
                 self.pin = ""
-                self.draw_pin(error=True)
-        elif action.startswith("pin_"):
-            if len(self.pin) < 4:
-                self.pin += action[-1]
+                self.draw_pin()
+            return
+        if len(self.pin) < 4 and key in "0123456789":
+            self.pin += key
             self.draw_pin()
+
+    def _perform_action(self, action):
+        if action == "lock":
+            self.locked = True
+            asset = "confirm_locked"
+        elif action == "unlock":
+            self.locked = False
+            asset = "confirm_unlocked"
+        elif action == "connect":
+            self.connected = True
+            asset = "confirm_connected"
+        elif action == "disconnect":
+            self.connected = False
+            asset = "confirm_disconnected"
+        else:
+            asset = "confirm_generic"
+
+        if self.action_handler:
+            try:
+                self.action_handler(action)
+            except Exception as exc:
+                print("Action failed:", action, exc)
+
+        self.show_confirm(asset)
+
+    def show_confirm(self, asset="confirm_generic", return_screen=None):
+        self.confirm_asset = asset
+        self.confirm_return = return_screen or self._return_after_action()
+        self.confirm_until = time.ticks_add(time.ticks_ms(), CONFIRM_MS)
+        self.go(SCREEN_CONFIRM)
+
+    def _return_after_action(self):
+        if self.submenu in ("deckel", "fahren", "problem", "power"):
+            return SCREEN_MENU_1
+        if self.submenu in ("sicherheit", "verbindung", "energy"):
+            return SCREEN_MENU_2
+        return SCREEN_STATUS
 
     def draw(self):
-        if self.locked:
-            self.draw_locked()
-        elif self.screen == SCREEN_STATUS:
+        if self.screen == SCREEN_STATUS:
             self.draw_status()
-        elif self.screen == SCREEN_OPEN:
-            self.draw_open()
-        elif self.screen == SCREEN_LID_OPEN:
-            self.draw_success("DECKEL GEOEFFNET", "SCHLIESSEN", "close_lid_confirm")
-        elif self.screen == SCREEN_REPORT:
-            self.draw_report()
-        elif self.screen == SCREEN_MAINTENANCE:
-            self.draw_maintenance()
-        elif self.screen == SCREEN_REPORTED:
-            self.draw_success("PROBLEM GEMELDET", "SCHLIESSEN", "close_lid_confirm")
         elif self.screen == SCREEN_PIN:
             self.draw_pin()
-
-    def base(self, left="", right=""):
-        self.buttons = []
-        self.d.fill_screen(WHITE)
-        self.d.rect(4, 4, 312, 232, BLACK, 2)
-        if left:
-            self.d.text(left, 12, 12, BLACK, 1)
-            self.d.line(12, 25, 98, 25, BLACK, 1)
-        if right:
-            tx = 308 - self.d.text_width(right, 1)
-            self.d.text(right, tx, 12, BLACK, 1)
-            self.d.line(tx, 25, 308, 25, BLACK, 1)
-
-    def draw_arrow_button(self, x, y, direction, action):
-        self.buttons.append(Button(x, y, 58, 56, direction, action))
-        self.d.rect(x, y, 58, 56, BLACK, 2)
-        cy = y + 28
-        if direction == "left":
-            self.d.line(x + 38, cy, x + 18, cy, BLACK, 4)
-            self.d.line(x + 18, cy, x + 30, cy - 12, BLACK, 4)
-            self.d.line(x + 18, cy, x + 30, cy + 12, BLACK, 4)
-        else:
-            self.d.line(x + 20, cy, x + 40, cy, BLACK, 4)
-            self.d.line(x + 40, cy, x + 28, cy - 12, BLACK, 4)
-            self.d.line(x + 40, cy, x + 28, cy + 12, BLACK, 4)
-
-    def draw_big_button(self, x, y, w, h, label, action, scale=3):
-        self.buttons.append(Button(x, y, w, h, label, action))
-        self.d.rect(x, y, w, h, BLACK, 2)
-        tw = self.d.text_width(label, scale)
-        self.d.text(label, x + (w - tw) // 2, y + (h - 7 * scale) // 2, BLACK, scale)
+        elif self.screen == SCREEN_MENU_1:
+            self.draw_menu(1)
+        elif self.screen == SCREEN_MENU_2:
+            self.draw_menu(2)
+        elif self.screen == SCREEN_SUBMENU:
+            self.draw_submenu()
+        elif self.screen == SCREEN_DIAGNOSE:
+            self.draw_diagnose()
+        elif self.screen == SCREEN_CONFIRM:
+            self.draw_confirm()
 
     def draw_status(self):
-        self.base()
-        self.draw_bin_icon(46, 56, 96, 92)
-        self.d.text(str(self.fill_level) + "%", 76, 91, BLACK, 3)
-        self.d.text("FUELLSTAND", 54, 128, DARK, 1)
-        self.d.line(174, 55, 174, 152, GRAY, 1)
-        self.draw_battery_icon(210, 58, self.battery)
-        self.d.text(str(self.battery) + "%", 211, 128, BLACK, 2)
-        self.d.text("AKKU", 222, 150, DARK, 1)
-        self.d.text("FUELLSTAND / AKKU", 54, 190, BLACK, 2)
-        self.draw_arrow_button(252, 92, "right", "next_from_status")
+        self.buttons = [
+            Button(256, 176, 64, 64, "pin"),
+            Button(0, 176, 64, 64, "toggle_theme"),
+        ]
+        asset = "status_full_home_clean"
+        if self.status_kind == "obstacle":
+            asset = "status_obstacle"
+        elif self.status_kind == "help":
+            asset = "status_help"
+        elif self.status_kind == "line_ok":
+            asset = "status_line_ok"
+        elif self.status_kind == "line_lost":
+            asset = "status_line_lost"
+        elif self.location == "truck":
+            asset = "status_full_truck_clean"
+        show_fill = asset in ("status_full_home_clean", "status_full_truck_clean")
+        if self.light_mode:
+            asset += "_light"
+        self.r.draw(asset)
+        self.draw_theme_toggle()
+        if show_fill:
+            self.draw_fill_overlay()
 
-    def draw_open(self):
-        self.base("FUELLSTAND", "PROBLEM MELDEN")
-        self.draw_arrow_button(14, 92, "left", "back_status")
-        self.draw_arrow_button(248, 92, "right", "report")
-        self.draw_open_bin_icon(112, 58)
-        self.draw_big_button(86, 176, 148, 48, "DECKEL", "open_lid", 2)
-        self.d.text("OEFFNEN", 116, 202, BLACK, 2)
+    def draw_theme_toggle(self):
+        asset = "theme_to_dark" if self.light_mode else "theme_to_light"
+        self.r.draw_at_keyed(asset, 10, 190, ASSET_KEY)
 
-    def draw_report(self):
-        self.base("PROBLEM", "WARTUNG")
-        self.draw_arrow_button(14, 92, "left", "back_status")
-        self.draw_arrow_button(248, 92, "right", "maintenance")
-        self.draw_warning_icon(112, 55)
-        self.draw_big_button(72, 176, 176, 48, "PROBLEM", "report_damaged", 2)
-        self.d.text("MELDEN", 124, 202, BLACK, 2)
+    def draw_fill_overlay(self):
+        self.r.draw_at_keyed("fillbar_" + str(self.fill_level), 120, 96, ASSET_KEY)
 
-    def draw_maintenance(self):
-        self.base("WARTUNG")
-        self.draw_arrow_button(14, 42, "left", "back_status")
-        self.draw_big_button(108, 38, 190, 62, "BESCHAEDIGT", "report_damaged", 2)
-        self.draw_big_button(108, 136, 190, 62, "HYGIENE", "report_hygiene", 2)
-        self.draw_big_button(14, 148, 72, 44, "START", "back_status", 1)
+        # Repaint the small label field above the fill area in a 4:3 ratio.
+        self.d.fill_rect(148, 99, 35, 26, BIN_BODY)
+        self.d.fill_rect(151, 101, 28, 21, BIN_LABEL)
 
-    def draw_success(self, message, button_label, action):
-        self.base()
-        self.draw_check_icon(136, 24, 58)
-        tw = self.d.text_width(message, 2)
-        self.d.text(message, (320 - tw) // 2, 106, GREEN, 2)
-        self.draw_big_button(44, 156, 232, 58, button_label, action, 3)
+        self.r.draw_at_keyed("fill_" + str(self.fill_level), 131, 141, BIN_BODY)
 
-    def draw_locked(self):
-        self.base()
-        self.draw_warning_icon(112, 36, RED)
-        self.d.text("TONNE GESPERRT", 70, 132, RED, 2)
-        self.d.text("BITTE PERSONAL RUFEN", 54, 164, BLACK, 1)
-
-    def draw_pin(self, error=False):
-        self.base()
-        self.d.text("PIN", 140, 18, BLACK, 2)
-        if error:
-            self.d.text("FALSCH", 132, 205, RED, 1)
-        for i in range(4):
-            color = BLACK if i < len(self.pin) else GRAY
-            self.d.rect(94 + i * 34, 52, 20, 20, color, 2)
-            if i < len(self.pin):
-                self.d.fill_rect(99 + i * 34, 57, 10, 10, color)
-        labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+    def draw_pin(self):
         self.buttons = []
-        for i, label in enumerate(labels):
-            col = i % 5
-            row = i // 5
-            x = 36 + col * 44
-            y = 92 + row * 48
-            self.buttons.append(Button(x, y, 34, 34, label, "pin_" + label))
-            self.d.rect(x, y, 34, 34, BLUE, 2)
-            self.d.text(label, x + 11, y + 8, BLACK, 2)
-        self.draw_big_button(242, 54, 58, 42, "OK", "pin_ok", 2)
-        self.draw_arrow_button(242, 124, "left", "pin_back")
+        labels = (("1", "2", "3"), ("4", "5", "6"), ("7", "8", "9"), ("*", "0", "#"))
+        for row in range(4):
+            for col in range(3):
+                x = 21 + col * 56
+                y = 43 + row * 49
+                self.buttons.append(Button(x, y, 44, 38, "pin_" + labels[row][col]))
+        self.buttons.append(Button(187, 91, 110, 38, "pin_clear"))
+        self.buttons.append(Button(187, 140, 110, 38, "pin_ok"))
+        self.buttons.append(Button(187, 189, 110, 35, "pin_back"))
+        self.r.draw("pin_" + str(min(4, len(self.pin))))
 
-    def draw_bin_icon(self, x, y, w, h):
-        self.d.rect(x + 8, y + 18, w - 16, h - 18, BLACK, 3)
-        self.d.line(x + 2, y + 18, x + w - 2, y + 18, BLACK, 3)
-        self.d.line(x + 28, y + 4, x + w - 28, y + 4, BLACK, 3)
-        self.d.line(x + 28, y + 4, x + 18, y + 18, BLACK, 3)
-        self.d.line(x + w - 28, y + 4, x + w - 18, y + 18, BLACK, 3)
+    def draw_menu(self, page):
+        self.menu_page = page
+        self.buttons = [Button(0, 0, 36, 36, "status")]
+        items = self._menu_items(page)
+        positions = ((40, 36), (166, 36), (40, 126), (166, 126))
+        for i, key in enumerate(items):
+            x, y = positions[i]
+            action = "diag" if key == "diagnose" else "submenu:" + key
+            self.buttons.append(Button(x, y, 114, 72, action))
+        if page == 1:
+            self.buttons.append(Button(290, 82, 30, 76, "menu_2"))
+            self.r.draw("menu_1")
+        else:
+            self.buttons.append(Button(0, 82, 30, 76, "menu_1"))
+            self.r.draw("menu_2")
 
-    def draw_battery_icon(self, x, y, percent):
-        self.d.rect(x, y, 38, 62, BLACK, 3)
-        self.d.rect(x + 11, y - 8, 16, 8, BLACK, 2)
-        fill_h = int(52 * percent / 100)
-        self.d.fill_rect(x + 6, y + 56 - fill_h, 26, fill_h, GRAY)
-        self.d.line(x + 6, y + 20, x + 32, y + 20, BLACK, 1)
-        self.d.line(x + 6, y + 38, x + 32, y + 38, BLACK, 1)
+    def draw_submenu(self):
+        self.buttons = []
+        defs = self._submenu_defs(self.submenu)
+        for i, (_label, action) in enumerate(defs):
+            self.buttons.append(Button(40 + i * 126, 58, 114, 72, "do:" + action))
+        back = "menu_1" if self.submenu in ("deckel", "fahren", "problem", "power") else "menu_2"
+        self.buttons.append(Button(92, 188, 136, 46, back))
+        self.r.draw(self._submenu_asset(self.submenu))
 
-    def draw_open_bin_icon(self, x, y):
-        self.d.rect(x + 20, y + 52, 96, 58, BLACK, 3)
-        self.d.line(x + 10, y + 50, x + 126, y + 50, BLACK, 4)
-        self.d.line(x + 48, y + 26, x + 88, y + 26, BLACK, 3)
-        self.d.line(x + 48, y + 26, x + 36, y + 50, BLACK, 3)
-        self.d.line(x + 88, y + 26, x + 100, y + 50, BLACK, 3)
-        self.d.line(x + 68, y + 12, x + 68, y - 18, BLACK, 4)
-        self.d.line(x + 68, y - 18, x + 54, y - 4, BLACK, 4)
-        self.d.line(x + 68, y - 18, x + 82, y - 4, BLACK, 4)
+    def draw_diagnose(self):
+        self.buttons = [Button(92, 188, 136, 46, "menu_2")]
+        self.r.draw("diagnose_ok" if self.connected and self.line_ok else "diagnose_alert")
 
-    def draw_warning_icon(self, x, y, color=ORANGE):
-        self.d.line(x + 52, y, x, y + 92, color, 4)
-        self.d.line(x + 52, y, x + 104, y + 92, color, 4)
-        self.d.line(x, y + 92, x + 104, y + 92, color, 4)
-        self.d.line(x + 52, y + 28, x + 52, y + 58, BLACK, 5)
-        self.d.fill_rect(x + 49, y + 72, 7, 7, BLACK)
+    def draw_confirm(self):
+        self.buttons = [Button(0, 0, 320, 240, "confirm_back")]
+        self.r.draw(self.confirm_asset)
 
-    def draw_check_icon(self, x, y, size):
-        self.d.rect(x, y, size, size, GREEN, 3)
-        self.d.line(x + 14, y + 31, x + 25, y + 43, GREEN, 5)
-        self.d.line(x + 25, y + 43, x + 45, y + 16, GREEN, 5)
+    def _menu_items(self, page):
+        if page == 1:
+            return ("deckel", "fahren", "problem", "power")
+        return ("sicherheit", "verbindung", "energy", "diagnose")
+
+    def _submenu_defs(self, key):
+        if key == "deckel":
+            return (("OEFFNEN", "lid_open"), ("SCHLIESSEN", "lid_close"))
+        if key == "fahren":
+            return (("HEIM", "goto_home"), ("ABHOLUNG", "goto_street"))
+        if key == "problem":
+            return (("SCHADEN", "report_damage"), ("HYGIENE", "report_hygiene"))
+        if key == "power":
+            return (("AUS", "shutdown"), ("RESET", "factory_reset"))
+        if key == "sicherheit":
+            return (("ENTSPERREN", "unlock"), ("SPERREN", "lock"))
+        if key == "verbindung":
+            return (("VERBINDEN", "connect"), ("TRENNEN", "disconnect"))
+        if key == "energy":
+            return (("ECO", "eco"), ("DOCK", "goto_dock"))
+        return (("OK", "noop"), ("OK", "noop"))
+
+    def _submenu_asset(self, key):
+        if key == "deckel":
+            return "submenu_lid"
+        if key == "fahren":
+            return "submenu_drive"
+        if key == "problem":
+            return "submenu_problem"
+        if key == "power":
+            return "submenu_power"
+        if key == "sicherheit":
+            return "submenu_security"
+        if key == "verbindung":
+            return "submenu_connection"
+        if key == "energy":
+            return "submenu_energy"
+        return "menu_1"

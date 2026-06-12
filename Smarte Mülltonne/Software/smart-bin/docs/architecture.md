@@ -6,6 +6,10 @@
 > **Stand:** Mai 2026
 > **Scope:** Software-Komponenten unter `smart-bin/` — Backend, Frontend, Simulatoren, Agent, Pico-W-Touchpanel-Konzept
 
+> **Aktueller Agent-Handoff:** siehe `docs/handoff_2026-06-12.md` fuer den
+> neuesten Stand nach Render-Deployment, Groq-Umstellung, Solar-Entfernung aus
+> der UI und die bekannte Truck-Depot-Routing-Baustelle.
+
 ---
 
 ## 1. System-Überblick

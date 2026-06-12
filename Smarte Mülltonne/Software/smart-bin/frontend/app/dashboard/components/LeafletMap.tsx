@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { binStatusLabel, truckActionLabel } from "@/lib/labels";
 import type { Bin, Route, TruckPosition } from "@/types";
 
 // Soest Altstadt centroid (initial fallback)
@@ -21,7 +22,7 @@ function FitToBins({ bins }: { bins: Bin[] }) {
 
 function fillColor(pct: number): string {
   if (pct >= 80) return "#ef4444"; // red-500
-  if (pct >= 50) return "#f59e0b"; // amber-500
+  if (pct >= 50) return "#f2c94c";
   return "#10b981";                 // emerald-500
 }
 
@@ -56,32 +57,56 @@ function binIcon(bin: Bin): L.DivIcon {
  */
 function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
   const markerRef = useRef<L.Marker | null>(null);
+  const initialPositionRef = useRef<[number, number]>([truck.lat, truck.lng]);
+  const initialIconRef = useRef<L.DivIcon>(truckIcon(truck));
   const fromRef = useRef<[number, number]>([truck.lat, truck.lng]);
   const toRef = useRef<[number, number]>([truck.lat, truck.lng]);
   const startRef = useRef<number>(performance.now());
-  const ANIM_MS = 1500;
+  const lastUpdateRef = useRef<number>(performance.now());
+  const durationRef = useRef<number>(1200);
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     const m = markerRef.current;
-    if (m) {
-      const cur = m.getLatLng();
-      fromRef.current = [cur.lat, cur.lng];
-    }
-    toRef.current = [truck.lat, truck.lng];
-    startRef.current = performance.now();
+    if (!m) return;
+    m.setIcon(truckIcon(truck));
+  }, [truck.load_percent]);
 
-    let raf = 0;
-    const tick = () => {
-      const m2 = markerRef.current;
-      if (!m2) return;
-      const t = Math.min(1, (performance.now() - startRef.current) / ANIM_MS);
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) return;
+
+    const target: [number, number] = [truck.lat, truck.lng];
+    const current = marker.getLatLng();
+    const from: [number, number] = [current.lat, current.lng];
+    const now = performance.now();
+    const updateGap = now - lastUpdateRef.current;
+
+    lastUpdateRef.current = now;
+    fromRef.current = from;
+    toRef.current = target;
+    startRef.current = now;
+    durationRef.current = Math.min(1800, Math.max(850, updateGap * 1.15));
+
+    if (Math.abs(from[0] - target[0]) < 0.000001 && Math.abs(from[1] - target[1]) < 0.000001) {
+      marker.setLatLng(target);
+      return;
+    }
+
+    cancelAnimationFrame(rafRef.current);
+
+    const tick = (time: number) => {
+      const m = markerRef.current;
+      if (!m) return;
+      const t = Math.min(1, (time - startRef.current) / durationRef.current);
       const lat = fromRef.current[0] + (toRef.current[0] - fromRef.current[0]) * t;
       const lng = fromRef.current[1] + (toRef.current[1] - fromRef.current[1]) * t;
-      m2.setLatLng([lat, lng]);
-      if (t < 1) raf = requestAnimationFrame(tick);
+      m.setLatLng([lat, lng]);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
   }, [truck.lat, truck.lng]);
 
   return (
@@ -89,13 +114,13 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
       ref={(el) => {
         markerRef.current = el ?? null;
       }}
-      position={[truck.lat, truck.lng]}
-      icon={truckIcon(truck)}
+      position={initialPositionRef.current}
+      icon={initialIconRef.current}
     >
       <Popup>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-900">Müllfahrzeug</p>
-          <p className="text-xs text-slate-500">Status: {truck.action ?? "idle"}</p>
+          <p className="font-semibold text-white">Müllfahrzeug</p>
+          <p className="text-xs text-slate-300">Status: {truckActionLabel(truck.action)}</p>
           {truck.current_bin_id && (
             <p className="text-xs">Aktuelle Tonne: {truck.current_bin_id}</p>
           )}
@@ -115,14 +140,14 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
 
 function truckIcon(truck: TruckPosition): L.DivIcon {
   const loadPct = Math.max(0, Math.min(100, truck.load_percent ?? 0));
-  const barColor = loadPct >= 90 ? "#dc2626" : loadPct >= 70 ? "#f59e0b" : "#10b981";
+  const barColor = loadPct >= 90 ? "#dc2626" : loadPct >= 70 ? "#f2c94c" : "#10b981";
   return L.divIcon({
     className: "",
     html: `
-      <div style="width:42px;height:42px;border-radius:9999px;background:white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;position:relative;">
-        <div style="position:absolute;inset:2px;border-radius:9999px;background:conic-gradient(${barColor} ${loadPct * 3.6}deg,#e2e8f0 0deg);"></div>
-        <div style="width:34px;height:34px;border-radius:9999px;background:#2563eb;border:3px solid white;display:flex;align-items:center;justify-content:center;position:relative;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <div style="width:42px;height:42px;border-radius:9999px;background:#111214;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;position:relative;border:1px solid rgba(242,201,76,0.55);">
+        <div style="position:absolute;inset:2px;border-radius:9999px;background:conic-gradient(${barColor} ${loadPct * 3.6}deg,#31343a 0deg);"></div>
+        <div style="width:34px;height:34px;border-radius:9999px;background:#f2c94c;border:3px solid #171717;display:flex;align-items:center;justify-content:center;position:relative;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 18H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v12"/>
           <path d="M15 18H9"/>
           <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H15"/>
@@ -147,8 +172,8 @@ function depotIcon(): L.DivIcon {
   return L.divIcon({
     className: "",
     html: `
-      <div style="width:28px;height:28px;border-radius:6px;background:#1e293b;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <div style="width:30px;height:30px;border-radius:6px;background:#202328;border:2px solid #f2c94c;box-shadow:0 4px 12px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f2c94c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
           <polyline points="9 22 9 12 15 12 15 22"/>
         </svg>
@@ -187,7 +212,7 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
 
       {/* Real OSRM route — solid blue line following actual streets */}
       {geometryLine.length > 1 && (
-        <Polyline positions={geometryLine} color="#2563eb" weight={5} opacity={0.8} />
+        <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
       )}
 
       {/* Fallback straight line when OSRM unavailable */}
@@ -198,8 +223,8 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
       {depot && (
         <Marker position={[depot.lat, depot.lng]} icon={depotIcon()}>
           <Popup>
-            <p className="font-semibold">{depot.name}</p>
-            <p className="text-xs text-slate-500">Betriebshof</p>
+            <p className="font-semibold text-white">{depot.name}</p>
+            <p className="text-xs text-slate-300">Betriebshof</p>
           </Popup>
         </Marker>
       )}
@@ -208,11 +233,11 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
         <Marker key={bin.id} position={[bin.lat, bin.lng]} icon={binIcon(bin)}>
           <Popup>
             <div className="space-y-1">
-              <p className="font-semibold text-slate-900">{bin.name}</p>
-              <p className="text-xs text-slate-500">{bin.address}</p>
+              <p className="font-semibold text-white">{bin.name}</p>
+              <p className="text-xs text-slate-300">{bin.address}</p>
               <p className="text-xs">Füllstand: <span className="font-medium">{bin.fill_level}%</span></p>
-              <p className="text-xs">Akku: {bin.battery}% · Solar: {bin.solar_output_w.toFixed(1)} W</p>
-              <p className="text-xs text-slate-500">Status: {bin.status}{bin.locked ? " · gesperrt" : ""}</p>
+              <p className="text-xs">Akku: {bin.battery}%</p>
+              <p className="text-xs text-slate-300">Status: {binStatusLabel(bin.status, bin.locked)}</p>
             </div>
           </Popup>
         </Marker>

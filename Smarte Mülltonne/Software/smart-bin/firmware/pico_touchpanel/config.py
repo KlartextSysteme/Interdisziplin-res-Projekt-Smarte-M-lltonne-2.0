@@ -16,6 +16,19 @@ PIN_DISPLAY_RST = 21
 PIN_TOUCH_CS = 22
 PIN_TOUCH_IRQ = None
 
+# XPT2046 calibration from the on-device 5-point calibration.
+# The panel reports swapped axes in landscape rotation 0x28.
+TOUCH_X_MIN = 374
+TOUCH_X_MAX = 3895
+TOUCH_Y_MIN = 273
+TOUCH_Y_MAX = 3857
+TOUCH_SWAP_XY = True
+TOUCH_INVERT_X = True
+TOUCH_INVERT_Y = True
+
+# Optional display backlight pin. Set to the real BL pin when wired.
+PIN_BACKLIGHT = None
+
 # Landscape UI target.
 WIDTH = 320
 HEIGHT = 240
@@ -29,6 +42,8 @@ BIN_ID = 1
 BACKEND_URL = "http://192.168.0.10:8000"
 POLL_COMMAND_MS = 2000
 POST_STATUS_MS = 8000
+ENABLE_BACKEND_ACTIONS = False
+ADMIN_TOKEN = ""
 
 # Local maintenance PIN. Keep numeric for the on-screen keypad.
 MAINTENANCE_PIN = "1234"

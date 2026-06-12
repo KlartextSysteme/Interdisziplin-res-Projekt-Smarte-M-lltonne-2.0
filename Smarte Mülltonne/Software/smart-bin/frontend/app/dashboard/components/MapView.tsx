@@ -7,7 +7,7 @@ import type { Bin, Route, TruckPosition } from "@/types";
 const LeafletMap = dynamic(() => import("./LeafletMap"), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-slate-100 text-slate-500 text-sm">
+    <div className="flex h-full w-full items-center justify-center bg-[#111214] text-sm text-slate-400">
       Karte wird geladen...
     </div>
   ),

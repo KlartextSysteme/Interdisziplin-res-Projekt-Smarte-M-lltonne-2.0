@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { LiveData } from "@/types";
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws/live";
+import { getWebSocketUrl } from "@/lib/runtimeConfig";
 
 export function useLiveData(): LiveData | null {
   const [data, setData] = useState<LiveData | null>(null);
@@ -13,6 +12,7 @@ export function useLiveData(): LiveData | null {
     let isMounted = true;
 
     function connect() {
+      const WS_URL = getWebSocketUrl();
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 

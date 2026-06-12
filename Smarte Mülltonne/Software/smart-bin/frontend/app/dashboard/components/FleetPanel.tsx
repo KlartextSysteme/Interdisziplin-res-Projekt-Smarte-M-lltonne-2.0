@@ -1,6 +1,7 @@
 "use client";
 
-import { Battery, BatteryLow, Sun, Lock, Trash2 } from "lucide-react";
+import { Battery, BatteryLow, Lock, Trash2 } from "lucide-react";
+import { binStatusLabel } from "@/lib/labels";
 import type { Bin } from "@/types";
 
 interface Props {
@@ -9,15 +10,15 @@ interface Props {
 
 function fillColor(pct: number) {
   if (pct >= 80) return "bg-red-500";
-  if (pct >= 50) return "bg-amber-500";
+  if (pct >= 50) return "bg-[#f2c94c]";
   return "bg-emerald-500";
 }
 
 function batteryIcon(pct: number) {
   return pct < 20 ? (
-    <BatteryLow className="w-3.5 h-3.5 text-red-500" />
+    <BatteryLow className="h-3.5 w-3.5 text-red-400" />
   ) : (
-    <Battery className="w-3.5 h-3.5 text-slate-500" />
+    <Battery className="h-3.5 w-3.5 text-slate-400" />
   );
 }
 
@@ -25,8 +26,8 @@ export default function FleetPanel({ bins }: Props) {
   return (
     <aside className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
-        <Trash2 className="w-4 h-4 text-slate-600" />
-        <h2 className="font-semibold text-sm uppercase tracking-wider text-slate-600">
+        <Trash2 className="h-4 w-4 text-[#f2c94c]" />
+        <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
           Flotte · {bins.length}
         </h2>
       </div>
@@ -34,25 +35,30 @@ export default function FleetPanel({ bins }: Props) {
       {bins.map((b) => (
         <div
           key={b.id}
-          className={`rounded-xl border bg-white p-3 shadow-sm transition hover:shadow-md ${
-            b.locked ? "border-red-300 ring-1 ring-red-200" : "border-slate-200"
+          className={`rounded border p-3 transition hover:bg-white/[0.055] ${
+            b.locked ? "border-red-400/50 bg-red-500/10" : "border-white/10 bg-[#202328]"
           }`}
         >
-          <div className="flex items-start justify-between mb-2 gap-2">
+          <div className="mb-3 flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="font-semibold text-sm text-slate-900 truncate">{b.name}</p>
-              <p className="text-xs text-slate-500 truncate">{b.address}</p>
+              <p className="truncate text-sm font-semibold text-white">{b.name}</p>
+              <p className="truncate text-xs text-slate-400">{b.address}</p>
             </div>
-            {b.locked && <Lock className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />}
+            {b.locked ? (
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+            ) : (
+              <span className="rounded bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+                aktiv
+              </span>
+            )}
           </div>
 
-          {/* Fill-level progress bar */}
           <div className="mb-2">
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <div className="mb-1 flex justify-between text-xs text-slate-400">
               <span>Füllstand</span>
-              <span className="font-medium text-slate-900">{b.fill_level}%</span>
+              <span className="font-mono font-semibold text-white">{b.fill_level}%</span>
             </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-2.5 overflow-hidden rounded-full bg-black/35">
               <div
                 className={`h-full ${fillColor(b.fill_level)} transition-all`}
                 style={{ width: `${b.fill_level}%` }}
@@ -60,18 +66,14 @@ export default function FleetPanel({ bins }: Props) {
             </div>
           </div>
 
-          {/* Battery + Solar row */}
-          <div className="flex items-center justify-between text-xs text-slate-600">
+          <div className="flex items-center justify-between text-xs text-slate-400">
             <div className="flex items-center gap-1">
               {batteryIcon(b.battery)}
-              <span>{b.battery}%</span>
+              <span>Akku {b.battery}%</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Sun
-                className={`w-3.5 h-3.5 ${b.is_charging ? "text-amber-500" : "text-slate-300"}`}
-              />
-              <span>{b.solar_output_w.toFixed(1)} W</span>
-            </div>
+            <span className="rounded bg-white/5 px-2 py-0.5 text-slate-300">
+              {binStatusLabel(b.status, b.locked)}
+            </span>
           </div>
         </div>
       ))}

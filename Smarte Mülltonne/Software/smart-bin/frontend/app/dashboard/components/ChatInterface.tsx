@@ -69,7 +69,7 @@ export default function ChatInterface({ onActionComplete }: Props) {
           } else if (event.type === "error") {
             next[next.length - 1] = {
               ...last,
-              content: (last.content || "") + `\n\n⚠️ Fehler: ${event.message}`,
+              content: (last.content || "") + `\n\nFehler: ${event.message}`,
             };
           }
           return next;
@@ -84,7 +84,7 @@ export default function ChatInterface({ onActionComplete }: Props) {
         if (last.role === "assistant") {
           next[next.length - 1] = {
             ...last,
-            content: `⚠️ Verbindung zum Agenten fehlgeschlagen: ${(e as Error).message}`,
+            content: `Verbindung zum Agenten fehlgeschlagen: ${(e as Error).message}`,
           };
         }
         return next;
@@ -95,27 +95,26 @@ export default function ChatInterface({ onActionComplete }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex h-full flex-col">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.map((m, i) => (
           <MessageBubble key={i} message={m} />
         ))}
         {loading && messages[messages.length - 1]?.role === "assistant" && !messages[messages.length - 1].content && (
-          <div className="flex items-center gap-2 text-xs text-slate-500 ml-9">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Agent denkt nach...
+          <div className="ml-9 flex items-center gap-2 text-xs text-slate-400">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Assistent denkt nach...
           </div>
         )}
       </div>
 
-      {/* Quick-Prompt Chips */}
       {messages.length <= 1 && !loading && (
-        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 px-3 pb-2">
           {QUICK_PROMPTS.map((p) => (
             <button
               key={p}
               onClick={() => send(p)}
-              className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full px-3 py-1 transition"
+              className="rounded border border-white/10 bg-white/[0.055] px-3 py-1 text-xs text-slate-300 transition hover:border-[#f2c94c]/40 hover:text-[#f2c94c]"
             >
               {p}
             </button>
@@ -123,21 +122,21 @@ export default function ChatInterface({ onActionComplete }: Props) {
         </div>
       )}
 
-      <div className="flex gap-2 p-3 border-t border-slate-200 bg-white">
+      <div className="flex gap-2 border-t border-white/10 bg-[#151619] p-3">
         <input
-          className="flex-1 rounded-full border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-50"
+          className="h-10 flex-1 rounded border border-white/10 bg-[#202328] px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-[#f2c94c]/70 disabled:bg-[#151619]"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(input)}
-          placeholder={loading ? "Agent arbeitet..." : "Nachricht an Agent..."}
+          placeholder={loading ? "Assistent arbeitet..." : "Nachricht an Assistent..."}
           disabled={loading}
         />
         <button
           onClick={() => send(input)}
           disabled={loading || !input.trim()}
-          className="rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white w-10 h-10 flex items-center justify-center transition shrink-0"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-[#f2c94c] text-[#171717] transition hover:bg-[#ffd866] disabled:bg-slate-700 disabled:text-slate-400"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
     </div>
@@ -147,27 +146,26 @@ export default function ChatInterface({ onActionComplete }: Props) {
 function MessageBubble({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
     return (
-      <div className="flex gap-2 justify-end">
-        <div className="max-w-[75%] rounded-2xl rounded-br-sm bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap">
+      <div className="flex justify-end gap-2">
+        <div className="max-w-[78%] rounded rounded-br-none bg-[#f2c94c] px-3 py-2 text-sm font-medium whitespace-pre-wrap text-[#171717]">
           {message.content}
         </div>
-        <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
-          <User className="w-4 h-4 text-slate-600" />
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#f2c94c]/15">
+          <User className="h-4 w-4 text-[#f2c94c]" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex gap-2 items-start">
-      <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
-        <Bot className="w-4 h-4 text-blue-600" />
+    <div className="flex items-start gap-2">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white/10">
+        <Bot className="h-4 w-4 text-slate-300" />
       </div>
-      <div className="flex-1 space-y-2 min-w-0">
-        {/* Tool cards appear before/between the response text */}
+      <div className="min-w-0 flex-1 space-y-2">
         {message.toolCalls?.map((tc, i) => <ToolCallCard key={i} call={tc} />)}
         {message.content && (
-          <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-slate-100 text-slate-900 px-3 py-2 text-sm whitespace-pre-wrap">
+          <div className="max-w-[88%] rounded rounded-bl-none bg-[#202328] px-3 py-2 text-sm whitespace-pre-wrap text-slate-100">
             {message.content}
           </div>
         )}
@@ -181,30 +179,30 @@ function ToolCallCard({ call }: { call: ToolCall }) {
   const hasInput = Object.keys(call.input).length > 0;
 
   return (
-    <div className="max-w-[85%] rounded-lg border border-slate-200 bg-slate-50 text-xs overflow-hidden">
+    <div className="max-w-[88%] overflow-hidden rounded border border-white/10 bg-[#111214] text-xs">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-100 transition"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 transition hover:bg-white/5"
       >
-        {open ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronRight className="w-3 h-3 text-slate-400" />}
-        <Wrench className="w-3 h-3 text-slate-500" />
-        <span className="font-mono text-slate-700 font-medium">{call.name}</span>
-        {call.status === "pending" && <Loader2 className="w-3 h-3 animate-spin text-slate-400 ml-auto" />}
-        {call.status === "done" && <span className="text-emerald-600 ml-auto">✓</span>}
-        {call.status === "error" && <AlertTriangle className="w-3 h-3 text-red-500 ml-auto" />}
+        {open ? <ChevronDown className="h-3 w-3 text-slate-500" /> : <ChevronRight className="h-3 w-3 text-slate-500" />}
+        <Wrench className="h-3 w-3 text-[#f2c94c]" />
+        <span className="font-mono font-medium text-slate-300">{call.name}</span>
+        {call.status === "pending" && <Loader2 className="ml-auto h-3 w-3 animate-spin text-slate-400" />}
+        {call.status === "done" && <span className="ml-auto text-emerald-300">ok</span>}
+        {call.status === "error" && <AlertTriangle className="ml-auto h-3 w-3 text-red-400" />}
       </button>
       {open && (
-        <div className="border-t border-slate-200 px-2.5 py-2 space-y-1.5 font-mono">
+        <div className="space-y-1.5 border-t border-white/10 px-2.5 py-2 font-mono">
           {hasInput && (
             <div>
-              <span className="text-slate-500">input:</span>{" "}
-              <span className="text-slate-700">{JSON.stringify(call.input)}</span>
+              <span className="text-slate-500">Eingabe:</span>{" "}
+              <span className="text-slate-300">{JSON.stringify(call.input)}</span>
             </div>
           )}
           {call.output !== undefined && (
             <div>
-              <span className="text-slate-500">output:</span>{" "}
-              <span className="text-slate-700 break-all">
+              <span className="text-slate-500">Ausgabe:</span>{" "}
+              <span className="break-all text-slate-300">
                 {call.output.length > 300 ? call.output.slice(0, 300) + "..." : call.output}
               </span>
             </div>

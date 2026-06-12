@@ -1,14 +1,15 @@
 import type { Bin, Route, SecurityEvent, EnergyStatus, ChatMessage } from "@/types";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { getApiBaseUrl } from "@/lib/runtimeConfig";
 
 async function get<T>(path: string): Promise<T> {
+  const BASE = getApiBaseUrl();
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
   return res.json();
 }
 
 async function post<T>(path: string, body?: unknown, headers?: HeadersInit): Promise<T> {
+  const BASE = getApiBaseUrl();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
@@ -42,6 +43,7 @@ export interface SimSpeed {
 export const getSimSpeed = () => get<SimSpeed>("/sim/speed");
 
 async function putSim(body: { speed?: number; paused?: boolean }): Promise<SimSpeed> {
+  const BASE = getApiBaseUrl();
   const res = await fetch(`${BASE}/sim/speed`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -86,6 +88,7 @@ export async function streamChat(
   onEvent: (event: ChatStreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  const BASE = getApiBaseUrl();
   const resp = await fetch(`${BASE}/agent/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
