@@ -68,7 +68,7 @@ class DualStepper:
 # KALIBRIERUNG
 # -------------------------------------------------
 
-STEPS_GERADEAUS_TEST = 5000
+STEPS_GERADEAUS_TEST = 10000
 STEPS_90_GRAD = 16550
 STEPS_180_GRAD = STEPS_90_GRAD * 2
 
@@ -83,14 +83,14 @@ while True:
     motors.geradeaus_fahrt(STEPS_GERADEAUS_TEST)
     sleep(2)
 
-    print("90 Grad links")
-    motors.drehung_90_links()
-    sleep(2)
+    # print("90 Grad links")
+    # motors.drehung_90_links()
+    # sleep(2)
 
-    print("90 Grad rechts")
-    motors.drehung_90_rechts()
-    sleep(2)
+    # print("90 Grad rechts")
+    # motors.drehung_90_rechts()
+    # sleep(2)
 
-    print("180 Grad links")
-    motors.drehung_180_links()
-    sleep(2)
+    # print("180 Grad links")
+    # motors.drehung_180_links()
+    # sleep(2)

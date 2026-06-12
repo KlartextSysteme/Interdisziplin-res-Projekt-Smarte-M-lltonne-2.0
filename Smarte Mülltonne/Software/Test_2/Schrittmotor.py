@@ -54,13 +54,11 @@ while True:
     # motor1.move(40000, 1)
     # sleep(1)
 
-    # print("Motor 1 backward")
-    # motor1.move(20000, 0)
-    # sleep(1)
+    print("Motor 1 backward")
+    motor1.move(20000, 0)
 
     print("Motor 2 forward")
-    motor2.move(16550, 1)
-    sleep(1)
+    motor2.move(20000, 1)
 
     # print("Motor 2 backward")
     # motor2.move(20000, 0)
