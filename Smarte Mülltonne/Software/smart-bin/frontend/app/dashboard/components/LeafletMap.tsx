@@ -57,32 +57,56 @@ function binIcon(bin: Bin): L.DivIcon {
  */
 function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
   const markerRef = useRef<L.Marker | null>(null);
+  const initialPositionRef = useRef<[number, number]>([truck.lat, truck.lng]);
+  const initialIconRef = useRef<L.DivIcon>(truckIcon(truck));
   const fromRef = useRef<[number, number]>([truck.lat, truck.lng]);
   const toRef = useRef<[number, number]>([truck.lat, truck.lng]);
   const startRef = useRef<number>(performance.now());
-  const ANIM_MS = 1500;
+  const lastUpdateRef = useRef<number>(performance.now());
+  const durationRef = useRef<number>(1200);
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     const m = markerRef.current;
-    if (m) {
-      const cur = m.getLatLng();
-      fromRef.current = [cur.lat, cur.lng];
-    }
-    toRef.current = [truck.lat, truck.lng];
-    startRef.current = performance.now();
+    if (!m) return;
+    m.setIcon(truckIcon(truck));
+  }, [truck.load_percent]);
 
-    let raf = 0;
-    const tick = () => {
-      const m2 = markerRef.current;
-      if (!m2) return;
-      const t = Math.min(1, (performance.now() - startRef.current) / ANIM_MS);
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) return;
+
+    const target: [number, number] = [truck.lat, truck.lng];
+    const current = marker.getLatLng();
+    const from: [number, number] = [current.lat, current.lng];
+    const now = performance.now();
+    const updateGap = now - lastUpdateRef.current;
+
+    lastUpdateRef.current = now;
+    fromRef.current = from;
+    toRef.current = target;
+    startRef.current = now;
+    durationRef.current = Math.min(1800, Math.max(850, updateGap * 1.15));
+
+    if (Math.abs(from[0] - target[0]) < 0.000001 && Math.abs(from[1] - target[1]) < 0.000001) {
+      marker.setLatLng(target);
+      return;
+    }
+
+    cancelAnimationFrame(rafRef.current);
+
+    const tick = (time: number) => {
+      const m = markerRef.current;
+      if (!m) return;
+      const t = Math.min(1, (time - startRef.current) / durationRef.current);
       const lat = fromRef.current[0] + (toRef.current[0] - fromRef.current[0]) * t;
       const lng = fromRef.current[1] + (toRef.current[1] - fromRef.current[1]) * t;
-      m2.setLatLng([lat, lng]);
-      if (t < 1) raf = requestAnimationFrame(tick);
+      m.setLatLng([lat, lng]);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
   }, [truck.lat, truck.lng]);
 
   return (
@@ -90,8 +114,8 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
       ref={(el) => {
         markerRef.current = el ?? null;
       }}
-      position={[truck.lat, truck.lng]}
-      icon={truckIcon(truck)}
+      position={initialPositionRef.current}
+      icon={initialIconRef.current}
     >
       <Popup>
         <div className="space-y-1">
