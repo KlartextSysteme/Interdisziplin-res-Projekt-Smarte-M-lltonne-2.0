@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { binStatusLabel, truckActionLabel } from "@/lib/labels";
 import type { Bin, Route, TruckPosition } from "@/types";
 
 // Soest Altstadt centroid (initial fallback)
@@ -21,7 +22,7 @@ function FitToBins({ bins }: { bins: Bin[] }) {
 
 function fillColor(pct: number): string {
   if (pct >= 80) return "#ef4444"; // red-500
-  if (pct >= 50) return "#f59e0b"; // amber-500
+  if (pct >= 50) return "#f2c94c";
   return "#10b981";                 // emerald-500
 }
 
@@ -94,8 +95,8 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
     >
       <Popup>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-900">Müllfahrzeug</p>
-          <p className="text-xs text-slate-500">Status: {truck.action ?? "idle"}</p>
+          <p className="font-semibold text-white">Müllfahrzeug</p>
+          <p className="text-xs text-slate-300">Status: {truckActionLabel(truck.action)}</p>
           {truck.current_bin_id && (
             <p className="text-xs">Aktuelle Tonne: {truck.current_bin_id}</p>
           )}
@@ -115,14 +116,14 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
 
 function truckIcon(truck: TruckPosition): L.DivIcon {
   const loadPct = Math.max(0, Math.min(100, truck.load_percent ?? 0));
-  const barColor = loadPct >= 90 ? "#dc2626" : loadPct >= 70 ? "#f59e0b" : "#10b981";
+  const barColor = loadPct >= 90 ? "#dc2626" : loadPct >= 70 ? "#f2c94c" : "#10b981";
   return L.divIcon({
     className: "",
     html: `
-      <div style="width:42px;height:42px;border-radius:9999px;background:white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;position:relative;">
-        <div style="position:absolute;inset:2px;border-radius:9999px;background:conic-gradient(${barColor} ${loadPct * 3.6}deg,#e2e8f0 0deg);"></div>
-        <div style="width:34px;height:34px;border-radius:9999px;background:#2563eb;border:3px solid white;display:flex;align-items:center;justify-content:center;position:relative;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <div style="width:42px;height:42px;border-radius:9999px;background:#111214;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;position:relative;border:1px solid rgba(242,201,76,0.55);">
+        <div style="position:absolute;inset:2px;border-radius:9999px;background:conic-gradient(${barColor} ${loadPct * 3.6}deg,#31343a 0deg);"></div>
+        <div style="width:34px;height:34px;border-radius:9999px;background:#f2c94c;border:3px solid #171717;display:flex;align-items:center;justify-content:center;position:relative;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 18H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v12"/>
           <path d="M15 18H9"/>
           <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H15"/>
@@ -147,8 +148,8 @@ function depotIcon(): L.DivIcon {
   return L.divIcon({
     className: "",
     html: `
-      <div style="width:28px;height:28px;border-radius:6px;background:#1e293b;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <div style="width:30px;height:30px;border-radius:6px;background:#202328;border:2px solid #f2c94c;box-shadow:0 4px 12px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f2c94c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
           <polyline points="9 22 9 12 15 12 15 22"/>
         </svg>
@@ -187,7 +188,7 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
 
       {/* Real OSRM route — solid blue line following actual streets */}
       {geometryLine.length > 1 && (
-        <Polyline positions={geometryLine} color="#2563eb" weight={5} opacity={0.8} />
+        <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
       )}
 
       {/* Fallback straight line when OSRM unavailable */}
@@ -198,8 +199,8 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
       {depot && (
         <Marker position={[depot.lat, depot.lng]} icon={depotIcon()}>
           <Popup>
-            <p className="font-semibold">{depot.name}</p>
-            <p className="text-xs text-slate-500">Betriebshof</p>
+            <p className="font-semibold text-white">{depot.name}</p>
+            <p className="text-xs text-slate-300">Betriebshof</p>
           </Popup>
         </Marker>
       )}
@@ -208,11 +209,11 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
         <Marker key={bin.id} position={[bin.lat, bin.lng]} icon={binIcon(bin)}>
           <Popup>
             <div className="space-y-1">
-              <p className="font-semibold text-slate-900">{bin.name}</p>
-              <p className="text-xs text-slate-500">{bin.address}</p>
+              <p className="font-semibold text-white">{bin.name}</p>
+              <p className="text-xs text-slate-300">{bin.address}</p>
               <p className="text-xs">Füllstand: <span className="font-medium">{bin.fill_level}%</span></p>
               <p className="text-xs">Akku: {bin.battery}%</p>
-              <p className="text-xs text-slate-500">Status: {bin.status}{bin.locked ? " · gesperrt" : ""}</p>
+              <p className="text-xs text-slate-300">Status: {binStatusLabel(bin.status, bin.locked)}</p>
             </div>
           </Popup>
         </Marker>

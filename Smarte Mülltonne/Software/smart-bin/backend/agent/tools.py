@@ -6,6 +6,25 @@ from langchain_core.tools import tool
 BASE_URL = os.getenv("AGENT_BASE_URL") or f"http://127.0.0.1:{os.getenv('PORT', '8000')}"
 
 
+def _bin_status_label(status: str, locked: bool = False) -> str:
+    if locked:
+        return "Gesperrt"
+    return {
+        "idle": "Bereit",
+        "en_route": "Unterwegs",
+        "emptied": "Geleert",
+        "locked": "Gesperrt",
+    }.get(status, status)
+
+
+def _security_event_label(event_type: str) -> str:
+    return {
+        "tamper": "Manipulationsalarm",
+        "theft_attempt": "Diebstahlversuch",
+        "unauthorized_open": "Unbefugtes Öffnen",
+    }.get(event_type, event_type)
+
+
 def _admin_headers() -> dict[str, str]:
     return {"X-Admin-Token": os.getenv("ADMIN_TOKEN", "changeme")}
 
@@ -22,11 +41,11 @@ def get_bins() -> str:
         {
             "id": b["id"],
             "name": b["name"],
-            "address": b["address"],
-            "fill_level": b["fill_level"],
-            "battery": b["battery"],
-            "status": b["status"],
-            "locked": b["locked"],
+            "adresse": b["address"],
+            "fuellstand_prozent": b["fill_level"],
+            "akku_prozent": b["battery"],
+            "status": _bin_status_label(b["status"], b["locked"]),
+            "gesperrt": b["locked"],
         }
         for b in data
     ]
@@ -115,7 +134,17 @@ def get_security_events() -> str:
     events = resp.json()
     if not events:
         return "Keine offenen Sicherheitsmeldungen."
-    return json.dumps(events, ensure_ascii=False)
+    cleaned = [
+        {
+            "id": e["id"],
+            "tonne_id": e["bin_id"],
+            "meldung": _security_event_label(e["event_type"]),
+            "zeitpunkt": e["timestamp"],
+            "quittiert": e.get("resolved", False),
+        }
+        for e in events
+    ]
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 @tool
@@ -126,7 +155,15 @@ def get_energy_status() -> str:
     data = resp.json()
     if not data:
         return "Keine Akkudaten verfügbar."
-    return json.dumps(data, ensure_ascii=False)
+    cleaned = [
+        {
+            "tonne_id": e["bin_id"],
+            "name": e["name"],
+            "akku_prozent": e["battery"],
+        }
+        for e in data
+    ]
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 ALL_TOOLS = [

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Route as RouteIcon, Loader2, Gauge, Play, Pause } from "lucide-react";
+import type { ComponentType } from "react";
+import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Shield } from "lucide-react";
 import { useLiveData } from "@/lib/useWebSocket";
 import AlertBanner from "./components/AlertBanner";
 import FleetPanel from "./components/FleetPanel";
@@ -98,39 +99,52 @@ export default function DashboardPage() {
 
   const securityEvents = alerts.map((a) => ({ ...a, resolved: false as const }));
 
+  const tabs: { id: Tab; label: string; icon: ComponentType<{ className?: string }> }[] = [
+    { id: "chat", label: "Chat", icon: MessageSquare },
+    { id: "energy", label: "Akku", icon: Battery },
+    { id: "security", label: alerts.length ? `Sicherheit ${alerts.length}` : "Sicherheit", icon: Shield },
+  ];
+
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex h-screen flex-col bg-[#151619] text-slate-100">
       <AlertBanner alerts={alerts} bins={bins} />
 
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm">
-        <h1 className="text-xl font-bold tracking-tight">Smarte Mülltonne 2.0</h1>
+      <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#1e2024] px-5 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         <div className="flex items-center gap-3">
-          {/* Sim-Controls: Play/Pause + Speed-Regler */}
-          <div className="flex items-center gap-1 bg-slate-100 rounded-lg px-2 py-1">
+          <div className="flex h-10 w-10 items-center justify-center rounded bg-[#f2c94c] text-[#171717] shadow-[0_0_22px_rgba(242,201,76,0.22)]">
+            <RouteIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f2c94c]">Leitstand</p>
+            <h1 className="text-lg font-semibold tracking-tight text-white">Smarte Mülltonne 2.0</h1>
+          </div>
+        </div>
+
+        <div className="flex max-w-full items-center gap-3 overflow-x-auto pb-1 lg:pb-0">
+          <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-[#111214] px-2 py-1.5">
             <button
               onClick={togglePause}
-              className={`flex items-center justify-center w-6 h-6 rounded transition ${
+              className={`flex h-8 w-8 items-center justify-center rounded transition ${
                 simPaused
-                  ? "bg-amber-500 text-white hover:bg-amber-600"
-                  : "text-slate-600 hover:bg-slate-200"
+                  ? "bg-[#f2c94c] text-[#171717] hover:bg-[#ffd866]"
+                  : "text-slate-300 hover:bg-white/10 hover:text-white"
               }`}
               title={simPaused ? "Simulation fortsetzen" : "Simulation pausieren"}
               aria-label={simPaused ? "Simulation fortsetzen" : "Simulation pausieren"}
             >
-              {simPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+              {simPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             </button>
-            <span className="w-px h-4 bg-slate-300 mx-1" aria-hidden />
-            <Gauge className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-xs text-slate-500 mr-1">Sim</span>
+            <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
+            <Gauge className="h-4 w-4 text-[#f2c94c]" />
             {[1, 5, 10, 20].map((v) => (
               <button
                 key={v}
                 onClick={() => applySpeed(v)}
                 disabled={simPaused}
-                className={`text-xs font-mono px-2 py-0.5 rounded transition ${
+                className={`min-w-9 rounded px-2 py-1 text-xs font-semibold transition ${
                   simSpeed === v && !simPaused
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent"
+                    ? "bg-[#f2c94c] text-[#171717]"
+                    : "text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-35 disabled:hover:bg-transparent"
                 }`}
                 title={`Simulation auf ${v}× Geschwindigkeit`}
               >
@@ -139,8 +153,8 @@ export default function DashboardPage() {
             ))}
           </div>
           {activeRoute && activeRoute.waypoints.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">
+            <div className="hidden items-center gap-2 rounded border border-white/10 bg-[#111214] px-3 py-2 md:flex">
+              <span className="text-xs font-medium text-slate-300">
                 Route #{activeRoute.id} · {(activeRoute.distance_m / 1000).toFixed(1)} km
                 {activeRoute.duration_s ? ` · ${Math.round(activeRoute.duration_s / 60)} min` : ""}
               </span>
@@ -162,10 +176,10 @@ export default function DashboardPage() {
                   <span
                     className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
                       isOptimal
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-emerald-400/15 text-emerald-300"
                         : exact !== null
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-emerald-100 text-emerald-700"
+                          ? "bg-[#f2c94c]/15 text-[#f2c94c]"
+                          : "bg-emerald-400/15 text-emerald-300"
                     }`}
                     title={tooltip}
                   >
@@ -178,49 +192,51 @@ export default function DashboardPage() {
           <button
             onClick={handlePlan}
             disabled={planning}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 text-sm font-medium transition"
+            className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded bg-[#f2c94c] text-sm font-semibold text-[#171717] transition hover:bg-[#ffd866] disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto sm:px-4"
+            title="Route planen"
           >
             {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RouteIcon className="w-4 h-4" />}
-            Route planen
+            <span className="hidden sm:inline">Route planen</span>
           </button>
           <span
-            className={`text-xs px-2 py-1 rounded-full ${
-              live ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"
+            className={`hidden items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs font-semibold sm:flex ${
+              live ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-white/10 bg-white/5 text-slate-400"
             }`}
           >
+            <Radio className="h-3.5 w-3.5" />
             {live ? "Live" : "Verbinde..."}
           </span>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-72 border-r bg-white overflow-y-auto shrink-0">
+      <div className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
+        <div className="h-64 w-full shrink-0 overflow-y-auto border-b border-white/10 bg-[#1a1c20] lg:h-auto lg:w-[19rem] lg:border-r lg:border-b-0">
           <FleetPanel bins={[...bins].sort((a, b) => b.fill_level - a.fill_level)} />
         </div>
 
-        <div className="flex-1 relative">
+        <div className="relative h-[28rem] shrink-0 bg-[#111214] lg:h-auto lg:flex-1 lg:shrink">
           <MapView bins={bins} truck={truck} activeRoute={activeRoute} depot={config?.depot ?? null} />
         </div>
 
-        <div className="w-96 border-l bg-white flex flex-col shrink-0">
-          <div className="flex border-b">
-            {(["chat", "energy", "security"] as Tab[]).map((tab) => (
+        <div className="flex min-h-[36rem] w-full shrink-0 flex-col border-t border-white/10 bg-[#1a1c20] lg:min-h-0 lg:w-[25rem] lg:border-t-0 lg:border-l">
+          <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-[#151619] p-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-sm font-medium capitalize transition-colors ${
-                  activeTab === tab
-                    ? "border-b-2 border-blue-600 text-blue-600"
-                    : "text-slate-500 hover:text-slate-700"
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex h-10 items-center justify-center gap-2 rounded text-xs font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-[#f2c94c] text-[#171717]"
+                    : "text-slate-400 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {tab === "chat"
-                  ? "Chat"
-                  : tab === "energy"
-                  ? "Akku"
-                  : `Sicherheit${alerts.length ? ` (${alerts.length})` : ""}`}
+                <Icon className="h-4 w-4" />
+                {tab.label}
               </button>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex-1 overflow-y-auto">

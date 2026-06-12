@@ -11,6 +11,7 @@ from database import SessionLocal
 from models.bin import Bin
 from models.route import Route
 from routers import sim
+from services.routing import get_route_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ SPEED_MPS = 8.0
 TICK_S = 1.0
 ARRIVAL_THRESHOLD_M = 35.0
 EMPTY_PAUSE_S = 1.5
-TRUCK_CAPACITY_UNITS = 600.0
+TRUCK_CAPACITY_UNITS = 1000.0
 UNLOAD_PAUSE_S = 2.5
 
 
@@ -124,13 +125,37 @@ def _advance_with_arrival_check(
     return pos, seg_index, None
 
 
-async def _drive_to(
-    pos: tuple[float, float],
+async def _route_coords_between(
+    start: tuple[float, float],
     target: tuple[float, float],
+) -> list[tuple[float, float]]:
+    result = await get_route_geometry([start, target])
+    geometry = result.get("geometry")
+    if not geometry or not geometry.get("coordinates"):
+        return [start, target]
+
+    coords = [(lat, lng) for lng, lat in geometry["coordinates"]]
+    if len(coords) < 2:
+        return [start, target]
+
+    # OSRM may snap start/end to the nearest road. Keep simulator state exact at
+    # the handoff points, then follow the returned street geometry in between.
+    coords[0] = start
+    coords[-1] = target
+    return coords
+
+
+async def _drive_geometry(
+    pos: tuple[float, float],
+    coords: list[tuple[float, float]],
     action: str,
     load_units: float,
 ) -> tuple[float, float]:
-    while _haversine_m(pos, target) > 5.0:
+    if len(coords) < 2:
+        return pos
+
+    seg_index = 0
+    while seg_index < len(coords) - 1:
         speed, paused = _sim_state()
         if paused:
             _post_position(pos, "paused", None, load_units)
@@ -138,20 +163,34 @@ async def _drive_to(
             continue
 
         budget_m = SPEED_MPS * TICK_S * speed
-        dist = _haversine_m(pos, target)
-        ratio = min(1.0, budget_m / dist) if dist > 0 else 1.0
-        pos = (
-            pos[0] + (target[0] - pos[0]) * ratio,
-            pos[1] + (target[1] - pos[1]) * ratio,
+        pos, seg_index, _ = _advance_with_arrival_check(
+            pos,
+            coords,
+            seg_index,
+            budget_m,
+            [],
+            set(),
+            {},
         )
         _post_position(pos, action, None, load_units)
         await asyncio.sleep(TICK_S)
-    return target
+    return coords[-1]
+
+
+async def _drive_to(
+    pos: tuple[float, float],
+    target: tuple[float, float],
+    action: str,
+    load_units: float,
+) -> tuple[float, float]:
+    coords = await _route_coords_between(pos, target)
+    return await _drive_geometry(pos, coords, action, load_units)
 
 
 async def _unload_at_depot(
     pos: tuple[float, float],
     load_units: float,
+    resume_pos: tuple[float, float] | None = None,
 ) -> tuple[tuple[float, float], float]:
     depot = _depot()
     pos = await _drive_to(pos, depot, "returning_full", load_units)
@@ -160,6 +199,10 @@ async def _unload_at_depot(
     await asyncio.sleep(UNLOAD_PAUSE_S / max(speed, 1.0))
     load_units = 0.0
     _post_position(pos, "en_route", None, load_units)
+
+    if resume_pos is not None:
+        pos = await _drive_to(pos, resume_pos, "returning", load_units)
+
     return pos, load_units
 
 
@@ -203,7 +246,7 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
             if hit_bin is not None:
                 waste_units = _bin_fill(db, hit_bin)
                 if load_units > 0 and load_units + waste_units > TRUCK_CAPACITY_UNITS:
-                    pos, load_units = await _unload_at_depot(pos, load_units)
+                    pos, load_units = await _unload_at_depot(pos, load_units, resume_pos=pos)
 
                 _post_position(pos, "emptying", hit_bin, load_units)
                 collected_units = _empty_bin(db, hit_bin)

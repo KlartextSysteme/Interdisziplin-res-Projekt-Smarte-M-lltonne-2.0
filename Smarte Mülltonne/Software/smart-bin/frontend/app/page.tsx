@@ -2,8 +2,8 @@ export default function Home() {
   return (
     <>
       <meta httpEquiv="refresh" content="0; url=/dashboard/" />
-      <main className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700">
-        <a className="text-blue-600 underline" href="/dashboard/">
+      <main className="flex min-h-screen items-center justify-center bg-[#151619] text-slate-200">
+        <a className="rounded border border-[#f2c94c]/40 px-4 py-2 text-[#f2c94c]" href="/dashboard/">
           Dashboard öffnen
         </a>
       </main>
