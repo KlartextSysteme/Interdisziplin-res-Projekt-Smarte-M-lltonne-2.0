@@ -17,10 +17,10 @@ class Stepper:
 
     # -------- ENABLE / DISABLE --------
     def enable_motor(self):
-        self.enable.value(1)   # A4988: LOW = ON
+        self.enable.value(1)
 
     def disable(self):
-        self.enable.value(0)   # A4988: HIGH = OFF
+        self.enable.value(0)
 
     # -------- STEP --------
     def step_once(self):
@@ -50,9 +50,10 @@ motor1 = Stepper(dir_pin=10, step_pin=11, enable_pin=12, delay_us=2, name="Motor
 motor2 = Stepper(dir_pin=13, step_pin=14, enable_pin=15, delay_us=2, name="Motor 2")
 
 while True:
-    # print("Motor 1 forward")
-    # motor1.move(40000, 1)
-    # sleep(1)
+    
+    print("Motor 1 forward")
+    motor1.move(40000, 1)
+    sleep(1)
 
     print("Motor 1 backward")
     motor1.move(20000, 0)
@@ -62,8 +63,8 @@ while True:
     motor2.move(20000, 1)
     sleep(1)
 
-    # print("Motor 2 backward")
-    # motor2.move(20000, 0)
-    # sleep(1)
+    print("Motor 2 backward")
+    motor2.move(20000, 0)
+    sleep(1)
 
     #PWM Objekt hinzufügen für delay, um genauer arbeiten zu können
