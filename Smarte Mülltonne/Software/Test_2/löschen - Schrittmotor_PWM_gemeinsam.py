@@ -90,8 +90,8 @@ motor1 = StepperPWM(
 
 motor2 = StepperPWM(
     dir_pin=13,
-    step_pin=14,
-    enable_pin=15,
+    step_pin=8,
+    enable_pin=9,
     step_freq=200,
     name="Motor 2"
 )

@@ -71,7 +71,7 @@ class DualStepperPWM:
         self.left_dir.value(left_dir)
         self.right_dir.value(right_dir)
 
-        sleep(0.02)
+        sleep(0.05)
 
         steps_per_part = schritte // (ramp_steps * 2 + 1)
 
@@ -113,16 +113,17 @@ class DualStepperPWM:
     #     self.move_together(schritte, 0, 1)
 
     def geradeaus_fahrt(self, schritte):
-        self.move_together_ramp(schritte, 1, 0, start_freq=2000, max_freq=5500, ramp_steps=100)
+        self.move_together_ramp(schritte, 1, 0, start_freq=4500, max_freq=10000, ramp_steps=300)
 
     def rueckwaerts_fahrt(self, schritte):
-        self.move_together_ramp(schritte, 0, 1, start_freq=2000, max_freq=5500, ramp_steps=100)
+        self.move_together_ramp(schritte, 0, 1, start_freq=4500, max_freq=10000, ramp_steps=300)
 
     def drehung_links(self, schritte):
-        self.move_together_ramp(schritte, 0, 0, start_freq=2000, max_freq=5500, ramp_steps=100)
+        self.move_together_ramp(schritte, 1, 1, start_freq=4500, max_freq=10000, ramp_steps=300)
 
     def drehung_rechts(self, schritte):
-        self.move_together_ramp(schritte, 1, 1, start_freq=2000, max_freq=5500, ramp_steps=100)
+        #self.move_together(schritte, 1, 1)
+        self.move_together_ramp(schritte, 0, 0, start_freq=4500, max_freq=10000, ramp_steps=300)
         
     # def drehung_links(self, schritte):
     #     self.move_together_ramp(schritte, 0, 0)
@@ -136,36 +137,39 @@ motors = DualStepperPWM(
     left_step_pin=11,
     left_enable_pin=12,
     right_dir_pin=13,
-    right_step_pin=14,
-    right_enable_pin=15,
+    right_step_pin=8,
+    right_enable_pin=9,
     frequency=5500,
     enable_active_value=1
 )
 
 while True:
     print("Geradeaus")
-    motors.geradeaus_fahrt(40000)
+    motors.geradeaus_fahrt(20000)
 
     sleep(1)
 
-    # print("Rückwärtsfahrt")
-    # motors.rueckwaerts_fahrt(40000)
+    print("Rückwärtsfahrt")
+    motors.rueckwaerts_fahrt(20000)
 
-    # sleep(1)
+    sleep(1)
 
 
     print("Links drehen 90 Grad")
     motors.drehung_links(29980)
     sleep(1)
 
-    print("Links drehen 180 Grad")
-    motors.drehung_links(59960)
-    sleep(1)
-
-    # print("Rechts drehen 90 Grad")
-    # motors.drehung_rechts(29980)
+    # print("Links drehen 180 Grad")
+    # motors.drehung_links(59960)
     # sleep(1)
+
+    print("Rechts drehen 90 Grad")
+    motors.drehung_rechts(29980)
+    sleep(1)
 
     # print("Rechts drehen 180 Grad")
     # motors.drehung_rechts(59960)
     # sleep(1)
+
+    # motors.drehung_rechts(29980)
+    # sleep(2)
