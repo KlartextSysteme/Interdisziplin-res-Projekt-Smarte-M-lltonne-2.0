@@ -76,7 +76,7 @@ STEPS_180_GRAD = STEPS_90_GRAD * 2
 # enable_active_value=1 testen.
 # Wenn Motoren dauerhaft aus bleiben, auf 0 ändern.
 
-motors = DualStepper(left_dir_pin=10,left_step_pin=11,left_enable_pin=12,right_dir_pin=13,right_step_pin=14,right_enable_pin=15,delay_us=2,enable_active_value=1)
+motors = DualStepper(left_dir_pin=10,left_step_pin=11,left_enable_pin=12,right_dir_pin=13,right_step_pin=8,right_enable_pin=9,delay_us=2,enable_active_value=1)
 
 while True:
     print("Geradeaus")

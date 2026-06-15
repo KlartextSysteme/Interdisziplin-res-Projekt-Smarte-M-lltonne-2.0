@@ -3,15 +3,7 @@ from time import sleep
 
 
 class DualStepperPWM:
-    def __init__(self,
-                 left_dir_pin,
-                 left_step_pin,
-                 left_enable_pin,
-                 right_dir_pin,
-                 right_step_pin,
-                 right_enable_pin,
-                 frequency=500,
-                 enable_active_value=1):
+    def __init__(self,left_dir_pin,left_step_pin,left_enable_pin,right_dir_pin,right_step_pin,right_enable_pin,frequency=4500,enable_active_value=1):
 
         self.left_dir = Pin(left_dir_pin, Pin.OUT)
         self.right_dir = Pin(right_dir_pin, Pin.OUT)
@@ -61,10 +53,7 @@ class DualStepperPWM:
 
         self.disable()
 
-    def move_together_ramp(self, schritte, left_dir, right_dir,
-                       start_freq=800,
-                       max_freq=5500,
-                       ramp_steps=30):
+    def move_together_ramp(self, schritte, left_dir, right_dir,start_freq=800,max_freq=5500,ramp_steps=30):
 
         self.enable()
 
@@ -106,12 +95,6 @@ class DualStepperPWM:
 
         self.disable()
 
-    # def geradeaus_fahrt(self, schritte):
-    #     self.move_together(schritte, 1, 0)
-
-    # def rueckwaerts_fahrt(self, schritte):
-    #     self.move_together(schritte, 0, 1)
-
     def geradeaus_fahrt(self, schritte):
         self.move_together_ramp(schritte, 1, 0, start_freq=4500, max_freq=10000, ramp_steps=300)
 
@@ -119,55 +102,15 @@ class DualStepperPWM:
         self.move_together_ramp(schritte, 0, 1, start_freq=4500, max_freq=10000, ramp_steps=300)
 
     def drehung_links(self, schritte):
-        self.move_together_ramp(schritte, 1, 1, start_freq=200, max_freq=500, ramp_steps=30)
+        self.move_together_ramp(schritte, 1, 1, start_freq=4500, max_freq=10000, ramp_steps=300)
 
     def drehung_rechts(self, schritte):
-        #self.move_together(schritte, 1, 1)
         self.move_together_ramp(schritte, 0, 0, start_freq=4500, max_freq=10000, ramp_steps=300)
-        
-    # def drehung_links(self, schritte):
-    #     self.move_together_ramp(schritte, 0, 0)
-
-    # def drehung_rechts(self, schritte):
-    #     self.move_together_ramp(schritte, 1, 1)
 
 
-motors = DualStepperPWM(
-    left_dir_pin=10,
-    left_step_pin=11,
-    left_enable_pin=12,
-    right_dir_pin=13,
-    right_step_pin=8,
-    right_enable_pin=9,
-    frequency=5500,
-    enable_active_value=1
-)
+# ---------------- EINSTELLUNGEN ----------------
 
-while True:
-    # print("Geradeaus")
-    # motors.geradeaus_fahrt(20000)
-    # sleep(1)
-
-    # print("Rückwärtsfahrt")
-    # motors.rueckwaerts_fahrt(20000)
-    # sleep(1)
-
-
-    print("Links drehen 90 Grad")
-    motors.drehung_links(29980)
-    sleep(1)
-
-    # print("Links drehen 180 Grad")
-    # motors.drehung_links(59960)
-    # sleep(1)
-
-    # print("Rechts drehen 90 Grad")
-    # motors.drehung_rechts(29980)
-    # sleep(1)
-
-    # print("Rechts drehen 180 Grad")
-    # motors.drehung_rechts(59960)
-    # sleep(1)
-
-    # motors.drehung_rechts(29980)
-    # sleep(2)
+SCHRITTE_LINKSDREHUNG_90_GRAD = 32080
+SCHRITTE_LINKSDREHUNG_180_GRAD = 2*SCHRITTE_LINKSDREHUNG_90_GRAD
+SCHRITTE_RECHTSDREHUNG_90_GRAD = 32080
+SCHRITTE_RECHTSDREHUNG_180_GRAD = 2*SCHRITTE_RECHTSDREHUNG_90_GRAD
