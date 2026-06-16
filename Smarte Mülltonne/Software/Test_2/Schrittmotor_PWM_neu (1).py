@@ -48,8 +48,10 @@ class DualStepperPWM:
         self.right_step.freq(self.frequency)
 
         # PWM starten (50 % Tastgrad)
-        self.left_step.duty_u16(32768)
-        self.right_step.duty_u16(32768)
+        # self.left_step.duty_u16(32768)
+        # self.right_step.duty_u16(32768)
+        self.right_step.duty_ns(10000)
+        self.left_step.duty_ns(10000)
 
         # Zeit aus Schrittzahl berechnen
         dauer = schritte / self.frequency
@@ -81,8 +83,9 @@ class DualStepperPWM:
             self.left_step.freq(freq)
             self.right_step.freq(freq)
 
-            self.left_step.duty_u16(32768)
-            self.right_step.duty_u16(32768)
+            self.left_step.duty_u16(43690)
+            self.right_step.duty_u16(43690)
+            
 
             sleep(steps_per_part / freq)
 
@@ -113,17 +116,17 @@ class DualStepperPWM:
     #     self.move_together(schritte, 0, 1)
 
     def geradeaus_fahrt(self, schritte):
-        self.move_together_ramp(schritte, 1, 0, start_freq=2000, max_freq=10000, ramp_steps=300)
+        self.move_together(schritte, 1, 0)#, start_freq=2000, max_freq=10000, ramp_steps=300)
 
     def rueckwaerts_fahrt(self, schritte):
-        self.move_together_ramp(schritte, 0, 1, start_freq=2000, max_freq=10000, ramp_steps=300)
+        self.move_together(schritte, 0, 1)#, start_freq=2000, max_freq=10000, ramp_steps=300)
 
     def drehung_links(self, schritte):
-        self.move_together_ramp(schritte, 1, 1, start_freq=200, max_freq=1000, ramp_steps=30)
+        self.move_together(schritte, 1, 1)#, start_freq=5000, max_freq=20000, ramp_steps=300)
 
     def drehung_rechts(self, schritte):
         #self.move_together(schritte, 1, 1)
-        self.move_together_ramp(schritte, 0, 0, start_freq=4500, max_freq=10000, ramp_steps=300)
+        self.move_together_ramp(schritte, 0, 0, start_freq=500, max_freq=2500, ramp_steps=100)
         
     # def drehung_links(self, schritte):
     #     self.move_together_ramp(schritte, 0, 0)
@@ -144,26 +147,26 @@ motors = DualStepperPWM(
 )
 
 while True:
-    print("Geradeaus")
-    motors.geradeaus_fahrt(20000)
-    sleep(1)
+    # print("Geradeaus")
+    # motors.geradeaus_fahrt(20000)
+    # sleep(1)
 
-    print("Rückwärtsfahrt")
-    motors.rueckwaerts_fahrt(20000)
-    sleep(1)
+    # print("Rückwärtsfahrt")
+    # motors.rueckwaerts_fahrt(20000)
+    # sleep(1)
 
 
-    print("Links drehen 90 Grad")
-    motors.drehung_links(10980)
-    sleep(1)
+    # print("Links drehen 90 Grad")
+    # motors.drehung_links(10980)
+    # sleep(1)
 
     # print("Links drehen 180 Grad")
     # motors.drehung_links(59960)
     # sleep(1)
 
-    # print("Rechts drehen 90 Grad")
-    # motors.drehung_rechts(29980)
-    # sleep(1)
+    print("Rechts drehen 90 Grad")
+    motors.drehung_rechts(29980)
+    sleep(1)
 
     # print("Rechts drehen 180 Grad")
     # motors.drehung_rechts(59960)
