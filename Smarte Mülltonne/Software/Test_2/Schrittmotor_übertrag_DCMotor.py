@@ -4,9 +4,9 @@ from time import sleep
 
 class DualStepperMotorPWM:
     """
-    Treiberklasse fuer zwei Schrittmotoren mit STEP/DIR/ENABLE-Treibern.
+    Treiberklasse für zwei Schrittmotoren mit STEP/DIR/ENABLE-Treibern.
 
-    Geschwindigkeit wird ueber die STEP-Frequenz gesteuert.
+    Geschwindigkeit wird über die STEP-Frequenz gesteuert.
     Beide Motoren werden zeitgleich per PWM angesteuert.
     """
 
@@ -21,6 +21,7 @@ class DualStepperMotorPWM:
                  max_freq=4500,
                  left_trim_factor=1.0,
                  right_trim_factor=1.0,
+                 right_backward_trim_factor=1.0,
                  enable_active_value=1,
                  name="DUAL_STEPPER",
                  debug=True):
@@ -39,6 +40,7 @@ class DualStepperMotorPWM:
 
         self.left_trim_factor = left_trim_factor
         self.right_trim_factor = right_trim_factor
+        self.right_backward_trim_factor = right_backward_trim_factor
 
         self.enable_active_value = enable_active_value
         self.disable_value = 0 if enable_active_value == 1 else 1
@@ -86,8 +88,14 @@ class DualStepperMotorPWM:
     def _drive(self, mode, speed, left_dir, right_dir):
         speed = max(0, min(100, int(speed)))
 
-        left_freq = self._speed_to_frequency(speed, self.left_trim_factor)
-        right_freq = self._speed_to_frequency(speed, self.right_trim_factor)
+        left_trim = self.left_trim_factor
+        right_trim = self.right_trim_factor
+
+        if mode == "backward":
+            right_trim = self.right_backward_trim_factor
+
+        left_freq = self._speed_to_frequency(speed, left_trim)
+        right_freq = self._speed_to_frequency(speed, right_trim)
 
         if left_freq <= 0 or right_freq <= 0:
             self.stop()
@@ -100,8 +108,8 @@ class DualStepperMotorPWM:
 
         sleep(0.02)
 
-        self.left_step.freq(left_freq)
-        self.right_step.freq(right_freq)
+        self.left_step.freq(4500)
+        self.right_step.freq(4500)
 
         self.left_step.duty_u16(32768)
         self.right_step.duty_u16(32768)
@@ -111,10 +119,10 @@ class DualStepperMotorPWM:
 
         if self.debug:
             print(self.name,
-                  mode,
-                  "speed", speed,
-                  "left_freq", left_freq,
-                  "right_freq", right_freq)
+                mode,
+                "speed", speed,
+                "left_freq", left_freq,
+                "right_freq", right_freq)
 
     def forward(self, speed):
         self._drive("forward", speed, 1, 0)
@@ -160,6 +168,7 @@ motors = DualStepperMotorPWM(
     max_freq=4500,
     left_trim_factor=1.0,
     right_trim_factor=1.0,
+    right_backward_trim_factor=1.0,
     enable_active_value=1,
     name="Muelltonne"
 )
@@ -171,8 +180,8 @@ while True:
     motors.move_steps(20000, "backward", 80)
     sleep(1)
 
-    motors.move_steps(29980, "turn_left", 80)
-    sleep(1)
+    # motors.move_steps(29980, "turn_left", 80)
+    # sleep(1)
 
-    motors.move_steps(29980, "turn_right", 80)
-    sleep(1)
+    # motors.move_steps(29980, "turn_right", 80)
+    # sleep(1)

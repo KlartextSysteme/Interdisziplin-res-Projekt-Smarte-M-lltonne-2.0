@@ -83,8 +83,11 @@ class DualStepperPWM:
             self.left_step.freq(freq)
             self.right_step.freq(freq)
 
-            self.left_step.duty_u16(43690)
-            self.right_step.duty_u16(43690)
+            # self.left_step.duty_u16(43690)
+            # self.right_step.duty_u16(43690)
+
+            self.left_step.duty_ns(100000)
+            self.right_step.duty_ns(100000)
             
 
             sleep(steps_per_part / freq)
@@ -126,7 +129,7 @@ class DualStepperPWM:
 
     def drehung_rechts(self, schritte):
         #self.move_together(schritte, 1, 1)
-        self.move_together_ramp(schritte, 0, 0, start_freq=500, max_freq=2500, ramp_steps=100)
+        self.move_together(schritte, 1, 0)#, start_freq=300, max_freq=1000, ramp_steps=100)
         
     # def drehung_links(self, schritte):
     #     self.move_together_ramp(schritte, 0, 0)
@@ -142,7 +145,7 @@ motors = DualStepperPWM(
     right_dir_pin=13,
     right_step_pin=8,
     right_enable_pin=9,
-    frequency=500,
+    frequency=30000,
     enable_active_value=1
 )
 
