@@ -3,13 +3,19 @@ from time import sleep, sleep_us
 
 
 class StepperPWM:
-    def __init__(self, dir_pin, step_pin, enable_pin, step_freq=1000, name="STEPPER", debug=True):
-        self.dir = Pin(dir_pin, Pin.OUT)
-        self.step_pin = Pin(step_pin, Pin.OUT)
-        self.enable = Pin(enable_pin, Pin.OUT)
+    def __init__(self, dir_left_pin, step_left_pin, enable_left_pin, dir_right_pin, step_right_pin, enable_right_pin, step_freq=1000, name="STEPPER_dual", debug=True):
+        self.dir_left = Pin(dir_left_pin, Pin.OUT)
+        self.step_left_pin = Pin(step_left_pin, Pin.OUT)
+        self.enable_left = Pin(enable_left_pin, Pin.OUT)
 
-        self.pwm = PWM(self.step_pin)
-        self.pwm.duty_u16(0)
+        self.dir_right = Pin(dir_right_pin, Pin.OUT)
+        self.step_right_pin = Pin(step_right_pin, Pin.OUT)
+        self.enable_right = Pin(enable_right_pin, Pin.OUT)
+
+        self.pwm_left = PWM(self.step_left_pin)
+        self.pwm_right = PWM(self.step_right_pin)
+        self.pwm_left.duty_u16(0)
+        self.pwm_right.duty_u16(0)
 
         self.step_freq = step_freq
         self.name = name
@@ -18,23 +24,29 @@ class StepperPWM:
         self.disable()
 
     def enable_motor(self):
-        self.enable.value(1)   # A4988: LOW = ON
+        self.enable_left.value(1) 
+        self.enable_right.value(1)
 
     def disable(self):
-        self.pwm.duty_u16(0)
-        self.enable.value(0)   # A4988: HIGH = OFF
+        self.pwm_left.duty_u16(0)
+        self.pwm_right.duty_u16(0)
+        self.enable_left.value(0)
+        self.enable_right.value(0)
 
-    def move(self, steps, direction):
+    def move(self, steps, direction_left, direction_right):
         self.enable_motor()
-        self.dir.value(direction)
+        self.dir_left.value(direction_left)
+        self.dir_right.value(direction_right)
 
         sleep_us(20)  # kurze Zeit, damit DIR stabil ist
 
         if self.debug:
-            print(self.name, "dir:", direction, "steps:", steps, "freq:", self.step_freq)
+            print(self.name, "dir:", direction_left, "dir", direction_right, "steps:", steps, "freq:", self.step_freq)
 
-        self.pwm.freq(self.step_freq)
-        self.pwm.duty_u16(32768)  # 50 Prozent Duty Cycle
+        self.pwm_left.freq(self.step_freq)
+        self.pwm_right.freq(self.step_freq)
+        self.pwm_left.duty_u16(32768)
+        self.pwm_right.duty_u16(32768)
 
         move_time = steps / self.step_freq
         sleep(move_time)
@@ -44,10 +56,10 @@ class StepperPWM:
 
 # ---------------- TEST ----------------
 
-motor1 = StepperPWM(
-    dir_pin=10,
-    step_pin=11,
-    enable_pin=12,
+motors = StepperPWM(
+    dir_left_pin=10,
+    step_left_pin=11,
+    enable_left_pin=12,
     step_freq=2000,
     name="Motor 1"
 )
