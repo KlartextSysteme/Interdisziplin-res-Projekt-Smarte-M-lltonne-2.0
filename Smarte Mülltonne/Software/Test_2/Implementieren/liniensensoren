@@ -1,0 +1,155 @@
+import time
+
+class LiniensensorMux:
+    """
+    Klasse zur Verwaltung von 5 digitalen Liniensensoren ueber einen Multiplexer.
+
+    Berechnet aus den Einzelwerten eine relative Position der Linie zur Fahrzeugmitte.
+
+    Rueckgabe get_position():
+    - negativ: Linie links
+    - 0: Linie mittig
+    - positiv: Linie rechts
+    - None: keine Linie erkannt
+    """
+
+    _W_LA = -100
+    _W_LM = -50
+    _W_M = 0
+    _W_RM = 50
+    _W_RA = 100
+
+    def __init__(self,mux,channel_links_aussen,channel_links_mitte,channel_mitte,channel_rechts_mitte,channel_rechts_aussen,min_read_interval_ms=8,samples_per_read=3,sample_delay_us=80):
+        self.mux = mux
+
+        self.channel_links_aussen = channel_links_aussen
+        self.channel_links_mitte = channel_links_mitte
+        self.channel_mitte = channel_mitte
+        self.channel_rechts_mitte = channel_rechts_mitte
+        self.channel_rechts_aussen = channel_rechts_aussen
+
+        self.gewicht_links_aussen = self._W_LA
+        self.gewicht_links_mitte = self._W_LM
+        self.gewicht_mitte = self._W_M
+        self.gewicht_rechts_mitte = self._W_RM
+        self.gewicht_rechts_aussen = self._W_RA
+
+        self.target_position = 0
+
+        self._last_read_ms = 0
+        self._cached_position = None
+        self._cached_bits = 0
+        self._min_read_interval_ms = int(min_read_interval_ms)
+
+        self._samples_per_read = int(samples_per_read)
+        if self._samples_per_read < 1:
+            self._samples_per_read = 1
+
+        self._sample_delay_us = int(sample_delay_us)
+        if self._sample_delay_us < 0:
+            self._sample_delay_us = 0
+
+    def _read_channel_majority(self, channel):
+        """
+        Liest einen Multiplexer-Kanal mehrfach aus.
+        Dadurch werden kurze Störimpulse reduziert.
+        """
+        ones = 0
+        n = self._samples_per_read
+
+        if n == 1:
+            return self.mux.read_digital(channel)
+
+        for _ in range(n):
+            if self.mux.read_digital(channel):
+                ones += 1
+
+            if self._sample_delay_us:
+                time.sleep_us(self._sample_delay_us)
+
+        return 1 if ones > (n // 2) else 0
+
+    def _read_sensors_bits(self):
+        """
+        Liest alle 5 Sensoren und speichert sie als Bitmuster.
+
+        Bit 4 = links aussen
+        Bit 3 = links mitte
+        Bit 2 = mitte
+        Bit 1 = rechts mitte
+        Bit 0 = rechts aussen
+        """
+        la = self._read_channel_majority(self.channel_links_aussen)
+        lm = self._read_channel_majority(self.channel_links_mitte)
+        m = self._read_channel_majority(self.channel_mitte)
+        rm = self._read_channel_majority(self.channel_rechts_mitte)
+        ra = self._read_channel_majority(self.channel_rechts_aussen)
+
+        bits = (la << 4) | (lm << 3) | (m << 2) | (rm << 1) | ra
+        return bits
+
+    def get_position(self):
+        """
+        Bestimmt die aktuelle Linienposition.
+        """
+        now = time.ticks_ms()
+
+        if time.ticks_diff(now, self._last_read_ms) < self._min_read_interval_ms:
+            return self._cached_position
+
+        self._last_read_ms = now
+
+        bits = self._read_sensors_bits()
+        self._cached_bits = bits
+
+        active = (
+            ((bits >> 4) & 1) +
+            ((bits >> 3) & 1) +
+            ((bits >> 2) & 1) +
+            ((bits >> 1) & 1) +
+            (bits & 1)
+        )
+
+        if active == 0:
+            self._cached_position = None
+            return None
+
+        la = (bits >> 4) & 1
+        lm = (bits >> 3) & 1
+        m = (bits >> 2) & 1
+        rm = (bits >> 1) & 1
+        ra = bits & 1
+
+        weighted_sum = (
+            la * self.gewicht_links_aussen +
+            lm * self.gewicht_links_mitte +
+            m * self.gewicht_mitte +
+            rm * self.gewicht_rechts_mitte +
+            ra * self.gewicht_rechts_aussen
+        )
+
+        pos = int(weighted_sum / active)
+
+        self._cached_position = pos
+        return pos
+
+    def get_bits(self):
+        """
+        Gibt das letzte Bitmuster zurueck.
+        """
+        return self._cached_bits
+
+    def get_values(self):
+        """
+        Gibt die letzten Sensorwerte als Liste zurueck:
+        [links_aussen, links_mitte, mitte, rechts_mitte, rechts_aussen]
+        """
+        bits = self._cached_bits
+
+        return [
+            (bits >> 4) & 1,
+            (bits >> 3) & 1,
+            (bits >> 2) & 1,
+            (bits >> 1) & 1,
+            bits & 1
+        ]

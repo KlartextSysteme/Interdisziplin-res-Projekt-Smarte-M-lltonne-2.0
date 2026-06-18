@@ -18,11 +18,11 @@ class StepperPWM:
         self.disable()
 
     def enable_motor(self):
-        self.enable.value(0)   # A4988: LOW = ON
+        self.enable.value(1)   # A4988: LOW = ON
 
     def disable(self):
         self.pwm.duty_u16(0)
-        self.enable.value(1)   # A4988: HIGH = OFF
+        self.enable.value(0)   # A4988: HIGH = OFF
 
     def move(self, steps, direction):
         self.enable_motor()
@@ -48,23 +48,31 @@ motor1 = StepperPWM(
     dir_pin=10,
     step_pin=11,
     enable_pin=12,
-    step_freq=1000,
+    step_freq=2000,
     name="Motor 1"
 )
 
 motor2 = StepperPWM(
     dir_pin=13,
-    step_pin=14,
-    enable_pin=15,
-    step_freq=1000,
+    step_pin=8,
+    enable_pin=9,
+    step_freq=2000,
     name="Motor 2"
 )
 
 while True:
+    print("Motor 1 forward")
+    motor1.move(5200, 1)
+    sleep(1)
+
+    print("Motor 1 backward")
+    motor1.move(5200, 0)
+    sleep(1)
+
     print("Motor 2 forward")
-    motor2.move(16550, 1)
+    motor2.move(5200, 1)
     sleep(1)
 
     print("Motor 2 backward")
-    motor2.move(16550, 0)
+    motor2.move(5200, 0)
     sleep(1)
