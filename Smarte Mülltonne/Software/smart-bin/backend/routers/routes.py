@@ -1,12 +1,13 @@
-"""Route planning: Füllstand-Threshold + 2-opt TSP-Heuristik.
+"""Route planning: Füllstand-Threshold + stabile Sammelreihenfolge.
 
-Hellweg-Feedback (Apr 2026): Nearest-Neighbour kann pathologische Fälle haben
-(Faktor 2 schlechter als optimal). Wir nutzen jetzt 2-opt aus `python-tsp`
-und behalten NN als Baseline für den A/B-Vergleich (Badge im Dashboard).
+Für die Live-Demo ist eine nachvollziehbare Sammelfahrt wichtiger als eine
+mathematisch kurze Rundtour, die in engen Clustern Tonnen überspringt und später
+wieder zurückkommt. Die Fahrreihenfolge nutzt deshalb deterministisch
+Nearest-Neighbour als "Street sweep". 2-opt bleibt als Vergleichswert im Code,
+wird aber nicht als Fahrreihenfolge genutzt.
 
-Distanzen für die Heuristik: planar (equirectangular). OSRM liefert dann die
-echte Straßen-Geometrie auf der finalen 2-opt-Reihenfolge — eine OSRM-Anfrage,
-nicht n² Anfragen über /table.
+Distanzen für die Heuristik: planar (equirectangular). OSRM liefert danach die
+echte Straßen-Geometrie auf der finalen Reihenfolge.
 """
 import logging
 from math import cos, radians, sqrt
@@ -74,6 +75,13 @@ def _build_distance_matrix(coords: list[tuple[float, float]]) -> np.ndarray:
             m[i, j] = d
             m[j, i] = d
     return m
+
+
+def _pickup_coords(b: Bin) -> tuple[float, float]:
+    return (
+        b.pickup_lat if b.pickup_lat is not None else b.lat,
+        b.pickup_lng if b.pickup_lng is not None else b.lng,
+    )
 
 
 # ── Heuristiken ───────────────────────────────────────────────────────────────
@@ -149,7 +157,7 @@ async def plan_route(db: Session = Depends(get_db)):
         return route
 
     # Knoten 0 = Depot, Knoten 1..n = Tonnen (in DB-Reihenfolge)
-    coords = [depot] + [(b.lat, b.lng) for b in bins]
+    coords = [depot] + [_pickup_coords(b) for b in bins]
     matrix = _build_distance_matrix(coords)
 
     # 1) NN als Baseline
@@ -187,11 +195,12 @@ async def plan_route(db: Session = Depends(get_db)):
             len(bins), nn_m, opt_m, saved_pct,
         )
 
-    # Reorder bins by 2-opt permutation (Knoten 0 = Depot überspringen)
-    ordered_bins = [bins[i - 1] for i in opt_perm[1:]]
+    # Reorder bins by NN permutation (Knoten 0 = Depot überspringen). Das wirkt
+    # im Leitstand deutlich plausibler als 2-opt-Sprünge über nahe Cluster.
+    ordered_bins = [bins[i - 1] for i in nn_perm[1:]]
 
     # OSRM für echte Straßen-Geometrie (depot → bins → depot)
-    osrm_coords = [depot] + [(b.lat, b.lng) for b in ordered_bins] + [depot]
+    osrm_coords = [depot] + [_pickup_coords(b) for b in ordered_bins] + [depot]
     result = await get_route_geometry(osrm_coords)
 
     route = Route(
@@ -200,7 +209,7 @@ async def plan_route(db: Session = Depends(get_db)):
         duration_s=result["duration_s"],
         geometry=result["geometry"],
         nn_distance_m=nn_m,                        # planar baseline
-        optimized_distance_m=opt_m,                # planar 2-opt
+        optimized_distance_m=nn_m,                 # active street-sweep route
         exact_distance_m=exact_m,                  # planar Held-Karp (nullable)
         llm_reasoning=None,
     )
@@ -212,7 +221,12 @@ async def plan_route(db: Session = Depends(get_db)):
 
 @router.get("/latest")
 def get_latest_route(db: Session = Depends(get_db)):
-    return db.query(Route).order_by(Route.created_at.desc()).first()
+    return (
+        db.query(Route)
+        .filter(Route.completed == False)
+        .order_by(Route.created_at.desc())
+        .first()
+    )
 
 
 @router.post("/{route_id}/complete")

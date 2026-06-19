@@ -9,6 +9,7 @@ from models.event import SecurityEvent
 import truck_state
 
 router = APIRouter()
+LIVE_UPDATE_INTERVAL_S = 0.35
 
 # Simple in-memory connection manager
 class ConnectionManager:
@@ -42,9 +43,15 @@ def _build_live_payload() -> dict:
         return {
             "bins": [
                 {
-                    "id": b.id, "name": b.name, "lat": b.lat, "lng": b.lng,
+                    "id": b.id, "name": b.name, "address": b.address,
+                    "lat": b.lat, "lng": b.lng,
+                    "home_lat": b.home_lat, "home_lng": b.home_lng,
+                    "pickup_lat": b.pickup_lat, "pickup_lng": b.pickup_lng,
+                    "current_lat": b.current_lat, "current_lng": b.current_lng,
                     "fill_level": b.fill_level, "battery": b.battery,
-                    "status": b.status, "locked": b.locked,
+                    "status": b.status, "location_state": b.location_state,
+                    "movement_state": b.movement_state,
+                    "locked": b.locked, "last_seen": str(b.last_seen),
                 }
                 for b in bins
             ],
@@ -65,6 +72,6 @@ async def websocket_live(websocket: WebSocket):
         while True:
             payload = _build_live_payload()
             await websocket.send_text(json.dumps(payload, default=str))
-            await asyncio.sleep(2)
+            await asyncio.sleep(LIVE_UPDATE_INTERVAL_S)
     except WebSocketDisconnect:
         manager.disconnect(websocket)

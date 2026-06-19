@@ -1,0 +1,74 @@
+export interface Bin {
+  id: number;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  fill_level: number;       // 0–100 %
+  battery: number;          // 0–100 %
+  status: "idle" | "en_route" | "emptied" | "locked";
+  locked: boolean;
+  last_seen: string;        // ISO datetime
+}
+
+export interface GeoJSONLineString {
+  type: "LineString";
+  coordinates: [number, number][];   // [lng, lat] pairs (OSRM/GeoJSON spec)
+}
+
+export interface Route {
+  id: number;
+  created_at: string;
+  waypoints: number[];                        // ordered bin IDs
+  distance_m: number;
+  duration_s: number | null;                  // OSRM estimated seconds
+  geometry: GeoJSONLineString | null;         // real street path from OSRM
+  completed: boolean;
+  llm_reasoning: string | null;
+  // TSP-Heuristik-Vergleich (planar, für die Optimierungs-Badge)
+  nn_distance_m: number | null;                // Nearest-Neighbour Baseline
+  optimized_distance_m: number | null;         // 2-opt Optimierung
+  exact_distance_m: number | null;             // Held-Karp Exact (nur n ≤ 15)
+}
+
+export interface SecurityEvent {
+  id: number;
+  bin_id: number;
+  event_type: "tamper" | "theft_attempt" | "unauthorized_open";
+  timestamp: string;
+  resolved: boolean;
+}
+
+export interface EnergyStatus {
+  bin_id: number;
+  name: string;
+  battery: number;
+}
+
+export interface TruckPosition {
+  lat: number;
+  lng: number;
+  action?: string;                // idle | en_route | emptying | returning | returning_full | unloading
+  current_bin_id?: number | null;
+  load_units?: number;
+  capacity_units?: number;
+  load_percent?: number;
+}
+
+// --- Chat / LLM agent ---
+export interface ToolCall {
+  name: string;
+  input: Record<string, unknown>;
+  output?: string;
+  status: "pending" | "done" | "error";
+}
+
+export type ChatMessage =
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string; toolCalls?: ToolCall[] };
+
+export interface LiveData {
+  bins: Bin[];
+  alerts: Pick<SecurityEvent, "id" | "bin_id" | "event_type" | "timestamp">[];
+  truck: TruckPosition | null;
+}

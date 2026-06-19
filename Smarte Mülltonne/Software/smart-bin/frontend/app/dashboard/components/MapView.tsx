@@ -13,11 +13,16 @@ const LeafletMap = dynamic(() => import("./LeafletMap"), {
   ),
 });
 
+type AlertItem = { id: number; bin_id: number; event_type: string; timestamp: string };
+
 interface Props {
   bins: Bin[];
   truck: TruckPosition | null;
   activeRoute: Route | null;
   depot?: { lat: number; lng: number; name: string } | null;
+  selectedBinId?: number | null;
+  onSelectBin?: (id: number | null) => void;
+  alerts?: AlertItem[];
 }
 
 export default function MapView(props: Props) {

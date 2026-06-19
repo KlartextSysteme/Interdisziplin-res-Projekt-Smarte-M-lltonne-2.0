@@ -1,6 +1,13 @@
-from sqlalchemy import create_engine
+import logging
+import math
+
+import httpx
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from config import settings
+
+logger = logging.getLogger(__name__)
+MOVEMENT_MODEL_VERSION = "nearest_road_v1"
 
 engine = create_engine(
     settings.database_url,
@@ -28,7 +35,125 @@ def init_db():
     from models.command import Command
 
     Base.metadata.create_all(bind=engine)
+    _migrate_existing_schema()
     _seed(SessionLocal())
+    _ensure_movement_positions(SessionLocal())
+
+
+def _migrate_existing_schema():
+    """Tiny SQLite-friendly migration layer for demo/dev databases."""
+    with engine.begin() as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(bins)")).fetchall()
+        }
+        if "location_state" not in columns:
+            conn.execute(text("ALTER TABLE bins ADD COLUMN location_state VARCHAR DEFAULT 'home'"))
+        for column in ("home_lat", "home_lng", "pickup_lat", "pickup_lng", "current_lat", "current_lng"):
+            if column not in columns:
+                conn.execute(text(f"ALTER TABLE bins ADD COLUMN {column} FLOAT"))
+        if "movement_state" not in columns:
+            conn.execute(text("ALTER TABLE bins ADD COLUMN movement_state VARCHAR DEFAULT 'home'"))
+        if "movement_model_version" not in columns:
+            conn.execute(text("ALTER TABLE bins ADD COLUMN movement_model_version VARCHAR"))
+
+
+def _default_home_position(bin_id: int, pickup_lat: float, pickup_lng: float) -> tuple[float, float]:
+    # Deterministic small offsets: existing coordinates stay the pickup points,
+    # home points sit 18–34 m away so the autonomous movement is visible.
+    offsets_m = [
+        (-24.0, 10.0),
+        (22.0, -12.0),
+        (-18.0, -18.0),
+        (28.0, 18.0),
+        (12.0, 30.0),
+        (-30.0, -8.0),
+    ]
+    north_m, east_m = offsets_m[(bin_id - 1) % len(offsets_m)]
+    return (
+        pickup_lat + north_m / 111_000,
+        pickup_lng + east_m / 71_000,
+    )
+
+
+def _distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
+    lat1, lng1 = a
+    lat2, lng2 = b
+    return math.hypot((lat2 - lat1) * 111_000, (lng2 - lng1) * 71_000)
+
+
+def _nearest_road_position(lat: float, lng: float) -> tuple[float, float] | None:
+    url = f"{settings.osrm_base_url}/nearest/v1/driving/{lng},{lat}"
+    try:
+        with httpx.Client(timeout=2.5) as client:
+            resp = client.get(url, params={"number": 1})
+            resp.raise_for_status()
+            data = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("nearest-road lookup failed for %.6f,%.6f: %s", lat, lng, exc)
+        return None
+
+    waypoints = data.get("waypoints") or []
+    if not waypoints:
+        return None
+
+    location = waypoints[0].get("location")
+    if not location or len(location) != 2:
+        return None
+
+    snapped = (float(location[1]), float(location[0]))
+    if _distance_m((lat, lng), snapped) > 180:
+        logger.warning("nearest-road lookup too far for %.6f,%.6f -> %.6f,%.6f", lat, lng, *snapped)
+        return None
+    return snapped
+
+
+def _ensure_movement_positions(db):
+    from models.bin import Bin
+
+    try:
+        changed = False
+        for b in db.query(Bin).all():
+            previous_pickup = (
+                b.pickup_lat if b.pickup_lat is not None else b.lat,
+                b.pickup_lng if b.pickup_lng is not None else b.lng,
+            )
+            rebuild_pickup = b.movement_model_version != MOVEMENT_MODEL_VERSION
+
+            if b.home_lat is None or b.home_lng is None:
+                home_lat, home_lng = _default_home_position(b.id, *previous_pickup)
+                b.home_lat = home_lat
+                b.home_lng = home_lng
+                changed = True
+
+            if rebuild_pickup or b.pickup_lat is None or b.pickup_lng is None:
+                road_position = _nearest_road_position(b.home_lat, b.home_lng)
+                b.pickup_lat, b.pickup_lng = road_position or previous_pickup
+                b.movement_model_version = MOVEMENT_MODEL_VERSION
+                changed = True
+
+            if not b.movement_state:
+                b.movement_state = b.location_state or "home"
+                changed = True
+
+            if rebuild_pickup or b.current_lat is None or b.current_lng is None:
+                if b.location_state == "truck":
+                    b.current_lat = b.pickup_lat
+                    b.current_lng = b.pickup_lng
+                    b.movement_state = "pickup"
+                else:
+                    b.current_lat = b.home_lat
+                    b.current_lng = b.home_lng
+                    b.location_state = "home"
+                    b.movement_state = "home"
+                b.lat = b.current_lat
+                b.lng = b.current_lng
+                changed = True
+
+        if changed:
+            db.commit()
+    finally:
+        db.close()
 
 
 def _seed(db):

@@ -4,9 +4,19 @@ export interface Bin {
   address: string;
   lat: number;
   lng: number;
+  home_lat?: number | null;
+  home_lng?: number | null;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
+  current_lat?: number | null;
+  current_lng?: number | null;
   fill_level: number;       // 0–100 %
   battery: number;          // 0–100 %
+  solar_output_w?: number;
+  is_charging?: boolean;
   status: "idle" | "en_route" | "emptied" | "locked";
+  location_state?: "home" | "truck" | "docking" | "unknown" | "moving_to_pickup" | "moving_home" | string;
+  movement_state?: "home" | "moving_to_pickup" | "pickup" | "moving_home" | string;
   locked: boolean;
   last_seen: string;        // ISO datetime
 }
@@ -34,7 +44,13 @@ export interface Route {
 export interface SecurityEvent {
   id: number;
   bin_id: number;
-  event_type: "tamper" | "theft_attempt" | "unauthorized_open";
+  event_type:
+    | "tamper" | "theft_attempt" | "unauthorized_open"
+    | "damage_report" | "hygiene_report"
+    // Pico/Touchpanel-Events (Aufgabe 4)
+    | "lock" | "unlock" | "lid_open" | "lid_close"
+    | "goto_pickup" | "return_home" | "eco_mode" | "power_off"
+    | string;
   timestamp: string;
   resolved: boolean;
 }
