@@ -1,12 +1,16 @@
 "use client";
 
-import { AlertTriangle, Battery, BatteryLow, Lock, Sparkles, Trash2, Wrench } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Battery, BatteryLow, Lock, Plus, Sparkles, Trash2, Wrench } from "lucide-react";
 import { binLocationLabel, binStatusLabel, eventTone, securityEventLabel } from "@/lib/labels";
 import type { Bin, LiveData } from "@/types";
+import PairingModal from "./PairingModal";
 
 interface Props {
   bins: Bin[];
   alerts?: LiveData["alerts"];
+  selectedBinId?: number | null;
+  onSelectBin?: (id: number | null) => void;
 }
 
 function fillColor(pct: number) {
@@ -24,9 +28,10 @@ function batteryIcon(pct: number) {
 }
 
 function locationIcon(locationState?: string | null) {
-  const src = locationState === "truck" || locationState === "moving_to_pickup"
-    ? "/icons/status-truck.svg"
-    : "/icons/status-home.svg";
+  const src =
+    locationState === "truck" || locationState === "moving_to_pickup"
+      ? "/icons/status-truck.svg"
+      : "/icons/status-home.svg";
   return <img src={src} alt="" className="h-3.5 w-3.5 object-contain" />;
 }
 
@@ -36,92 +41,116 @@ function reportIcon(eventType: string) {
   return <AlertTriangle className="h-3 w-3" />;
 }
 
-export default function FleetPanel({ bins, alerts = [] }: Props) {
+export default function FleetPanel({ bins, alerts = [], selectedBinId, onSelectBin }: Props) {
+  const [pairingOpen, setPairingOpen] = useState(false);
+
   return (
-    <aside className="flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-2">
-        <Trash2 className="h-4 w-4 text-[#f2c94c]" />
-        <h2 className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-          Flotte · {bins.length}
-        </h2>
-      </div>
-
-      {bins.map((b) => {
-        const binAlerts = alerts.filter((a) => a.bin_id === b.id);
-        const latestAlert = binAlerts[binAlerts.length - 1];
-        const tone = latestAlert ? eventTone(latestAlert.event_type) : null;
-
-        return (
-        <div
-          key={b.id}
-          className={`rounded border p-3 transition hover:bg-white/[0.055] ${
-            b.locked
-              ? "border-red-400/50 bg-red-500/10"
-              : latestAlert
-                ? tone === "amber"
-                  ? "border-[#f2c94c]/45 bg-[#f2c94c]/10"
-                  : "border-red-400/50 bg-red-500/10"
-                : "border-white/10 bg-[#202328]"
-          }`}
-        >
-          <div className="mb-3 flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{b.name}</p>
-              <p className="truncate text-xs text-slate-400">{b.address}</p>
-            </div>
-            {b.locked ? (
-              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-            ) : (
-              <span className="rounded bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
-                aktiv
-              </span>
-            )}
-          </div>
-
-          <div className="mb-2">
-            <div className="mb-1 flex justify-between text-xs text-slate-400">
-              <span>Füllstand</span>
-              <span className="font-mono font-semibold text-white">{b.fill_level}%</span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-black/35">
-              <div
-                className={`h-full ${fillColor(b.fill_level)} transition-all`}
-                style={{ width: `${b.fill_level}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <div className="flex items-center gap-1">
-              {batteryIcon(b.battery)}
-              <span>Akku {b.battery}%</span>
-            </div>
-            <span className="rounded bg-white/5 px-2 py-0.5 text-slate-300">
-              {binStatusLabel(b.status, b.locked)}
-            </span>
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className="flex items-center gap-1 rounded bg-white/5 px-2 py-0.5 text-slate-300">
-              {locationIcon(b.location_state)}
-              {binLocationLabel(b.location_state)}
-            </span>
-            {latestAlert && (
-              <span
-                className={`flex items-center gap-1 rounded px-2 py-0.5 font-medium ${
-                  tone === "amber"
-                    ? "bg-[#f2c94c]/15 text-[#f2c94c]"
-                    : "bg-red-400/15 text-red-300"
-                }`}
-              >
-                {reportIcon(latestAlert.event_type)}
-                {securityEventLabel(latestAlert.event_type)}
-              </span>
-            )}
-          </div>
+    <>
+      <aside className="flex flex-col gap-3 p-4">
+        {/* Header mit Pairing-Button */}
+        <div className="flex items-center gap-2">
+          <Trash2 className="h-4 w-4 text-[#f2c94c]" />
+          <h2 className="flex-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+            Flotte · {bins.length}
+          </h2>
+          <button
+            onClick={() => setPairingOpen(true)}
+            title="Neue Tonne verbinden"
+            className="flex items-center gap-1 rounded border border-[#f2c94c]/30 bg-[#f2c94c]/10 px-2 py-1 text-[10px] font-semibold text-[#f2c94c] transition hover:bg-[#f2c94c]/20"
+          >
+            <Plus className="h-3 w-3" />
+            Verbinden
+          </button>
         </div>
-        );
-      })}
-    </aside>
+
+        {bins.map((b) => {
+          const binAlerts = alerts.filter((a) => a.bin_id === b.id);
+          const latestAlert = binAlerts[binAlerts.length - 1];
+          const tone = latestAlert ? eventTone(latestAlert.event_type) : null;
+          const isSelected = selectedBinId === b.id;
+
+          return (
+            <div
+              key={b.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectBin?.(isSelected ? null : b.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onSelectBin?.(isSelected ? null : b.id);
+              }}
+              className={`cursor-pointer rounded border p-3 transition hover:bg-white/[0.055] focus:outline-none focus:ring-1 focus:ring-[#f2c94c]/50 ${
+                isSelected
+                  ? "border-[#f2c94c]/70 bg-[#f2c94c]/10 ring-1 ring-[#f2c94c]/30"
+                  : b.locked
+                    ? "border-red-400/50 bg-red-500/10"
+                    : latestAlert
+                      ? tone === "amber"
+                        ? "border-[#f2c94c]/45 bg-[#f2c94c]/10"
+                        : "border-red-400/50 bg-red-500/10"
+                      : "border-white/10 bg-[#202328]"
+              }`}
+            >
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{b.name}</p>
+                  <p className="truncate text-xs text-slate-400">{b.address}</p>
+                </div>
+                {b.locked ? (
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                ) : (
+                  <span className="rounded bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+                    aktiv
+                  </span>
+                )}
+              </div>
+
+              <div className="mb-2">
+                <div className="mb-1 flex justify-between text-xs text-slate-400">
+                  <span>Füllstand</span>
+                  <span className="font-mono font-semibold text-white">{b.fill_level}%</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-black/35">
+                  <div
+                    className={`h-full ${fillColor(b.fill_level)} transition-all`}
+                    style={{ width: `${b.fill_level}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="flex items-center gap-1">
+                  {batteryIcon(b.battery)}
+                  <span>Akku {b.battery}%</span>
+                </div>
+                <span className="rounded bg-white/5 px-2 py-0.5 text-slate-300">
+                  {binStatusLabel(b.status, b.locked)}
+                </span>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="flex items-center gap-1 rounded bg-white/5 px-2 py-0.5 text-slate-300">
+                  {locationIcon(b.location_state)}
+                  {binLocationLabel(b.location_state)}
+                </span>
+                {latestAlert && (
+                  <span
+                    className={`flex items-center gap-1 rounded px-2 py-0.5 font-medium ${
+                      tone === "amber"
+                        ? "bg-[#f2c94c]/15 text-[#f2c94c]"
+                        : "bg-red-400/15 text-red-300"
+                    }`}
+                  >
+                    {reportIcon(latestAlert.event_type)}
+                    {securityEventLabel(latestAlert.event_type)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </aside>
+
+      {pairingOpen && <PairingModal onClose={() => setPairingOpen(false)} />}
+    </>
   );
 }

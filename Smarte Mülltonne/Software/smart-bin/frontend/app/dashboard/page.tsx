@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [planning, setPlanning] = useState(false);
   const [simSpeed, setSimSpeedState] = useState<number>(1);
   const [simPaused, setSimPausedState] = useState<boolean>(false);
+  const [selectedBinId, setSelectedBinId] = useState<number | null>(null);
 
   // Load current sim-state once
   useEffect(() => {
@@ -211,11 +212,24 @@ export default function DashboardPage() {
 
       <div className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
         <div className="h-64 w-full shrink-0 overflow-y-auto border-b border-white/10 bg-[#1a1c20] lg:h-auto lg:w-[19rem] lg:border-r lg:border-b-0">
-          <FleetPanel bins={[...bins].sort((a, b) => b.fill_level - a.fill_level)} alerts={alerts} />
+          <FleetPanel
+            bins={[...bins].sort((a, b) => b.fill_level - a.fill_level)}
+            alerts={alerts}
+            selectedBinId={selectedBinId}
+            onSelectBin={setSelectedBinId}
+          />
         </div>
 
         <div className="relative h-[28rem] shrink-0 bg-[#111214] lg:h-auto lg:flex-1 lg:shrink">
-          <MapView bins={bins} truck={truck} activeRoute={activeRoute} depot={config?.depot ?? null} />
+          <MapView
+            bins={bins}
+            truck={truck}
+            activeRoute={activeRoute}
+            depot={config?.depot ?? null}
+            selectedBinId={selectedBinId}
+            onSelectBin={setSelectedBinId}
+            alerts={alerts}
+          />
         </div>
 
         <div className="flex min-h-[36rem] w-full shrink-0 flex-col border-t border-white/10 bg-[#1a1c20] lg:min-h-0 lg:w-[25rem] lg:border-t-0 lg:border-l">

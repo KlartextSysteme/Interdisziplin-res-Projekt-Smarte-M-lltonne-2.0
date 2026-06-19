@@ -44,7 +44,13 @@ export interface Route {
 export interface SecurityEvent {
   id: number;
   bin_id: number;
-  event_type: "tamper" | "theft_attempt" | "unauthorized_open" | "damage_report" | "hygiene_report";
+  event_type:
+    | "tamper" | "theft_attempt" | "unauthorized_open"
+    | "damage_report" | "hygiene_report"
+    // Pico/Touchpanel-Events (Aufgabe 4)
+    | "lock" | "unlock" | "lid_open" | "lid_close"
+    | "goto_pickup" | "return_home" | "eco_mode" | "power_off"
+    | string;
   timestamp: string;
   resolved: boolean;
 }
