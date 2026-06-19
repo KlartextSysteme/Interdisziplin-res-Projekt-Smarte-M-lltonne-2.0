@@ -45,8 +45,8 @@ POST_STATUS_MS = 8000
 ENABLE_BACKEND_ACTIONS = False
 ADMIN_TOKEN = ""
 
-# Local maintenance PIN. Keep numeric for the on-screen keypad.
-MAINTENANCE_PIN = "1234"
+# Local maintenance PIN. The on-screen keypad supports digits plus * and #.
+MAINTENANCE_PIN = "12#"
 
 
 def make_output(pin_no, value=1):

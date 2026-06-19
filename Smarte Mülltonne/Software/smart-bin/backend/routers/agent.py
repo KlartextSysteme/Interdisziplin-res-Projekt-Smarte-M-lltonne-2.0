@@ -16,8 +16,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import AIMessage, HumanMessage
 
-from agent.planner import get_agent
-
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -48,6 +46,8 @@ def _history_to_messages(history: list[ChatHistoryItem] | None):
 
 async def _stream(payload: ChatRequest) -> AsyncIterator[str]:
     try:
+        from agent.planner import get_agent
+
         executor = get_agent()
     except Exception as e:
         logger.exception("agent init failed")

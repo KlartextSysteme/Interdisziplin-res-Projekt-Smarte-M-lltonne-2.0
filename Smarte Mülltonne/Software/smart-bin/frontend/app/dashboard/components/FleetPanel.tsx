@@ -1,11 +1,12 @@
 "use client";
 
-import { Battery, BatteryLow, Lock, Trash2 } from "lucide-react";
-import { binStatusLabel } from "@/lib/labels";
-import type { Bin } from "@/types";
+import { AlertTriangle, Battery, BatteryLow, Lock, Sparkles, Trash2, Wrench } from "lucide-react";
+import { binLocationLabel, binStatusLabel, eventTone, securityEventLabel } from "@/lib/labels";
+import type { Bin, LiveData } from "@/types";
 
 interface Props {
   bins: Bin[];
+  alerts?: LiveData["alerts"];
 }
 
 function fillColor(pct: number) {
@@ -22,7 +23,20 @@ function batteryIcon(pct: number) {
   );
 }
 
-export default function FleetPanel({ bins }: Props) {
+function locationIcon(locationState?: string | null) {
+  const src = locationState === "truck" || locationState === "moving_to_pickup"
+    ? "/icons/status-truck.svg"
+    : "/icons/status-home.svg";
+  return <img src={src} alt="" className="h-3.5 w-3.5 object-contain" />;
+}
+
+function reportIcon(eventType: string) {
+  if (eventType === "damage_report") return <Wrench className="h-3 w-3" />;
+  if (eventType === "hygiene_report") return <Sparkles className="h-3 w-3" />;
+  return <AlertTriangle className="h-3 w-3" />;
+}
+
+export default function FleetPanel({ bins, alerts = [] }: Props) {
   return (
     <aside className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
@@ -32,11 +46,22 @@ export default function FleetPanel({ bins }: Props) {
         </h2>
       </div>
 
-      {bins.map((b) => (
+      {bins.map((b) => {
+        const binAlerts = alerts.filter((a) => a.bin_id === b.id);
+        const latestAlert = binAlerts[binAlerts.length - 1];
+        const tone = latestAlert ? eventTone(latestAlert.event_type) : null;
+
+        return (
         <div
           key={b.id}
           className={`rounded border p-3 transition hover:bg-white/[0.055] ${
-            b.locked ? "border-red-400/50 bg-red-500/10" : "border-white/10 bg-[#202328]"
+            b.locked
+              ? "border-red-400/50 bg-red-500/10"
+              : latestAlert
+                ? tone === "amber"
+                  ? "border-[#f2c94c]/45 bg-[#f2c94c]/10"
+                  : "border-red-400/50 bg-red-500/10"
+                : "border-white/10 bg-[#202328]"
           }`}
         >
           <div className="mb-3 flex items-start justify-between gap-2">
@@ -75,8 +100,28 @@ export default function FleetPanel({ bins }: Props) {
               {binStatusLabel(b.status, b.locked)}
             </span>
           </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="flex items-center gap-1 rounded bg-white/5 px-2 py-0.5 text-slate-300">
+              {locationIcon(b.location_state)}
+              {binLocationLabel(b.location_state)}
+            </span>
+            {latestAlert && (
+              <span
+                className={`flex items-center gap-1 rounded px-2 py-0.5 font-medium ${
+                  tone === "amber"
+                    ? "bg-[#f2c94c]/15 text-[#f2c94c]"
+                    : "bg-red-400/15 text-red-300"
+                }`}
+              >
+                {reportIcon(latestAlert.event_type)}
+                {securityEventLabel(latestAlert.event_type)}
+              </span>
+            )}
+          </div>
         </div>
-      ))}
+        );
+      })}
     </aside>
   );
 }

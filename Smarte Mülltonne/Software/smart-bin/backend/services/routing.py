@@ -21,6 +21,7 @@ class RouteResult(TypedDict):
     distance_m: int
     duration_s: int
     source: str                 # "osrm" | "fallback"
+    legs: list[dict]
 
 
 def _haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -34,6 +35,21 @@ def _haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
 def _fallback(coords: list[tuple[float, float]]) -> RouteResult:
     """Straight-line fallback when OSRM is unreachable."""
     total = sum(_haversine_m(coords[i], coords[i + 1]) for i in range(len(coords) - 1))
+    legs = []
+    for index in range(len(coords) - 1):
+        start = coords[index]
+        end = coords[index + 1]
+        distance_m = int(_haversine_m(start, end))
+        legs.append(
+            {
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[start[1], start[0]], [end[1], end[0]]],
+                },
+                "distance_m": distance_m,
+                "duration_s": int(distance_m / 8.0),
+            }
+        )
     return {
         "geometry": {
             "type": "LineString",
@@ -42,7 +58,26 @@ def _fallback(coords: list[tuple[float, float]]) -> RouteResult:
         "distance_m": int(total),
         "duration_s": int(total / 8.0),   # assume 8 m/s (~29 km/h) average speed
         "source": "fallback",
+        "legs": legs,
     }
+
+
+def _leg_geometry_from_steps(leg: dict) -> dict | None:
+    coords: list[list[float]] = []
+    for step in leg.get("steps") or []:
+        step_coords = ((step.get("geometry") or {}).get("coordinates") or [])
+        if not step_coords:
+            continue
+        if not coords:
+            coords.extend(step_coords)
+        elif coords[-1] == step_coords[0]:
+            coords.extend(step_coords[1:])
+        else:
+            coords.extend(step_coords)
+
+    if len(coords) < 2:
+        return None
+    return {"type": "LineString", "coordinates": coords}
 
 
 async def get_route_geometry(coords: list[tuple[float, float]]) -> RouteResult:
@@ -57,7 +92,7 @@ async def get_route_geometry(coords: list[tuple[float, float]]) -> RouteResult:
     # OSRM wants lng,lat;lng,lat;...
     path_coords = ";".join(f"{lng},{lat}" for lat, lng in coords)
     url = f"{settings.osrm_base_url}/route/v1/driving/{path_coords}"
-    params = {"overview": "full", "geometries": "geojson", "steps": "false"}
+    params = {"overview": "full", "geometries": "geojson", "steps": "true"}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -70,11 +105,21 @@ async def get_route_geometry(coords: list[tuple[float, float]]) -> RouteResult:
             return _fallback(coords)
 
         route = data["routes"][0]
+        legs = []
+        for leg in route.get("legs") or []:
+            legs.append(
+                {
+                    "geometry": _leg_geometry_from_steps(leg),
+                    "distance_m": int(leg.get("distance") or 0),
+                    "duration_s": int(leg.get("duration") or 0),
+                }
+            )
         return {
             "geometry": route["geometry"],
             "distance_m": int(route["distance"]),
             "duration_s": int(route["duration"]),
             "source": "osrm",
+            "legs": legs,
         }
     except (httpx.HTTPError, ValueError, KeyError) as e:
         logger.warning("OSRM request failed, falling back to straight-line: %s", e)

@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-pi-pico",
+      "id": "pico",
+      "top": 169.65,
+      "left": -102,
+      "attrs": { "env": "micropython-20241129-v1.24.1" }
+    },
+    {
+      "type": "wokwi-stepper-motor",
+      "id": "stepper1",
+      "top": -159.59,
+      "left": -9.17,
+      "attrs": { "size": "17" }
+    },
+    { "type": "wokwi-a4988", "id": "drv1", "top": 52.8, "left": -14.4, "attrs": {} },
+    {
+      "type": "wokwi-stepper-motor",
+      "id": "stepper2",
+      "top": -159.59,
+      "left": -191.57,
+      "attrs": { "size": "17" }
+    },
+    { "type": "wokwi-a4988", "id": "drv2", "top": 52.8, "left": -283.2, "attrs": {} },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "ultrasonic1",
+      "top": -8.1,
+      "left": 187.9,
+      "attrs": { "distance": "236" }
+    },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "ultrasonic2",
+      "top": 404.7,
+      "left": -224.9,
+      "attrs": { "distance": "317" }
+    },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "ultrasonic3",
+      "top": 30.3,
+      "left": -580.1,
+      "attrs": { "distance": "208" }
+    }
+  ],
+  "connections": [
+    [ "stepper1:A-", "drv1:2B", "green", [ "v0" ] ],
+    [ "stepper1:A+", "drv1:2A", "green", [ "v67.2", "h-28.8" ] ],
+    [ "stepper1:B+", "drv1:1A", "green", [ "v0" ] ],
+    [ "stepper1:B-", "drv1:1B", "green", [ "v0" ] ],
+    [ "drv1:GND.2", "pico:GND.8", "black", [ "h-86.25", "v134.48" ] ],
+    [ "drv1:SLEEP", "drv1:RESET", "green", [ "h0" ] ],
+    [ "stepper2:A-", "drv2:2B", "green", [ "v0" ] ],
+    [ "stepper2:A+", "drv2:2A", "green", [ "v0" ] ],
+    [ "stepper2:B+", "drv2:1A", "green", [ "v0" ] ],
+    [ "stepper2:B-", "drv2:1B", "green", [ "v0" ] ],
+    [ "drv2:GND.2", "pico:GND.1", "black", [ "h-9.45", "v105.68", "v28.8" ] ],
+    [ "drv2:SLEEP", "drv2:RESET", "green", [ "h0" ] ],
+    [ "drv1:VDD", "pico:3V3_EN", "red", [ "h28.95", "v48.08", "h-97.2" ] ],
+    [ "drv1:DIR", "pico:GP0", "orange", [ "h0" ] ],
+    [ "drv1:STEP", "pico:GP1", "orange", [ "h-105.6", "v76.8" ] ],
+    [ "drv2:DIR", "pico:GP2", "orange", [ "h-19.2", "v86.4" ] ],
+    [ "drv2:STEP", "pico:GP3", "orange", [ "h-28.8", "v105.6" ] ],
+    [ "ultrasonic1:VCC", "pico:3V3_EN", "red", [ "v124.8", "h-288" ] ],
+    [ "ultrasonic1:GND", "pico:GND.8", "black", [ "v0" ] ],
+    [ "ultrasonic1:TRIG", "pico:GP4", "orange", [ "v0" ] ],
+    [ "ultrasonic1:ECHO", "pico:GP5", "orange", [ "v0" ] ],
+    [ "ultrasonic3:TRIG", "pico:GP6", "orange", [ "v0" ] ],
+    [ "ultrasonic3:ECHO", "pico:GP7", "orange", [ "v0" ] ],
+    [ "ultrasonic2:TRIG", "pico:GP8", "orange", [ "v0" ] ],
+    [ "ultrasonic2:ECHO", "pico:GP9", "orange", [ "v0" ] ],
+    [ "drv2:VDD", "pico:3V3_EN", "red", [ "h28.95", "v28.88", "h171.6" ] ],
+    [ "ultrasonic3:VCC", "pico:3V3_EN", "red", [ "v0" ] ],
+    [ "ultrasonic2:VCC", "pico:3V3_EN", "red", [ "v48", "h201.6", "v-336" ] ],
+    [ "ultrasonic2:GND", "pico:GND.2", "black", [ "h8.4", "v-249.6" ] ],
+    [ "ultrasonic3:GND", "pico:GND.2", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

@@ -22,7 +22,20 @@ def _security_event_label(event_type: str) -> str:
         "tamper": "Manipulationsalarm",
         "theft_attempt": "Diebstahlversuch",
         "unauthorized_open": "Unbefugtes Öffnen",
+        "damage_report": "Beschädigung gemeldet",
+        "hygiene_report": "Hygieneproblem gemeldet",
     }.get(event_type, event_type)
+
+
+def _location_state_label(location_state: str | None) -> str:
+    return {
+        "home": "Am Haus",
+        "truck": "Abholposition",
+        "moving_to_pickup": "Fährt zur Abholposition",
+        "moving_home": "Fährt nach Hause",
+        "docking": "Dockingstation",
+        "unknown": "Position unbekannt",
+    }.get(location_state or "unknown", location_state or "Position unbekannt")
 
 
 def _admin_headers() -> dict[str, str]:
@@ -45,6 +58,7 @@ def get_bins() -> str:
             "fuellstand_prozent": b["fill_level"],
             "akku_prozent": b["battery"],
             "status": _bin_status_label(b["status"], b["locked"]),
+            "position": _location_state_label(b.get("location_state")),
             "gesperrt": b["locked"],
         }
         for b in data
@@ -128,12 +142,12 @@ def empty_bin_manual(bin_id: int) -> str:
 
 @tool
 def get_security_events() -> str:
-    """Aktuelle, nicht quittierte Sicherheitsmeldungen."""
+    """Aktuelle, nicht quittierte Sicherheits- und Problem-Meldungen."""
     resp = httpx.get(f"{BASE_URL}/security/events", timeout=10)
     resp.raise_for_status()
     events = resp.json()
     if not events:
-        return "Keine offenen Sicherheitsmeldungen."
+        return "Keine offenen Meldungen."
     cleaned = [
         {
             "id": e["id"],

@@ -1,4 +1,4 @@
-const LOCAL_API_URL = "http://localhost:8000";
+const LOCAL_API_URL = "http://127.0.0.1:8000";
 const RENDER_API_URL = "https://smarte-muelltonne-2-api.onrender.com";
 
 function isRenderHost() {

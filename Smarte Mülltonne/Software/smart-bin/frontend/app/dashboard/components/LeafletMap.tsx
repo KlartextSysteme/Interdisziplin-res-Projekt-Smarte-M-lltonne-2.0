@@ -1,22 +1,58 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { CircleMarker, MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { binStatusLabel, truckActionLabel } from "@/lib/labels";
+import { Crosshair, Truck } from "lucide-react";
+import { binLocationLabel, binStatusLabel, truckActionLabel } from "@/lib/labels";
 import type { Bin, Route, TruckPosition } from "@/types";
 
 // Soest Altstadt centroid (initial fallback)
 const SOEST_CENTER: [number, number] = [51.5700, 8.1150];
+const MARKER_TELEPORT_THRESHOLD = 0.01;
+
+function binCurrentPosition(bin: Bin): [number, number] {
+  return [bin.current_lat ?? bin.lat, bin.current_lng ?? bin.lng];
+}
+
+function binHomePosition(bin: Bin): [number, number] | null {
+  if (bin.home_lat == null || bin.home_lng == null) return null;
+  return [bin.home_lat, bin.home_lng];
+}
+
+function binPickupPosition(bin: Bin): [number, number] | null {
+  if (bin.pickup_lat == null || bin.pickup_lng == null) return null;
+  return [bin.pickup_lat, bin.pickup_lng];
+}
+
+function isMovingBin(bin: Bin): boolean {
+  return bin.location_state === "moving_to_pickup" || bin.location_state === "moving_home";
+}
 
 function FitToBins({ bins }: { bins: Bin[] }) {
   const map = useMap();
   useEffect(() => {
     if (bins.length === 0) return;
-    const bounds = L.latLngBounds(bins.map((b) => [b.lat, b.lng] as [number, number]));
+    const bounds = L.latLngBounds(bins.map(binCurrentPosition));
     map.fitBounds(bounds, { padding: [40, 40] });
   }, [map, bins.length]);
+  return null;
+}
+
+function TruckFocusController({ truck, active }: { truck: TruckPosition | null; active: boolean }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!active || !truck) return;
+
+    map.panTo([truck.lat, truck.lng], {
+      animate: true,
+      duration: 0.35,
+      easeLinearity: 0.2,
+    });
+  }, [active, map, truck?.lat, truck?.lng]);
+
   return null;
 }
 
@@ -24,6 +60,17 @@ function fillColor(pct: number): string {
   if (pct >= 80) return "#ef4444"; // red-500
   if (pct >= 50) return "#f2c94c";
   return "#10b981";                 // emerald-500
+}
+
+function locationBadge(locationState?: string | null): string {
+  const src = locationState === "truck" || locationState === "moving_to_pickup"
+    ? "/icons/status-truck.svg"
+    : "/icons/status-home.svg";
+
+  return `
+    <div style="position:absolute;right:-4px;bottom:1px;width:18px;height:18px;border-radius:9999px;background:#111214;border:2px solid #f2c94c;display:flex;align-items:center;justify-content:center;">
+      <img src="${src}" alt="" style="width:12px;height:12px;object-fit:contain;display:block;" />
+    </div>`;
 }
 
 function binIcon(bin: Bin): L.DivIcon {
@@ -42,12 +89,17 @@ function binIcon(bin: Bin): L.DivIcon {
             ${bin.fill_level}
           </text>
         </svg>
+        ${locationBadge(bin.location_state)}
       </div>
     `,
     iconSize: [32, 40],
     iconAnchor: [16, 40],
     popupAnchor: [0, -36],
   });
+}
+
+function animationDuration(updateGap: number): number {
+  return Math.min(700, Math.max(240, updateGap * 0.9));
 }
 
 /**
@@ -86,14 +138,18 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
     fromRef.current = from;
     toRef.current = target;
     startRef.current = now;
-    durationRef.current = Math.min(1800, Math.max(850, updateGap * 1.15));
+    durationRef.current = animationDuration(updateGap);
+    cancelAnimationFrame(rafRef.current);
 
     if (Math.abs(from[0] - target[0]) < 0.000001 && Math.abs(from[1] - target[1]) < 0.000001) {
       marker.setLatLng(target);
       return;
     }
 
-    cancelAnimationFrame(rafRef.current);
+    if (Math.abs(from[0] - target[0]) > MARKER_TELEPORT_THRESHOLD || Math.abs(from[1] - target[1]) > MARKER_TELEPORT_THRESHOLD) {
+      marker.setLatLng(target);
+      return;
+    }
 
     const tick = (time: number) => {
       const m = markerRef.current;
@@ -132,6 +188,85 @@ function AnimatedTruckMarker({ truck }: { truck: TruckPosition }) {
                 : ""}
             </p>
           )}
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
+function AnimatedBinMarker({ bin, position }: { bin: Bin; position: [number, number] }) {
+  const markerRef = useRef<L.Marker | null>(null);
+  const initialPositionRef = useRef<[number, number]>(position);
+  const initialIconRef = useRef<L.DivIcon>(binIcon(bin));
+  const fromRef = useRef<[number, number]>(position);
+  const toRef = useRef<[number, number]>(position);
+  const startRef = useRef<number>(performance.now());
+  const lastUpdateRef = useRef<number>(performance.now());
+  const durationRef = useRef<number>(350);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) return;
+    marker.setIcon(binIcon(bin));
+  }, [bin.fill_level, bin.locked, bin.location_state]);
+
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) return;
+
+    const current = marker.getLatLng();
+    const from: [number, number] = [current.lat, current.lng];
+    const now = performance.now();
+    const updateGap = now - lastUpdateRef.current;
+
+    lastUpdateRef.current = now;
+    fromRef.current = from;
+    toRef.current = position;
+    startRef.current = now;
+    durationRef.current = animationDuration(updateGap);
+    cancelAnimationFrame(rafRef.current);
+
+    if (Math.abs(from[0] - position[0]) < 0.000001 && Math.abs(from[1] - position[1]) < 0.000001) {
+      marker.setLatLng(position);
+      return;
+    }
+
+    if (Math.abs(from[0] - position[0]) > MARKER_TELEPORT_THRESHOLD || Math.abs(from[1] - position[1]) > MARKER_TELEPORT_THRESHOLD) {
+      marker.setLatLng(position);
+      return;
+    }
+
+    const tick = (time: number) => {
+      const m = markerRef.current;
+      if (!m) return;
+      const t = Math.min(1, (time - startRef.current) / durationRef.current);
+      const lat = fromRef.current[0] + (toRef.current[0] - fromRef.current[0]) * t;
+      const lng = fromRef.current[1] + (toRef.current[1] - fromRef.current[1]) * t;
+      m.setLatLng([lat, lng]);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [position[0], position[1]]);
+
+  return (
+    <Marker
+      ref={(el) => {
+        markerRef.current = el ?? null;
+      }}
+      position={initialPositionRef.current}
+      icon={initialIconRef.current}
+    >
+      <Popup>
+        <div className="space-y-1">
+          <p className="font-semibold text-white">{bin.name}</p>
+          <p className="text-xs text-slate-300">{bin.address}</p>
+          <p className="text-xs">Füllstand: <span className="font-medium">{bin.fill_level}%</span></p>
+          <p className="text-xs">Akku: {bin.battery}%</p>
+          <p className="text-xs text-slate-300">Position: {binLocationLabel(bin.location_state)}</p>
+          <p className="text-xs text-slate-300">Status: {binStatusLabel(bin.status, bin.locked)}</p>
         </div>
       </Popup>
     </Marker>
@@ -184,6 +319,9 @@ function depotIcon(): L.DivIcon {
 }
 
 export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
+  const [truckFocusActive, setTruckFocusActive] = useState(false);
+  const activeRouteBins = new Set(activeRoute?.waypoints ?? []);
+
   // Prefer OSRM geometry (real streets) over straight-line fallback
   const geometryLine: [number, number][] = activeRoute?.geometry
     ? activeRoute.geometry.coordinates.map(([lng, lat]) => [lat, lng])
@@ -194,56 +332,99 @@ export default function LeafletMap({ bins, truck, activeRoute, depot }: Props) {
     ? (activeRoute?.waypoints
         .map((id) => bins.find((b) => b.id === id))
         .filter((b): b is Bin => !!b)
-        .map((b) => [b.lat, b.lng] as [number, number]) ?? [])
+        .map((b) => binPickupPosition(b) ?? binCurrentPosition(b)) ?? [])
     : [];
 
   return (
-    <MapContainer
-      center={SOEST_CENTER}
-      zoom={14}
-      scrollWheelZoom
-      className="h-full w-full"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <FitToBins bins={bins} />
+    <div className="relative h-full w-full">
+      <MapContainer
+        center={SOEST_CENTER}
+        zoom={14}
+        scrollWheelZoom
+        className="h-full w-full"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <FitToBins bins={bins} />
+        <TruckFocusController truck={truck} active={truckFocusActive} />
 
-      {/* Real OSRM route — solid blue line following actual streets */}
-      {geometryLine.length > 1 && (
-        <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
-      )}
+        {/* Real OSRM route — solid blue line following actual streets */}
+        {geometryLine.length > 1 && (
+          <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
+        )}
 
-      {/* Fallback straight line when OSRM unavailable */}
-      {fallbackLine.length > 1 && (
-        <Polyline positions={fallbackLine} color="#94a3b8" weight={3} opacity={0.5} dashArray="8 8" />
-      )}
+        {/* Fallback straight line when OSRM unavailable */}
+        {fallbackLine.length > 1 && (
+          <Polyline positions={fallbackLine} color="#94a3b8" weight={3} opacity={0.5} dashArray="8 8" />
+        )}
 
-      {depot && (
-        <Marker position={[depot.lat, depot.lng]} icon={depotIcon()}>
-          <Popup>
-            <p className="font-semibold text-white">{depot.name}</p>
-            <p className="text-xs text-slate-300">Betriebshof</p>
-          </Popup>
-        </Marker>
-      )}
+        {depot && (
+          <Marker position={[depot.lat, depot.lng]} icon={depotIcon()}>
+            <Popup>
+              <p className="font-semibold text-white">{depot.name}</p>
+              <p className="text-xs text-slate-300">Betriebshof</p>
+            </Popup>
+          </Marker>
+        )}
 
-      {bins.map((bin) => (
-        <Marker key={bin.id} position={[bin.lat, bin.lng]} icon={binIcon(bin)}>
-          <Popup>
-            <div className="space-y-1">
-              <p className="font-semibold text-white">{bin.name}</p>
-              <p className="text-xs text-slate-300">{bin.address}</p>
-              <p className="text-xs">Füllstand: <span className="font-medium">{bin.fill_level}%</span></p>
-              <p className="text-xs">Akku: {bin.battery}%</p>
-              <p className="text-xs text-slate-300">Status: {binStatusLabel(bin.status, bin.locked)}</p>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+        {bins.map((bin) => {
+          const current = binCurrentPosition(bin);
+          const home = binHomePosition(bin);
+          const pickup = binPickupPosition(bin);
+          const showMovementPath = Boolean(
+            home && pickup && (activeRouteBins.has(bin.id) || isMovingBin(bin) || bin.location_state === "truck"),
+          );
 
-      {truck && <AnimatedTruckMarker truck={truck} />}
-    </MapContainer>
+          return (
+            <Fragment key={bin.id}>
+              {showMovementPath && (
+                <>
+                  <Polyline
+                    positions={[home!, pickup!]}
+                    color="#f2c94c"
+                    weight={2}
+                    opacity={0.48}
+                    dashArray="4 6"
+                  />
+                  <CircleMarker
+                    center={pickup!}
+                    radius={4}
+                    pathOptions={{
+                      color: "#f2c94c",
+                      weight: 2,
+                      fillColor: "#111214",
+                      fillOpacity: 0.85,
+                    }}
+                  />
+                </>
+              )}
+              <AnimatedBinMarker bin={bin} position={current} />
+            </Fragment>
+          );
+        })}
+
+        {truck && <AnimatedTruckMarker truck={truck} />}
+      </MapContainer>
+
+      <button
+        type="button"
+        disabled={!truck}
+        onClick={() => setTruckFocusActive((active) => !active)}
+        title={truckFocusActive ? "Truck-Fokus deaktivieren" : "Truck fokussieren"}
+        aria-label={truckFocusActive ? "Truck-Fokus deaktivieren" : "Truck fokussieren"}
+        aria-pressed={truckFocusActive}
+        className={[
+          "absolute left-3 top-[86px] z-[1000] flex h-9 w-9 items-center justify-center rounded border shadow-lg transition",
+          truckFocusActive
+            ? "border-[#f2c94c] bg-[#f2c94c] text-[#111214] shadow-[#f2c94c]/20"
+            : "border-[#3a3f46] bg-[#181b20] text-[#f2c94c] hover:border-[#f2c94c]/70",
+          !truck ? "cursor-not-allowed opacity-45" : "",
+        ].join(" ")}
+      >
+        {truckFocusActive ? <Truck size={18} strokeWidth={2.4} /> : <Crosshair size={18} strokeWidth={2.4} />}
+      </button>
+    </div>
   );
 }

@@ -62,17 +62,17 @@ motor2 = StepperPWM(
 
 while True:
     print("Motor 1 forward")
-    motor1.move(5200, 1)
+    motor1.move(15000, 1) 
     sleep(1)
 
     print("Motor 1 backward")
-    motor1.move(5200, 0)
+    motor1.move(15000, 0)
     sleep(1)
 
-    print("Motor 2 forward")
-    motor2.move(5200, 1)
-    sleep(1)
+##    print("Motor 2 forward")
+##    motor2.move(5200, 1)
+##    sleep(1)
 
-    print("Motor 2 backward")
-    motor2.move(5200, 0)
-    sleep(1)
+##    print("Motor 2 backward")
+##    motor2.move(5200, 0)
+##    sleep(1) 

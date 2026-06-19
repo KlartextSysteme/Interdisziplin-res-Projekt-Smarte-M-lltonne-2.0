@@ -154,7 +154,7 @@ class TouchUi:
                 self.pin = ""
                 self.draw_pin()
             return
-        if len(self.pin) < 4 and key in "0123456789":
+        if len(self.pin) < len(MAINTENANCE_PIN) and key in "0123456789*#":
             self.pin += key
             self.draw_pin()
 
@@ -240,6 +240,8 @@ class TouchUi:
         self.r.draw_at_keyed(asset, 10, 190, ASSET_KEY)
 
     def draw_fill_overlay(self):
+        body_asset = "fillbody_base_light" if self.light_mode else "fillbody_base"
+        self.r.draw_at_keyed(body_asset, 120, 96, ASSET_KEY)
         self.r.draw_at_keyed("fillbar_" + str(self.fill_level), 120, 96, ASSET_KEY)
 
         # Repaint the small label field above the fill area in a 4:3 ratio.
@@ -259,7 +261,7 @@ class TouchUi:
         self.buttons.append(Button(187, 91, 110, 38, "pin_clear"))
         self.buttons.append(Button(187, 140, 110, 38, "pin_ok"))
         self.buttons.append(Button(187, 189, 110, 35, "pin_back"))
-        self.r.draw("pin_" + str(min(4, len(self.pin))))
+        self.r.draw("pin_" + str(min(len(MAINTENANCE_PIN), len(self.pin))))
 
     def draw_menu(self, page):
         self.menu_page = page

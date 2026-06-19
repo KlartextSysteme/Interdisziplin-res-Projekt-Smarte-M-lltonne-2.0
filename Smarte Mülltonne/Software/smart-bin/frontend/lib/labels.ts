@@ -29,6 +29,24 @@ export function securityEventLabel(eventType: string): string {
     tamper: "Manipulationsalarm",
     theft_attempt: "Diebstahlversuch",
     unauthorized_open: "Unbefugtes Öffnen",
+    damage_report: "Beschädigung gemeldet",
+    hygiene_report: "Hygieneproblem gemeldet",
   };
   return labels[eventType] ?? eventType;
+}
+
+export function binLocationLabel(locationState?: string | null): string {
+  const labels: Record<string, string> = {
+    home: "Am Haus",
+    truck: "Abholposition",
+    moving_to_pickup: "Fährt zur Abholposition",
+    moving_home: "Fährt nach Hause",
+    docking: "Dockingstation",
+    unknown: "Position unbekannt",
+  };
+  return labels[locationState ?? "unknown"] ?? locationState ?? "Position unbekannt";
+}
+
+export function eventTone(eventType: string): "red" | "amber" {
+  return eventType === "damage_report" || eventType === "hygiene_report" ? "amber" : "red";
 }

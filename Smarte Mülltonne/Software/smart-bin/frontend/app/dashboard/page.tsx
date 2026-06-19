@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
-import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Shield } from "lucide-react";
+import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Inbox } from "lucide-react";
 import { useLiveData } from "@/lib/useWebSocket";
 import AlertBanner from "./components/AlertBanner";
 import FleetPanel from "./components/FleetPanel";
@@ -102,7 +102,7 @@ export default function DashboardPage() {
   const tabs: { id: Tab; label: string; icon: ComponentType<{ className?: string }> }[] = [
     { id: "chat", label: "Chat", icon: MessageSquare },
     { id: "energy", label: "Akku", icon: Battery },
-    { id: "security", label: alerts.length ? `Sicherheit ${alerts.length}` : "Sicherheit", icon: Shield },
+    { id: "security", label: alerts.length ? `Meldungen ${alerts.length}` : "Meldungen", icon: Inbox },
   ];
 
   return (
@@ -211,7 +211,7 @@ export default function DashboardPage() {
 
       <div className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
         <div className="h-64 w-full shrink-0 overflow-y-auto border-b border-white/10 bg-[#1a1c20] lg:h-auto lg:w-[19rem] lg:border-r lg:border-b-0">
-          <FleetPanel bins={[...bins].sort((a, b) => b.fill_level - a.fill_level)} />
+          <FleetPanel bins={[...bins].sort((a, b) => b.fill_level - a.fill_level)} alerts={alerts} />
         </div>
 
         <div className="relative h-[28rem] shrink-0 bg-[#111214] lg:h-auto lg:flex-1 lg:shrink">
