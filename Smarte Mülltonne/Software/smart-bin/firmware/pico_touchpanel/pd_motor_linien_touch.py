@@ -1,68 +1,10 @@
 from machine import Pin, PWM
 from time import sleep_ms, sleep_us, ticks_diff, ticks_ms, ticks_us
 
-from config import PIN_BACKLIGHT
-from display import BLACK, BLUE, GREEN, ILI9341, ORANGE, RED, WHITE
-from touch import XPT2046
-from ui import TouchUi
 
-
-# ============================================================
-# Touchpanel + PD-Schrittmotor-Regelung in einer main.py
-#
-# Start ueber Touchpanel:
-# PIN -> Fahren -> Abholung
-#
-# Die Motorlogik ist absichtlich direkt in dieser Datei enthalten,
-# damit kein zusaetzliches pd_motor_linien_touch.py importiert werden muss.
-# ============================================================
-
-
-display = None
-touch = None
-ui = None
-motors = None
-_backlight = None
-
-
-# ---------------- TOUCHPANEL / ANZEIGE ----------------
-def set_backlight(enabled):
-    global _backlight
-    if PIN_BACKLIGHT is None:
-        return
-    if _backlight is None:
-        _backlight = Pin(PIN_BACKLIGHT, Pin.OUT, value=1)
-    _backlight.value(1 if enabled else 0)
-
-
-def center_text(text, y, color=BLACK, scale=2):
-    x = (display.width - display.text_width(text, scale)) // 2
-    display.text(text, x, y, color, scale)
-
-
-def draw_drive_screen(title, subtitle="", color=BLUE):
-    display.fill_screen(WHITE)
-    display.rect(4, 4, 312, 232, BLACK, 2)
-    center_text(title, 78, color, 3)
-    if subtitle:
-        center_text(subtitle, 142, BLACK, 2)
-
-
-def draw_result_screen(result):
-    if result == "street":
-        draw_drive_screen("ZIEL", "STRASSE ERREICHT", GREEN)
-        ui.set_status(location="truck", status_kind="full_home", line_ok=True)
-    elif result == "obstacle":
-        draw_drive_screen("STOPP", "HINDERNIS", ORANGE)
-        ui.set_status(status_kind="obstacle", obstacle_cm=0)
-    elif result == "line_lost":
-        draw_drive_screen("STOPP", "LINIE VERLOREN", RED)
-        ui.set_status(status_kind="line_lost", line_ok=False)
-    elif result == "aborted":
-        draw_drive_screen("STOPP", "ABBRUCH", RED)
-    else:
-        draw_drive_screen("STOPP", "UNBEKANNT", RED)
-    sleep_ms(1800)
+# Linienfolger mit PD-Regler fuer Pico + CD74HC4067 + 2 Schrittmotoren.
+# Dieses Modul startet nicht automatisch. Es wird vom Touchpanel per
+# run_to_street() gestartet.
 
 
 # ---------------- MULTIPLEXER CD74HC4067 ----------------
@@ -78,6 +20,7 @@ s2 = Pin(MUX_S2_PIN, Pin.OUT)
 s3 = Pin(MUX_S3_PIN, Pin.OUT)
 mux_signal = Pin(MUX_SIGNAL_PIN, Pin.IN)
 
+# Vorderer Ultraschallsensor: Trigger GP6, Echo ueber Multiplexer C5.
 US_TRIGGER_PIN = 6
 US_FRONT_CHANNEL = 5
 US_STOP_CM = 15
@@ -87,6 +30,7 @@ US_TIMEOUT_US = 30000
 us_trigger = Pin(US_TRIGGER_PIN, Pin.OUT)
 us_trigger.value(0)
 
+# C0-C4: Liniensensoren von rechts nach links.
 LINE_CHANNELS = [0, 1, 2, 3, 4]
 LINE_WEIGHTS = [2, 1, 0, -1, -2]
 LINE_DETECTED_VALUE = 1
@@ -102,9 +46,13 @@ RIGHT_STEP_PIN = 8
 RIGHT_ENABLE_PIN = 9
 
 ENABLE_ACTIVE_VALUE = 1
+
+# Aus der vorhandenen Datei pd_motor_linien.py:
 LEFT_FORWARD_DIR = 1
 RIGHT_FORWARD_DIR = 0
 
+
+# ---------------- PARAMETER ----------------
 MIN_FREQ = 2000
 MAX_FREQ = 4500
 LEFT_TRIM_FACTOR = 1.0
@@ -372,11 +320,9 @@ def speeds_from_correction(correction):
     return left_speed, right_speed
 
 
-def run_to_street():
-    global motors
-
+def run_to_street(motors=None, status_callback=None):
     if motors is None:
-        motors = create_motors(debug=False)
+        motors = create_motors()
 
     controller = PDController(KP, KD, MAX_CORRECTION, MAX_DERIVATIVE_PER_S)
     last_control_ms = ticks_ms()
@@ -410,12 +356,10 @@ def run_to_street():
 
                 if obstacle_detected(front_distance_cm):
                     motors.stop()
-                    print("Stopp: Hindernis", front_distance_cm, "cm")
                     return "obstacle"
 
                 if position == "street":
                     motors.stop()
-                    print("Stopp: Strasse erkannt")
                     return "street"
 
                 if position is not None:
@@ -434,7 +378,6 @@ def run_to_street():
                         motors.drive_forward_differential(left_speed, right_speed)
                     else:
                         motors.stop()
-                        print("Stopp: Linie verloren")
                         return "line_lost"
 
                 if ticks_diff(now_ms, last_print_ms) >= PRINT_INTERVAL_MS:
@@ -463,71 +406,11 @@ def run_to_street():
                         "US vorne:",
                         front_distance_cm,
                     )
+                    if status_callback:
+                        status_callback(line_values, position, front_distance_cm)
 
     except KeyboardInterrupt:
         return "aborted"
     finally:
         motors.stop()
         print("Linienfolger gestoppt")
-
-
-def handle_action(action):
-    print("Touch action:", action)
-
-    if action == "eco":
-        set_backlight(False)
-        return
-
-    if action in ("connect", "disconnect"):
-        return
-
-    if action == "shutdown":
-        set_backlight(False)
-        return
-
-    if action == "goto_home":
-        draw_drive_screen("TEST", "HEIMFAHRT NICHT AKTIV", ORANGE)
-        sleep_ms(1400)
-        return
-
-    if action == "goto_street":
-        draw_drive_screen("FAEHRT", "PD REGLER AKTIV", BLUE)
-        result = run_to_street()
-        draw_result_screen(result)
-        return
-
-
-def main():
-    global display, touch, ui
-
-    set_backlight(True)
-
-    display = ILI9341()
-    display.init()
-
-    touch = XPT2046(display)
-    ui = TouchUi(display, action_handler=handle_action)
-    ui.draw()
-
-    print("Touchpanel UI + PD-Regler gestartet")
-    print("Start der Fahrt: PIN -> Fahren -> Abholung")
-
-    last_touch = False
-
-    while True:
-        ui.tick()
-        data = touch.read_screen()
-
-        if data is not None:
-            x, y, x_raw, y_raw = data
-            if not last_touch:
-                print("Touch:", x, y, "| Raw:", x_raw, y_raw)
-                ui.handle_touch(x, y)
-                last_touch = True
-        else:
-            last_touch = False
-
-        sleep_ms(60)
-
-
-main()
