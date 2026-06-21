@@ -3,7 +3,7 @@ import time
 
 class PDController:
     """
-    PD-Regler fuer die Linienverfolgung.
+    PD-Regler für die Linienverfolgung.
 
     Der Liniensensor liefert aktuell eine Position von ca. -2 bis +2.
     Der Regler berechnet daraus eine Korrektur, die auf die linke und
@@ -41,7 +41,7 @@ class PDController:
         """
         Berechnet die PD-Korrektur.
 
-        Rueckgabe:
+        Rückgabe:
         - correction > 0: linker Motor wird langsamer, rechter schneller.
         - correction < 0: linker Motor wird schneller, rechter langsamer.
         - 0 bei None oder Sonderwerten wie "street".
@@ -97,7 +97,7 @@ class PDController:
         """
         Berechnet direkt linke und rechte Motorgeschwindigkeit.
 
-        Rueckgabe:
+        Rückgabe:
         (left_speed, right_speed, correction)
         """
         correction = self.calculate(current_position, target_position, now_ms)
@@ -112,7 +112,7 @@ class PDController:
 
     def reset(self):
         """
-        Setzt den internen Speicher des Reglers zurueck.
+        Setzt den internen Speicher des Reglers zurück.
         """
         self.last_error = 0
         self.last_ms = None

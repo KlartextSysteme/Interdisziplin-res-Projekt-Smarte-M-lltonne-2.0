@@ -1,10 +1,10 @@
 from machine import Pin
 from time import sleep
 
-# KY-021 Magnet-Schalter an GP2
+# KY-021 Magnet-Schalter an GP1
 # Bei internem Pull-up gilt normalerweise:
 # 1 = kein Magnet erkannt, 0 = Magnet erkannt
-magnet_schalter = Pin(2, Pin.IN, Pin.PULL_UP)
+magnet_schalter = Pin(1, Pin.IN, Pin.PULL_UP)
 
 print("Starte KY-021 Magnet-Schalter-Test auf GP2...")
 

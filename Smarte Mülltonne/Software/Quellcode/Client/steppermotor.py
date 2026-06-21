@@ -51,7 +51,6 @@ class DualStepperMotorPWM:
         self.name = name
         self.debug = debug
 
-        self.current_mode = "stop"
         self.last_left_speed = 0
         self.last_right_speed = 0
         self.last_left_freq = 0
@@ -79,7 +78,6 @@ class DualStepperMotorPWM:
         self.right_step.duty_u16(0)
         self.disable()
 
-        self.current_mode = "stop"
         self.last_left_speed = 0
         self.last_right_speed = 0
         self.last_left_freq = 0
@@ -103,7 +101,7 @@ class DualStepperMotorPWM:
             + (self.max_freq - self.min_freq) * (adjusted_speed / 100)
         )
 
-    def _apply_pwm(self, left_speed, right_speed, left_dir, right_dir, mode):
+    def _apply_pwm(self, left_speed, right_speed, left_dir, right_dir):
         left_speed = self._clamp(left_speed, 0, 100)
         right_speed = self._clamp(right_speed, 0, 100)
 
@@ -132,7 +130,6 @@ class DualStepperMotorPWM:
         else:
             self.right_step.duty_u16(0)
 
-        self.current_mode = mode
         self.last_left_speed = left_speed
         self.last_right_speed = right_speed
         self.last_left_freq = left_freq
@@ -141,7 +138,6 @@ class DualStepperMotorPWM:
         if self.debug:
             print(
                 self.name,
-                mode,
                 "L",
                 round(left_speed, 1),
                 left_freq,
@@ -160,7 +156,6 @@ class DualStepperMotorPWM:
             right_speed,
             self.left_forward_dir,
             self.right_forward_dir,
-            "forward_differential",
         )
 
     def forward(self, speed):
@@ -172,7 +167,6 @@ class DualStepperMotorPWM:
             speed,
             1 - self.left_forward_dir,
             1 - self.right_forward_dir,
-            "backward",
         )
 
     def turn_left(self, speed):
@@ -181,7 +175,6 @@ class DualStepperMotorPWM:
             speed,
             1 - self.left_forward_dir,
             self.right_forward_dir,
-            "turn_left",
         )
 
     def turn_right(self, speed):
@@ -190,7 +183,6 @@ class DualStepperMotorPWM:
             speed,
             self.left_forward_dir,
             1 - self.right_forward_dir,
-            "turn_right",
         )
 
     def get_last_frequencies(self):

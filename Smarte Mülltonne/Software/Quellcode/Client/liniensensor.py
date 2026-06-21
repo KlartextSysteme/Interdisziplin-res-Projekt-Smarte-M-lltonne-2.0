@@ -5,7 +5,7 @@ class Liniensensor:
     """
     Klasse zur Verwaltung von 5 digitalen Liniensensoren am CD74HC4067.
 
-    Die Klasse liest die Sensoren ueber eine Multiplexer-Instanz ein und
+    Die Klasse liest die Sensoren über eine Multiplexer-Instanz ein und
     berechnet daraus eine relative Linienposition.
     """
 
@@ -130,16 +130,16 @@ class Liniensensor:
 
     def read_values(self, force=False):
         """
-        Gibt die 5 rohen Sensorwerte als Liste zurueck.
+        Gibt die 5 rohen Sensorwerte als Liste zurück.
         """
         self.update(force)
         return list(self._cached_values)
 
     def get_position(self, force=False):
         """
-        Gibt die Linienposition zurueck.
+        Gibt die Linienposition zurück.
 
-        Rueckgabe:
+        Rückgabe:
         - Zahl von ca. -2 bis +2: relative Linienposition.
         - None: keine Linie erkannt.
         - "street": alle 5 Sensoren erkennen Linie.
@@ -156,7 +156,7 @@ class Liniensensor:
 
     def get_bits(self, force=False):
         """
-        Gibt das rohe Bitmuster der letzten Messung zurueck.
+        Gibt das rohe Bitmuster der letzten Messung zurück.
         """
         self.update(force)
         return self._cached_bits

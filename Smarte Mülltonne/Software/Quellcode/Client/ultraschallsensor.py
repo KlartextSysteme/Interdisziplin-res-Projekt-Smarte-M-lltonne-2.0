@@ -209,7 +209,7 @@ class HindernisSensoren:
 
 class FuellstandSensor:
     """
-    Logik-Klasse fuer die Fuellstandsmessung der Muelltonne.
+    Logik-Klasse fuer die Füllstandsmessung der Mülltonne.
 
     Nutzt einen Ultraschallsensor und berechnet daraus:
     - deckel_offen
@@ -238,14 +238,14 @@ class FuellstandSensor:
 
     def run(self, force=False):
         """
-        Aktualisiert Abstand, Deckelstatus und Fuellstand.
+        Aktualisiert Abstand, Deckelstatus und Füllstand.
         """
         distance = self.us.run(force)
         self.update_from_distance(distance)
 
     def update_from_distance(self, distance):
         """
-        Interpretiert eine Distanzmessung fuer den Fuellstand.
+        Interpretiert eine Distanzmessung für den Füllstand.
         """
         if distance is None:
             self._no_echo_count += 1
