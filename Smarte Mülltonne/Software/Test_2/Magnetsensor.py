@@ -1,38 +1,22 @@
 from machine import Pin
-from time import sleep_ms
+from time import sleep
 
-# =========================
-# MAGNETSCHALTER
-# =========================
+# KY-021 Magnet-Schalter an GP2
+# Bei internem Pull-up gilt normalerweise:
+# 1 = kein Magnet erkannt, 0 = Magnet erkannt
+magnet_schalter = Pin(2, Pin.IN, Pin.PULL_UP)
 
-# GPIO anpassen
-MAGNET_PIN = 28
-
-magnet = Pin(MAGNET_PIN, Pin.IN, Pin.PULL_UP)
-
-print("Starte Magnetschalter-Test")
-
-
-# =========================
-# HAUPTSCHLEIFE
-# =========================
-
-last_state = None
+print("Starte KY-021 Magnet-Schalter-Test auf GP2...")
 
 while True:
+    wert = magnet_schalter.value()
 
-    # LOW = geschlossen
-    # HIGH = offen
-    state = magnet.value()
+    print("Sensorwert:", wert)
 
-    if state != last_state:
+    if wert == 0:
+        print("Magnet erkannt")
+    else:
+        print("kein Magnet erkannt")
 
-        if state == 0:
-            print("Deckel GESCHLOSSEN")
-
-        else:
-            print("Deckel GEOEFFNET")
-
-        last_state = state
-
-    sleep_ms(100)
+    print("-------------------")
+    sleep(0.2)
