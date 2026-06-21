@@ -19,6 +19,9 @@ interface Props {
   bins: Bin[];
   truck: TruckPosition | null;
   activeRoute: Route | null;
+  candidates?: Route[];
+  activeRouteId?: number | null;
+  onSelectCandidate?: (id: number) => void;
   depot?: { lat: number; lng: number; name: string } | null;
   selectedBinId?: number | null;
   onSelectBin?: (id: number | null) => void;

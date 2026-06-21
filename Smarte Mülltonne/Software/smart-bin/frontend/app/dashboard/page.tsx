@@ -14,6 +14,8 @@ import {
   resolveAlerts,
   lockBin,
   planRoute,
+  getCandidates,
+  activateRoute,
   getLatestRoute,
   getPublicConfig,
   getSimSpeed,
@@ -29,6 +31,7 @@ export default function DashboardPage() {
   const live = useLiveData();
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const [activeRoute, setActiveRoute] = useState<Route | null>(null);
+  const [candidates, setCandidates] = useState<Route[]>([]);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [planning, setPlanning] = useState(false);
   const [simSpeed, setSimSpeedState] = useState<number>(1);
@@ -69,6 +72,11 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, []);
 
+  // Vorschläge der letzten Planung laden (überleben einen Reload)
+  useEffect(() => {
+    getCandidates().then(setCandidates).catch(() => {});
+  }, []);
+
   const bins = live?.bins ?? [];
   const alerts = live?.alerts ?? [];
   const truck = live?.truck ?? null;
@@ -76,10 +84,25 @@ export default function DashboardPage() {
   async function handlePlan() {
     setPlanning(true);
     try {
-      const route = await planRoute();
-      setActiveRoute(route);
+      const cands = await planRoute();
+      setCandidates(cands);
+      setActiveRoute(cands.find((c) => c.active) ?? cands[0] ?? null);
     } finally {
       setPlanning(false);
+    }
+  }
+
+  // Bediener wählt einen Vorschlag → wird die aktive (gefahrene) Route.
+  async function handleSelectCandidate(id: number) {
+    const chosen = candidates.find((c) => c.id === id);
+    if (!chosen || chosen.active) return;
+    // Optimistisch umschalten (Karte/Badge reagieren sofort)
+    setActiveRoute(chosen);
+    setCandidates((prev) => prev.map((c) => ({ ...c, active: c.id === id })));
+    try {
+      await activateRoute(id);
+    } catch {
+      // bei Fehler nächster Poll korrigiert den Zustand
     }
   }
 
@@ -156,9 +179,25 @@ export default function DashboardPage() {
           {activeRoute && activeRoute.waypoints.length > 0 && (
             <div className="hidden items-center gap-2 rounded border border-white/10 bg-[#111214] px-3 py-2 md:flex">
               <span className="text-xs font-medium text-slate-300">
-                Route #{activeRoute.id} · {(activeRoute.distance_m / 1000).toFixed(1)} km
+                Route #{activeRoute.id} · {activeRoute.waypoints.length} Tonnen · {(activeRoute.distance_m / 1000).toFixed(1)} km
                 {activeRoute.duration_s ? ` · ${Math.round(activeRoute.duration_s / 60)} min` : ""}
               </span>
+              {activeRoute.capacity_units && activeRoute.load_units != null && (() => {
+                const cap = activeRoute.capacity_units!;
+                const load = activeRoute.load_units!;
+                const pct = Math.min(100, Math.round((load / cap) * 100));
+                // Volle Tonnen, die nicht mehr in diese Fahrt passten (Schwelle 60 %)
+                const fullBins = bins.filter((b) => !b.locked && b.fill_level >= 60).length;
+                const skipped = Math.max(0, fullBins - activeRoute.waypoints.length);
+                return (
+                  <span
+                    className="rounded-full bg-[#f2c94c]/15 px-2 py-0.5 text-[11px] font-medium text-[#f2c94c]"
+                    title={`Beladung ${load} / ${cap} Einheiten${skipped ? ` · ${skipped} volle Tonnen erst in der nächsten Fahrt` : ""}`}
+                  >
+                    Auslastung {pct}%{skipped ? ` · +${skipped} übrig` : ""}
+                  </span>
+                );
+              })()}
               {activeRoute.nn_distance_m && activeRoute.optimized_distance_m && activeRoute.nn_distance_m > activeRoute.optimized_distance_m && (() => {
                 const nn = activeRoute.nn_distance_m!;
                 const opt = activeRoute.optimized_distance_m!;
@@ -188,6 +227,34 @@ export default function DashboardPage() {
                   </span>
                 );
               })()}
+            </div>
+          )}
+          {candidates.filter((c) => c.waypoints.length > 0).length > 1 && (
+            <div className="hidden items-center gap-1 rounded border border-white/10 bg-[#111214] px-1.5 py-1 lg:flex" title="Vorschlag wählen — wird gefahren">
+              {candidates
+                .filter((c) => c.waypoints.length > 0)
+                .map((c) => {
+                  const isActive = c.id === activeRoute?.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => handleSelectCandidate(c.id)}
+                      className={`flex flex-col items-start rounded px-2 py-1 text-left text-[11px] leading-tight transition ${
+                        isActive
+                          ? "bg-[#f2c94c] text-[#171717]"
+                          : "text-slate-400 hover:bg-white/10 hover:text-white"
+                      }`}
+                      title={`${c.variant_label ?? "Route"} · ${c.waypoints.length} Tonnen · ${(c.distance_m / 1000).toFixed(1)} km`}
+                    >
+                      <span className="font-semibold">
+                        {c.variant_label ?? "Route"}{c.is_default ? " ★" : ""}
+                      </span>
+                      <span className={isActive ? "text-[#171717]/70" : "text-slate-500"}>
+                        {(c.distance_m / 1000).toFixed(1)} km · {c.waypoints.length}
+                      </span>
+                    </button>
+                  );
+                })}
             </div>
           )}
           <button
@@ -225,6 +292,9 @@ export default function DashboardPage() {
             bins={bins}
             truck={truck}
             activeRoute={activeRoute}
+            candidates={candidates}
+            activeRouteId={activeRoute?.id ?? null}
+            onSelectCandidate={handleSelectCandidate}
             depot={config?.depot ?? null}
             selectedBinId={selectedBinId}
             onSelectBin={setSelectedBinId}

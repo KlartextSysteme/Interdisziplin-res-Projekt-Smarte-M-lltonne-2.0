@@ -24,7 +24,10 @@ export const getBins = () => get<Bin[]>("/bins");
 export const getBin = (id: number) => get<Bin>(`/bins/${id}`);
 
 // --- Routes ---
-export const planRoute = () => post<Route>("/routes/plan");
+// Planung liefert mehrere Kandidaten (Default ist active + is_default).
+export const planRoute = () => post<Route[]>("/routes/plan");
+export const getCandidates = () => get<Route[]>("/routes/candidates");
+export const activateRoute = (id: number) => post<Route>(`/routes/${id}/activate`);
 export const getLatestRoute = () => get<Route | null>("/routes/latest");
 
 // --- Config ---

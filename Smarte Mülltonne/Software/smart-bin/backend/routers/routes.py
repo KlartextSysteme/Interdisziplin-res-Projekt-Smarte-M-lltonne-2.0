@@ -10,6 +10,7 @@ Distanzen für die Heuristik: planar (equirectangular). OSRM liefert danach die
 echte Straßen-Geometrie auf der finalen Reihenfolge.
 """
 import logging
+from datetime import datetime, timezone
 from math import cos, radians, sqrt
 
 import numpy as np
@@ -27,9 +28,9 @@ from services.routing import get_route_geometry
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Nur Tonnen ab diesem Füllstand werden angefahren — entspricht der Agent-Regel
-# „Tonnen < 30 % lohnen sich selten"; 60 % bildet die Abhol-Schwelle.
-FILL_THRESHOLD = 60
+# Nur Tonnen ab diesem Füllstand werden angefahren — gemeinsame Wahrheit mit dem
+# Simulator (config), damit Planung und Fahrt dieselbe Schwelle nutzen.
+FILL_THRESHOLD = settings.collect_fill_threshold
 
 # Held-Karp DP ist O(n²·2ⁿ). Bei n ≤ 15 läuft das in <1s, ab n=16 wirds zäh.
 # Gate so gewählt, dass die Demo nicht hängt, aber bei kleinen Instanzen
@@ -81,6 +82,65 @@ def _pickup_coords(b: Bin) -> tuple[float, float]:
     return (
         b.pickup_lat if b.pickup_lat is not None else b.lat,
         b.pickup_lng if b.pickup_lng is not None else b.lng,
+    )
+
+
+def _bin_units(b: Bin) -> int:
+    """Beladung einer Tonne in Einheiten — 1 % Füllung ≈ 1 Einheit, konsistent
+    zur Entleerungslogik im Simulator (eingesammelter fill_level → load_units)."""
+    return max(0, min(100, int(b.fill_level or 0)))
+
+
+def _capacity_cutoff(ordered_bins: list[Bin], capacity_units: float) -> tuple[list[Bin], int]:
+    """Schneidet die Fahrreihenfolge an der Wagenkapazität ab.
+
+    Geht die Tonnen in Fahrreihenfolge durch und nimmt sie auf, solange die
+    kumulierte Beladung die Kapazität nicht überschreitet. Sobald die nächste
+    Tonne nicht mehr passt, endet die Fahrt (Rest bleibt für die nächste Planung).
+    Mindestens eine Tonne wird aufgenommen, damit nie eine leere Fahrt entsteht.
+
+    Returns (tonnen_in_dieser_fahrt, geladene_einheiten).
+    """
+    kept: list[Bin] = []
+    load = 0
+    for b in ordered_bins:
+        units = _bin_units(b)
+        if kept and load + units > capacity_units:
+            break
+        kept.append(b)
+        load += units
+    return kept, load
+
+
+async def _build_candidate(
+    depot: tuple[float, float],
+    ordered_bins: list[Bin],
+    capacity: float,
+    variant_label: str,
+    plan_group: str,
+    nn_m: int,
+    exact_m: int | None,
+) -> Route:
+    """Baut aus einer Fahrreihenfolge einen Routen-Kandidaten: Kapazität
+    abschneiden, OSRM-Geometrie holen, Kennzahlen setzen. Noch nicht aktiv."""
+    kept, load_units = _capacity_cutoff(ordered_bins, capacity)
+    osrm_coords = [depot] + [_pickup_coords(b) for b in kept] + [depot]
+    result = await get_route_geometry(osrm_coords)
+    return Route(
+        waypoints=[b.id for b in kept],
+        distance_m=result["distance_m"],
+        duration_s=result["duration_s"],
+        geometry=result["geometry"],
+        nn_distance_m=nn_m,
+        optimized_distance_m=nn_m,
+        exact_distance_m=exact_m,
+        load_units=load_units,
+        capacity_units=int(capacity),
+        variant_label=variant_label,
+        plan_group=plan_group,
+        active=False,
+        is_default=False,
+        llm_reasoning=None,
     )
 
 
@@ -150,11 +210,16 @@ async def plan_route(db: Session = Depends(get_db)):
     depot = (settings.depot_lat, settings.depot_lng)
 
     if not bins:
-        route = Route(waypoints=[], distance_m=0, duration_s=0, geometry=None)
+        db.query(Route).filter(Route.active == True).update({Route.active: False})
+        route = Route(
+            waypoints=[], distance_m=0, duration_s=0, geometry=None,
+            active=True, is_default=True,
+            plan_group=datetime.now(timezone.utc).isoformat(),
+        )
         db.add(route)
         db.commit()
         db.refresh(route)
-        return route
+        return [route]
 
     # Knoten 0 = Depot, Knoten 1..n = Tonnen (in DB-Reihenfolge)
     coords = [depot] + [_pickup_coords(b) for b in bins]
@@ -195,38 +260,95 @@ async def plan_route(db: Session = Depends(get_db)):
             len(bins), nn_m, opt_m, saved_pct,
         )
 
-    # Reorder bins by NN permutation (Knoten 0 = Depot überspringen). Das wirkt
-    # im Leitstand deutlich plausibler als 2-opt-Sprünge über nahe Cluster.
-    ordered_bins = [bins[i - 1] for i in nn_perm[1:]]
+    # Mehrere Kandidaten aus billigen Variationen derselben Heuristik — sichtbar
+    # verschiedene Routen, ohne echten VRP-Solver:
+    #   Sweep        = Nearest-Neighbour-Reihenfolge
+    #   Optimiert    = 2-opt-optimierte Reihenfolge
+    #   Volle zuerst = Tonnen nach Füllstand absteigend
+    capacity = settings.truck_capacity_units
+    orderings: list[tuple[str, list[Bin]]] = [
+        ("Sweep", [bins[i - 1] for i in nn_perm[1:]]),
+    ]
+    if opt_perm != nn_perm:
+        orderings.append(("Optimiert", [bins[i - 1] for i in opt_perm[1:]]))
+    orderings.append(("Volle zuerst", sorted(bins, key=_bin_units, reverse=True)))
 
-    # OSRM für echte Straßen-Geometrie (depot → bins → depot)
-    osrm_coords = [depot] + [_pickup_coords(b) for b in ordered_bins] + [depot]
-    result = await get_route_geometry(osrm_coords)
+    plan_group = datetime.now(timezone.utc).isoformat()
 
-    route = Route(
-        waypoints=[b.id for b in ordered_bins],
-        distance_m=result["distance_m"],          # OSRM, real streets
-        duration_s=result["duration_s"],
-        geometry=result["geometry"],
-        nn_distance_m=nn_m,                        # planar baseline
-        optimized_distance_m=nn_m,                 # active street-sweep route
-        exact_distance_m=exact_m,                  # planar Held-Karp (nullable)
-        llm_reasoning=None,
-    )
-    db.add(route)
+    # Bestehende aktive Route deaktivieren — der Simulator bricht ihre Fahrt ab
+    # und übernimmt die neu gewählte/Default-Route.
+    db.query(Route).filter(Route.active == True).update({Route.active: False})
     db.commit()
-    db.refresh(route)
-    return route
+
+    candidates: list[Route] = []
+    seen: set[tuple[int, ...]] = set()
+    for label, ordered in orderings:
+        cand = await _build_candidate(depot, ordered, capacity, label, plan_group, nn_m, exact_m)
+        key = tuple(cand.waypoints)
+        if not cand.waypoints or key in seen:
+            continue
+        seen.add(key)
+        candidates.append(cand)
+
+    # Default = kürzeste Fahrt (System-Empfehlung), wird sofort aktiv → der Truck
+    # fährt autonom los; der Bediener kann optional einen anderen Kandidaten wählen.
+    default = min(candidates, key=lambda c: c.distance_m)
+    default.is_default = True
+    default.active = True
+    for c in candidates:
+        db.add(c)
+    db.commit()
+    for c in candidates:
+        db.refresh(c)
+
+    logger.info(
+        "Plan: %d Kandidaten (Default=%s, %d/%d Tonnen, %d/%d units)",
+        len(candidates), default.variant_label, len(default.waypoints), len(bins),
+        default.load_units, int(capacity),
+    )
+    candidates.sort(key=lambda c: (not c.is_default, c.distance_m))
+    return candidates
 
 
 @router.get("/latest")
 def get_latest_route(db: Session = Depends(get_db)):
+    """Die aktuell aktive (gefahrene) Route."""
     return (
         db.query(Route)
-        .filter(Route.completed == False)
+        .filter(Route.active == True, Route.completed == False)
         .order_by(Route.created_at.desc())
         .first()
     )
+
+
+@router.get("/candidates")
+def get_candidates(db: Session = Depends(get_db)):
+    """Die Vorschläge der letzten Planung (zur Auswahl im Leitstand)."""
+    latest = (
+        db.query(Route)
+        .filter(Route.plan_group.isnot(None))
+        .order_by(Route.created_at.desc())
+        .first()
+    )
+    if not latest or not latest.plan_group:
+        return []
+    cands = db.query(Route).filter(Route.plan_group == latest.plan_group).all()
+    cands.sort(key=lambda c: (not c.is_default, c.distance_m))
+    return cands
+
+
+@router.post("/{route_id}/activate")
+def activate_route(route_id: int, db: Session = Depends(get_db)):
+    """Bediener wählt einen Kandidaten → wird die aktive (gefahrene) Route."""
+    route = db.query(Route).filter(Route.id == route_id).first()
+    if not route:
+        return None
+    db.query(Route).filter(Route.active == True).update({Route.active: False})
+    route.active = True
+    route.completed = False
+    db.commit()
+    db.refresh(route)
+    return route
 
 
 @router.post("/{route_id}/complete")

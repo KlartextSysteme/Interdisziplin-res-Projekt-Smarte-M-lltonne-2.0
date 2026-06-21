@@ -432,17 +432,61 @@ function BinDetailCard({
   );
 }
 
+// ── Routen-Geometrie: Truck-Position auf die Route projizieren ─────────────────
+// Damit sich die Route sichtbar aufbaut (gefahren vs. kommend) und der nächste
+// Streckenabschnitt bis zur nächsten Abholposition hervorgehoben werden kann.
+// Abschnittsgrenzen sind die Abholpositionen der Tonnen, die exakt auf der Route
+// liegen. Rein clientseitig aus dem vorhandenen Positionsstrom — kein Polling.
+
+type LatLng = [number, number];
+
+/** Projiziert Punkt p auf das Segment a–b, equirektangulär (lokal genau genug). */
+function projectOnSegment(p: LatLng, a: LatLng, b: LatLng): { t: number; point: LatLng; d2: number } {
+  const cos = Math.cos((a[0] * Math.PI) / 180);
+  const ax = a[1] * cos, ay = a[0];
+  const bx = b[1] * cos, by = b[0];
+  const px = p[1] * cos, py = p[0];
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const point: LatLng = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const ddx = p[1] * cos - point[1] * cos;
+  const ddy = p[0] - point[0];
+  return { t, point, d2: ddx * ddx + ddy * ddy };
+}
+
+/** Fortschritt eines Punktes entlang der Polylinie: Segmentindex + Projektion. */
+function projectOnLine(p: LatLng, line: LatLng[]): { segIndex: number; point: LatLng } {
+  let best = { segIndex: 0, point: line[0], d2: Infinity };
+  for (let i = 0; i < line.length - 1; i++) {
+    const r = projectOnSegment(p, line[i], line[i + 1]);
+    if (r.d2 < best.d2) best = { segIndex: i, point: r.point, d2: r.d2 };
+  }
+  return { segIndex: best.segIndex, point: best.point };
+}
+
+/** Teil-Polylinie zwischen zwei Projektionen (a vor b auf derselben Linie). */
+function subLine(line: LatLng[], aIdx: number, aPt: LatLng, bIdx: number, bPt: LatLng): LatLng[] {
+  if (bIdx < aIdx) return [];
+  if (aIdx === bIdx) return [aPt, bPt];
+  return [aPt, ...line.slice(aIdx + 1, bIdx + 1), bPt];
+}
+
 interface Props {
   bins: Bin[];
   truck: TruckPosition | null;
   activeRoute: Route | null;
+  candidates?: Route[];
+  activeRouteId?: number | null;
+  onSelectCandidate?: (id: number) => void;
   depot?: { lat: number; lng: number; name: string } | null;
   selectedBinId?: number | null;
   onSelectBin?: (id: number | null) => void;
   alerts?: AlertItem[];
 }
 
-export default function LeafletMap({ bins, truck, activeRoute, depot, selectedBinId, onSelectBin, alerts = [] }: Props) {
+export default function LeafletMap({ bins, truck, activeRoute, candidates = [], activeRouteId, onSelectCandidate, depot, selectedBinId, onSelectBin, alerts = [] }: Props) {
   const [truckFocusActive, setTruckFocusActive] = useState(false);
   const activeRouteBins = new Set(activeRoute?.waypoints ?? []);
 
@@ -458,6 +502,45 @@ export default function LeafletMap({ bins, truck, activeRoute, depot, selectedBi
         .filter((b): b is Bin => !!b)
         .map((b) => binPickupPosition(b) ?? binCurrentPosition(b)) ?? [])
     : [];
+
+  // Nicht-aktive Vorschläge als gedämpfte, klickbare Alternativlinien (Google-
+  // Maps-Stil): Klick wählt den Kandidaten → wird gelb und gefahren.
+  const currentRouteId = activeRouteId ?? activeRoute?.id ?? null;
+  const candidateLines = candidates
+    .filter((c) => c.id !== currentRouteId && c.geometry && c.waypoints.length > 0)
+    .map((c) => ({
+      id: c.id,
+      line: c.geometry!.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
+    }));
+
+  // Fortschritt entlang der Route: gefahren (gedämpft) vs. kommend (gelb), plus
+  // Hervorhebung des nächsten Abschnitts bis zur aktuellen Zieltonne. Baut sich
+  // sichtbar auf, während der Truck fährt.
+  const truckPos: LatLng | null = truck ? [truck.lat, truck.lng] : null;
+  const routeActive = Boolean(
+    geometryLine.length > 1 && truckPos && truck?.action && truck.action !== "idle",
+  );
+
+  let drivenLine: LatLng[] = [];
+  let upcomingLine: LatLng[] = [];
+  let nextSegment: LatLng[] = [];
+
+  if (routeActive && truckPos) {
+    const proj = projectOnLine(truckPos, geometryLine);
+    drivenLine = [...geometryLine.slice(0, proj.segIndex + 1), proj.point];
+    upcomingLine = [proj.point, ...geometryLine.slice(proj.segIndex + 1)];
+
+    // Nächster Abschnitt = bis zur Abholposition der aktuellen Zieltonne.
+    const targetBin =
+      truck?.current_bin_id != null ? bins.find((b) => b.id === truck.current_bin_id) : null;
+    const targetPickup = (targetBin ? binPickupPosition(targetBin) : null) as LatLng | null;
+    if (targetPickup) {
+      const tp = projectOnLine(targetPickup, geometryLine);
+      if (tp.segIndex >= proj.segIndex) {
+        nextSegment = subLine(geometryLine, proj.segIndex, proj.point, tp.segIndex, tp.point);
+      }
+    }
+  }
 
   function handleSelectBin(id: number) {
     // Bin-Selektion deaktiviert Truck-Fokus (Selektion hat Priorität)
@@ -481,8 +564,35 @@ export default function LeafletMap({ bins, truck, activeRoute, depot, selectedBi
         <TruckFocusController truck={truck} active={truckFocusActive} />
         <BinFocusController bin={selectedBin} />
 
-        {geometryLine.length > 1 && (
-          <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
+        {/* Nicht gewählte Vorschläge: gedämpft + klickbar */}
+        {candidateLines.map((c) => (
+          <Polyline
+            key={`cand-${c.id}`}
+            positions={c.line}
+            color="#94a3b8"
+            weight={4}
+            opacity={0.45}
+            dashArray="2 7"
+            eventHandlers={{ click: () => onSelectCandidate?.(c.id) }}
+          />
+        ))}
+
+        {routeActive ? (
+          <>
+            {drivenLine.length > 1 && (
+              <Polyline positions={drivenLine} color="#6b7280" weight={4} opacity={0.4} />
+            )}
+            {upcomingLine.length > 1 && (
+              <Polyline positions={upcomingLine} color="#f2c94c" weight={4} opacity={0.62} />
+            )}
+            {nextSegment.length > 1 && (
+              <Polyline positions={nextSegment} color="#ffd866" weight={6} opacity={1} />
+            )}
+          </>
+        ) : (
+          geometryLine.length > 1 && (
+            <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
+          )
         )}
         {fallbackLine.length > 1 && (
           <Polyline positions={fallbackLine} color="#94a3b8" weight={3} opacity={0.5} dashArray="8 8" />

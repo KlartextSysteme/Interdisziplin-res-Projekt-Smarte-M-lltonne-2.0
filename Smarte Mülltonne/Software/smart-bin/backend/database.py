@@ -57,6 +57,22 @@ def _migrate_existing_schema():
         if "movement_model_version" not in columns:
             conn.execute(text("ALTER TABLE bins ADD COLUMN movement_model_version VARCHAR"))
 
+        route_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(routes)")).fetchall()
+        }
+        for column in ("load_units", "capacity_units"):
+            if route_columns and column not in route_columns:
+                conn.execute(text(f"ALTER TABLE routes ADD COLUMN {column} INTEGER"))
+        if route_columns:
+            if "active" not in route_columns:
+                conn.execute(text("ALTER TABLE routes ADD COLUMN active BOOLEAN DEFAULT 0"))
+            if "is_default" not in route_columns:
+                conn.execute(text("ALTER TABLE routes ADD COLUMN is_default BOOLEAN DEFAULT 0"))
+            for column in ("variant_label", "plan_group"):
+                if column not in route_columns:
+                    conn.execute(text(f"ALTER TABLE routes ADD COLUMN {column} VARCHAR"))
+
 
 def _default_home_position(bin_id: int, pickup_lat: float, pickup_lng: float) -> tuple[float, float]:
     # Deterministic small offsets: existing coordinates stay the pickup points,

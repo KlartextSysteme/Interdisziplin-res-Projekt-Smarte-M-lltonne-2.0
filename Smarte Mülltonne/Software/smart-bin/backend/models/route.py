@@ -25,3 +25,16 @@ class Route(Base):
     geometry: Mapped[dict | None] = mapped_column(JSON, nullable=True)   # GeoJSON LineString
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     llm_reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Kapazitätsbezug: load_units = Summe der Füllstände der enthaltenen Tonnen
+    # (1 % ≈ 1 Einheit). capacity_units = Wagen-Kapazität zum Planungszeitpunkt.
+    # Bins, die nicht mehr in diese Fahrt passten, sind nicht in waypoints.
+    load_units: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    capacity_units: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Mehrere Vorschläge zur Auswahl (Google-Maps-Stil): jede Planung erzeugt
+    # mehrere Kandidaten mit derselben plan_group. Genau einer ist active (wird
+    # gefahren); is_default markiert die System-Empfehlung; variant_label z.B.
+    # "Sweep" / "Optimiert" / "Volle zuerst".
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    variant_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    plan_group: Mapped[str | None] = mapped_column(String, nullable=True)

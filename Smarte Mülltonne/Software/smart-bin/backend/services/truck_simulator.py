@@ -22,8 +22,10 @@ ARRIVAL_THRESHOLD_M = 10.0
 EMPTY_PAUSE_S = 6.0
 BIN_READY_BUFFER_S = 2.5
 BIN_MAX_WAIT_S = 18.0
-COLLECT_FILL_THRESHOLD = 60
-TRUCK_CAPACITY_UNITS = 5000.0
+# Gemeinsame Wahrheit mit der Routenplanung (config), damit geplante und
+# gefahrene Route bei Kapazität/Schwelle nicht auseinanderlaufen.
+COLLECT_FILL_THRESHOLD = settings.collect_fill_threshold
+TRUCK_CAPACITY_UNITS = settings.truck_capacity_units
 UNLOAD_PAUSE_S = 2.5
 
 _bin_move_tasks: dict[int, asyncio.Task] = {}
@@ -62,7 +64,12 @@ def _post_position(
 
 
 def _latest_active_route(db: Session) -> Route | None:
-    route = db.query(Route).order_by(Route.created_at.desc()).first()
+    route = (
+        db.query(Route)
+        .filter(Route.active == True)
+        .order_by(Route.created_at.desc())
+        .first()
+    )
     if route and not route.completed and route.waypoints:
         return route
     return None
@@ -716,6 +723,13 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
                 _post_position(pos, "paused", None, load_units)
                 await asyncio.sleep(0.5)
                 continue
+
+            # Wurde währenddessen ein anderer Kandidat aktiviert? Dann diese Fahrt
+            # abbrechen — der Haupt-Loop übernimmt die neue aktive Route.
+            if not db.query(Route.active).filter(Route.id == route_id).scalar():
+                logger.info("truck simulator route %s superseded → switching", route_id)
+                _post_position(pos, "en_route", None, load_units)
+                return pos, load_units
 
             budget_m = SPEED_MPS * TICK_S * speed
             next_bin = _next_unvisited_waypoint(waypoints, visited)

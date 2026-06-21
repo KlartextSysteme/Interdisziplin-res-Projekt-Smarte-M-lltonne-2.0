@@ -39,6 +39,14 @@ export interface Route {
   nn_distance_m: number | null;                // Nearest-Neighbour Baseline
   optimized_distance_m: number | null;         // 2-opt Optimierung
   exact_distance_m: number | null;             // Held-Karp Exact (nur n ≤ 15)
+  // Kapazitätsbezug der Fahrt (1 % Füllung ≈ 1 Einheit)
+  load_units?: number | null;                  // Beladung dieser Fahrt
+  capacity_units?: number | null;              // Wagen-Kapazität
+  // Mehrere Vorschläge zur Auswahl (Google-Maps-Stil)
+  active?: boolean;                            // wird aktuell gefahren
+  is_default?: boolean;                        // System-Empfehlung
+  variant_label?: string | null;              // "Sweep" | "Optimiert" | "Volle zuerst"
+  plan_group?: string | null;                 // gruppiert Kandidaten einer Planung
 }
 
 export interface SecurityEvent {

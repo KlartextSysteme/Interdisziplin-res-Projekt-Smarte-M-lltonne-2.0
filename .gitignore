@@ -28,3 +28,7 @@ smart_bin.db
 # IDE / editor
 .vscode/
 .idea/
+
+# Tooling / Build-Artefakte
+.claude/
+*.tsbuildinfo
