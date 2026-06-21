@@ -7,9 +7,10 @@ from liniensensor import Liniensensor
 from PDcontroller import PDController
 from network_manager import NetworkManager
 from network_controller import NetworkController
+from multiplexer import Multiplexer
 # --------------------------------- kann raus ---------------------------------
 from led import LED, LEDStateMachine, ConnectionLEDStateMachine
-from ultraschallsensor import HCSR04P, FuellstandSensor
+from ultraschallsensor import UltraschallsensorMUX, FuellstandSensor
 from global_controller import GlobalController
 from machine import Pin, PWM
 # --------------------------------- kann raus ---------------------------------
@@ -108,12 +109,49 @@ pico_led = LED(19, 20, 21)     # RGB-LED für Pico-Status
 pico_led_sm = LEDStateMachine(pico_led)              # Zustandsmaschine für Pico-LED (blinken etc.)
 connection_led_sm = ConnectionLEDStateMachine(server_led) # Zustandsmaschine für Netzwerk-LED
 
-# Ultraschall-Sensoren
-# HCSR04P ist eine angepasste Klasse für die Sensoren
-ultra = HCSR04P(trigger_pin=22, echo_pin=26, interval_ms=250, timeout_us=30_000) # Füllstand
-obstacle_sensor_front = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis vorne
-obstacle_sensor_right = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis rechts
-obstacle_sensor_left = HCSR04P(trigger_pin=27, echo_pin=28, interval_ms=100, timeout_us=30_000) # Hindernis links
+# Multiplexer fuer Liniensensoren und Ultraschall-Echos
+mux = Multiplexer(
+    s0_pin=2,
+    s1_pin=3,
+    s2_pin=4,
+    s3_pin=5,
+    signal_pin=28,
+)
+
+# Ultraschall-Sensoren: alle Echo-Signale laufen ueber den Multiplexer.
+# Trigger ist gemeinsam auf GP6.
+ultra = UltraschallsensorMUX(
+    multiplexer=mux,
+    trigger_pin=6,
+    echo_channel=8,
+    interval_ms=250,
+    timeout_us=30_000,
+    name="US Fuellstand",
+)
+obstacle_sensor_front = UltraschallsensorMUX(
+    multiplexer=mux,
+    trigger_pin=6,
+    echo_channel=5,
+    interval_ms=100,
+    timeout_us=30_000,
+    name="US vorne",
+)
+obstacle_sensor_right = UltraschallsensorMUX(
+    multiplexer=mux,
+    trigger_pin=6,
+    echo_channel=7,
+    interval_ms=100,
+    timeout_us=30_000,
+    name="US rechts",
+)
+obstacle_sensor_left = UltraschallsensorMUX(
+    multiplexer=mux,
+    trigger_pin=6,
+    echo_channel=6,
+    interval_ms=100,
+    timeout_us=30_000,
+    name="US links",
+)
 
 # Wrapper für den Füllstandssensor (berechnet Prozentwerte)
 fuell = FuellstandSensor(

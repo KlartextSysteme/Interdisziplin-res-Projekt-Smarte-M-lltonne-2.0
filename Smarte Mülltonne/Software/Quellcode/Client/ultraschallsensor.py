@@ -2,227 +2,280 @@ import time
 from machine import Pin
 
 
-class HCSR04P:
+class UltraschallsensorMUX:
     """
-    Treiber für den HC-SR04(P) Ultraschallsensor.
-    Besonderheit: Die Messung erfolgt nicht-blockierend über Interrupts (IRQ).
-    
-    Ablauf:
-    1. Trigger wird kurz (10µs) gesetzt.
-    2. Ein Interrupt lauscht auf die steigende Flanke des Echo-Pins (Startzeit).
-    3. Ein Interrupt lauscht auf die fallende Flanke des Echo-Pins (Endzeit).
-    4. Aus der Differenz wird die Distanz berechnet.
-    """
+    Treiber für einen Ultraschallsensor am Multiplexer.
 
-    def __init__(self, trigger_pin: int, echo_pin: int, interval_ms: int = 250, timeout_us: int = 30_000):
-        """
-        Initialisiert den Sensor.
-        - trigger_pin: GPIO für Trigger (Ausgang)
-        - echo_pin: GPIO für Echo (Eingang)
-        - interval_ms: Wie oft soll gemessen werden? (z.B. alle 250ms)
-        - timeout_us: Wann gilt eine Messung als fehlgeschlagen? (30ms ~ 5m Reichweite)
-        """
-        self.trig = Pin(trigger_pin, Pin.OUT)
-        self.echo = Pin(echo_pin, Pin.IN)
-
-        self.trig.value(0)
-
-        self.interval_ms = interval_ms
-        self.timeout_us = timeout_us
-
-        self._next_measure_ms = time.ticks_ms()
-
-        # Zustands-Flags für die Interrupt-Steuerung
-        self._measuring = False      # Läuft gerade eine Messung?
-        self._waiting_rise = False   # Warten wir auf den Start des Echos?
-        self._waiting_fall = False   # Warten wir auf das Ende des Echos?
-        
-        # Zeitstempel für die Berechnung
-        self._trigger_us = 0
-        self._rise_us = 0
-
-        # Ergebnis-Speicher
-        self.distance_cm = None
-        self._new_sample = False
-
-        # Interrupt für beide Flanken (Rising & Falling) aktivieren
-        self.echo.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._echo_irq)
-
-    def _echo_irq(self, pin):
-        """
-        Interrupt Service Routine (ISR). Wird bei Pegeländerung am Echo-Pin aufgerufen.
-        Muss extrem schnell sein (keine Prints, keine komplexen Rechnungen!).
-        """
-        # Wenn wir gar nicht messen wollten (Störimpuls?), ignorieren
-        if not self._measuring:
-            return
-
-        now = time.ticks_us()
-        level = pin.value()
-
-        # Steigende Flanke (Rising Edge): Das Echo beginnt -> Zeit merken
-        if self._waiting_rise and level == 1:
-            self._rise_us = now
-            self._waiting_rise = False
-            self._waiting_fall = True
-            return
-
-        # Fallende Flanke (Falling Edge): Das Echo ist zu Ende -> Dauer berechnen
-        if self._waiting_fall and level == 0:
-            pulse_us = time.ticks_diff(now, self._rise_us)
-
-            # Umrechnung: Schallgeschwindigkeit ~343m/s -> 1cm braucht ca. 29µs
-            # Da der Schall hin und zurück muss: 29 * 2 = 58µs pro cm.
-            self.distance_cm = pulse_us / 58.0
-            self._new_sample = True
-
-            # Messung erfolgreich beenden
-            self._measuring = False
-            self._waiting_rise = False
-            self._waiting_fall = False
-
-    def has_new_sample(self) -> bool:
-        """Prüft, ob ein neuer Messwert vorliegt."""
-        return self._new_sample
-
-    def read_distance_cm(self):
-        """
-        Gibt den letzten gemessenen Abstand zurück.
-        Löscht das 'New Sample'-Flag, damit man jeden Wert nur einmal verarbeitet.
-        """
-        if not self._new_sample:
-            return None
-        self._new_sample = False
-        return self.distance_cm
-
-    def _start_measurement(self):
-        """Sendet den Trigger-Impuls, um eine Messung zu starten."""
-        # 10µs High-Puls auf Trigger
-        self.trig.value(0)
-        time.sleep_us(2)
-        self.trig.value(1)
-        time.sleep_us(10)
-        self.trig.value(0)
-
-        # Zustandsvariablen setzen
-        self._trigger_us = time.ticks_us()
-        self._measuring = True
-        self._waiting_rise = True
-        self._waiting_fall = False
-
-    def run(self):
-        """
-        Hauptmethode: Muss zyklisch aufgerufen werden.
-        Startet neue Messungen und überwacht Timeouts.
-        """
-        now_ms = time.ticks_ms()
-
-        # Wenn keine Messung läuft: Prüfen, ob Zeit für die nächste ist
-        if not self._measuring:
-            if time.ticks_diff(now_ms, self._next_measure_ms) >= 0:
-                self._start_measurement()
-                self._next_measure_ms = time.ticks_add(now_ms, self.interval_ms)
-            return
-
-        # Wenn Messung läuft: Prüfen auf Timeout (Echo kam nie an)
-        # Passiert oft bei offener Umgebung oder zu großen Entfernungen
-        now_us = time.ticks_us()
-        if time.ticks_diff(now_us, self._trigger_us) > self.timeout_us:
-            self.distance_cm = None  # Kein gültiger Wert
-            self._new_sample = True  # Signalisiert "Messung fertig (aber leer)"
-
-            # Reset
-            self._measuring = False
-            self._waiting_rise = False
-            self._waiting_fall = False
-
-
-class FuellstandSensor:
-    """
-    Logik-Klasse für die Mülltonnen-Füllstandsmessung.
-    Nutzt den HCSR04P Treiber.
-    
-    Berechnet Füllstand in % basierend auf kalibrierten Abständen:
-    - Leer: Großer Abstand (Deckel bis Boden)
-    - Voll: Kleiner Abstand (Deckel bis Müll)
+    Der Trigger-Pin kann gemeinsam mit anderen Ultraschallsensoren genutzt
+    werden. Das Echo-Signal wird ueber den CD74HC4067 Multiplexer gelesen.
     """
 
     def __init__(
         self,
-        ultrasonic: HCSR04P,
-        leer_abstand_cm: float,
-        voll_abstand_cm: float = 5.0,
-        deckel_offen_margin_cm: float = 5.0
+        multiplexer,
+        trigger_pin,
+        echo_channel,
+        interval_ms=120,
+        timeout_us=30000,
+        name="US_MUX",
+        debug=False,
     ):
-        """
-        - ultrasonic: Instanz des HCSR04P Treibers.
-        - leer_abstand_cm: Abstand Sensor -> Boden (Tonne leer).
-        - voll_abstand_cm: Abstand Sensor -> Müll (Tonne voll).
-        - deckel_offen_margin_cm: Toleranz. Wenn gemessener Abstand > leer + margin -> Deckel offen.
-        """
-        self.us = ultrasonic
+        self.mux = multiplexer
+        self.trigger = Pin(trigger_pin, Pin.OUT)
+        self.echo_channel = echo_channel
+        self.interval_ms = int(interval_ms)
+        self.timeout_us = int(timeout_us)
+        self.name = name
+        self.debug = debug
 
+        self.trigger.value(0)
+
+        self.distance_cm = None
+        self._last_measure_ms = 0
+
+    def measure_cm(self):
+        """
+        Führt eine einzelne blockierende Messung aus.
+
+        Rückgabe:
+        - Distanz in cm
+        - None bei Timeout / keinem Echo
+        """
+        self.mux.select_channel(self.echo_channel)
+
+        self.trigger.value(0)
+        time.sleep_us(2)
+        self.trigger.value(1)
+        time.sleep_us(10)
+        self.trigger.value(0)
+
+        start_timeout = time.ticks_us()
+        while self.mux.value() == 0:
+            if time.ticks_diff(time.ticks_us(), start_timeout) > self.timeout_us:
+                self.distance_cm = None
+                return None
+
+        start = time.ticks_us()
+        while self.mux.value() == 1:
+            if time.ticks_diff(time.ticks_us(), start) > self.timeout_us:
+                self.distance_cm = None
+                return None
+
+        end = time.ticks_us()
+        duration = time.ticks_diff(end, start)
+        self.distance_cm = duration / 58.0
+
+        if self.debug:
+            print(self.name, round(self.distance_cm, 1), "cm")
+
+        return self.distance_cm
+
+    def run(self, force=False):
+        """
+        Aktualisiert die Distanz in einem festen Messintervall.
+        """
+        now = time.ticks_ms()
+
+        if (
+            not force
+            and time.ticks_diff(now, self._last_measure_ms) < self.interval_ms
+        ):
+            return self.distance_cm
+
+        self._last_measure_ms = now
+        return self.measure_cm()
+
+    def read_distance_cm(self):
+        """
+        Gibt den zuletzt gemessenen Abstand zurück.
+        """
+        return self.distance_cm
+
+    def is_below(self, limit_cm):
+        """
+        True, wenn ein gültiger Abstand kleiner/gleich limit_cm ist.
+        """
+        return self.distance_cm is not None and self.distance_cm <= limit_cm
+
+    def is_clear(self, clear_cm):
+        """
+        True, wenn kein Echo kam oder der Abstand größer als clear_cm ist.
+        """
+        return self.distance_cm is None or self.distance_cm > clear_cm
+
+
+class HindernisSensoren:
+    """
+    Bündelt die drei Hindernis-Ultraschallsensoren vorne, links und rechts.
+
+    Normalerweise wird nur vorne zyklisch gemessen. Links und rechts können
+    gezielt für die Hindernisumfahrung abgefragt werden.
+    """
+
+    def __init__(
+        self,
+        multiplexer,
+        trigger_pin=6,
+        front_channel=5,
+        left_channel=6,
+        right_channel=7,
+        stop_cm=20,
+        side_clear_cm=35,
+        interval_ms=120,
+        timeout_us=30000,
+        debug=False,
+    ):
+        self.stop_cm = stop_cm
+        self.side_clear_cm = side_clear_cm
+
+        self.front = UltraschallsensorMUX(
+            multiplexer,
+            trigger_pin,
+            front_channel,
+            interval_ms=interval_ms,
+            timeout_us=timeout_us,
+            name="US vorne",
+            debug=debug,
+        )
+        self.left = UltraschallsensorMUX(
+            multiplexer,
+            trigger_pin,
+            left_channel,
+            interval_ms=interval_ms,
+            timeout_us=timeout_us,
+            name="US links",
+            debug=debug,
+        )
+        self.right = UltraschallsensorMUX(
+            multiplexer,
+            trigger_pin,
+            right_channel,
+            interval_ms=interval_ms,
+            timeout_us=timeout_us,
+            name="US rechts",
+            debug=debug,
+        )
+
+    def run_front(self, force=False):
+        return self.front.run(force)
+
+    def front_obstacle_detected(self):
+        return self.front.is_below(self.stop_cm)
+
+    def measure_left(self):
+        return self.left.measure_cm()
+
+    def measure_right(self):
+        return self.right.measure_cm()
+
+    def left_is_clear(self):
+        return self.left.is_clear(self.side_clear_cm)
+
+    def right_is_clear(self):
+        return self.right.is_clear(self.side_clear_cm)
+
+    def choose_avoidance_side(self):
+        """
+        Misst links und rechts und gibt die bevorzugte Umfahrungsseite zurück.
+
+        Rückgabe:
+        - "right"
+        - "left"
+        - None, wenn beide Seiten blockiert wirken
+        """
+        left_distance = self.measure_left()
+        time.sleep_ms(60)
+        right_distance = self.measure_right()
+
+        left_clear = self.left_is_clear()
+        right_clear = self.right_is_clear()
+
+        if right_clear and left_clear:
+            if right_distance is None:
+                return "right"
+            if left_distance is None:
+                return "left"
+            if right_distance >= left_distance:
+                return "right"
+            return "left"
+
+        if right_clear:
+            return "right"
+        if left_clear:
+            return "left"
+
+        return None
+
+
+class FuellstandSensor:
+    """
+    Logik-Klasse fuer die Fuellstandsmessung der Muelltonne.
+
+    Nutzt einen Ultraschallsensor und berechnet daraus:
+    - deckel_offen
+    - fuellstand_prozent
+    """
+
+    def __init__(
+        self,
+        ultrasonic,
+        leer_abstand_cm,
+        voll_abstand_cm=5.0,
+        deckel_offen_margin_cm=5.0,
+        no_echo_for_deckel_offen=3,
+    ):
+        self.us = ultrasonic
         self.leer_abstand_cm = float(leer_abstand_cm)
         self.voll_abstand_cm = float(voll_abstand_cm)
         self.deckel_offen_margin_cm = float(deckel_offen_margin_cm)
 
         self.deckel_offen = False
         self.fuellstand_prozent = None
-        self._last_valid_distance = None
+        self.last_distance_cm = None
 
-        # Entprellung für "Deckel offen" / "Kein Echo"
-        self._no_echo_count = 0               
-        self.NO_ECHO_FOR_DECKEL_OFFEN = 3 # Erst nach 3 Fehlversuchen als "Offen" werten
+        self._no_echo_count = 0
+        self.no_echo_for_deckel_offen = int(no_echo_for_deckel_offen)
 
-    def run(self):
+    def run(self, force=False):
         """
-        Zyklische Logik. Ruft den Treiber auf und interpretiert die Ergebnisse.
+        Aktualisiert Abstand, Deckelstatus und Fuellstand.
         """
-        self.us.run()
+        distance = self.us.run(force)
+        self.update_from_distance(distance)
 
-        # Nur weiterarbeiten, wenn der Treiber eine neue Messung fertig hat
-        if not self.us.has_new_sample():
-            return
-
-        d = self.us.read_distance_cm()  # Distanz in cm oder None (Timeout)
-
-        # Fall 1: Sensor liefert Timeout (kein Echo)
-        # Deutet oft darauf hin, dass der Schall ins Leere geht -> Deckel offen
-        if d is None:
+    def update_from_distance(self, distance):
+        """
+        Interpretiert eine Distanzmessung fuer den Fuellstand.
+        """
+        if distance is None:
             self._no_echo_count += 1
-            if self._no_echo_count >= self.NO_ECHO_FOR_DECKEL_OFFEN:
+            if self._no_echo_count >= self.no_echo_for_deckel_offen:
                 self.deckel_offen = True
                 self.fuellstand_prozent = None
             return
 
-        # Fall 2: Gemessener Abstand ist größer als die Tonnenhöhe
-        # -> Sensor schaut in den Raum -> Deckel offen
-        if d > (self.leer_abstand_cm + self.deckel_offen_margin_cm):
+        self.last_distance_cm = distance
+
+        if distance > (self.leer_abstand_cm + self.deckel_offen_margin_cm):
             self.deckel_offen = True
             self.fuellstand_prozent = None
-            self._no_echo_count = self.NO_ECHO_FOR_DECKEL_OFFEN # Zähler hochsetzen (für Stabilität)
+            self._no_echo_count = self.no_echo_for_deckel_offen
             return
 
-        # Fall 3: Gültige Messung im erwarteten Bereich
         self._no_echo_count = 0
         self.deckel_offen = False
-        self._last_valid_distance = d
 
-        # Füllstand berechnen
-        # Wenn Müll sehr nah am Deckel (<= voll_abstand) -> 100%
-        if d <= self.voll_abstand_cm:
+        if distance <= self.voll_abstand_cm:
             self.fuellstand_prozent = 100
             return
 
-        # Lineare Interpolation zwischen Leer und Voll
-        # span = Nutzbarer Messbereich (z.B. 80cm - 5cm = 75cm)
-        span = max(1e-6, (self.leer_abstand_cm - self.voll_abstand_cm))
-        
-        # ratio: Wie viel Müll ist drin? (1.0 = Voll, 0.0 = Leer)
-        ratio = (self.leer_abstand_cm - d) / span
-        
-        # Begrenzen auf 0..1
+        span = max(0.001, self.leer_abstand_cm - self.voll_abstand_cm)
+        ratio = (self.leer_abstand_cm - distance) / span
         ratio = max(0.0, min(1.0, ratio))
-        
-        # Prozentwert speichern
         self.fuellstand_prozent = int(round(ratio * 100))
+
+    def get_fuellstand_prozent(self):
+        return self.fuellstand_prozent
+
+    def is_deckel_offen(self):
+        return self.deckel_offen
