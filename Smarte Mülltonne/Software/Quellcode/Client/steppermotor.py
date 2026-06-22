@@ -185,6 +185,14 @@ class DualStepperMotorPWM:
             1 - self.right_forward_dir,
         )
 
+    def steps_to_ms(self, steps, speed):
+        freq = self.speed_to_frequency(speed)
+
+        if freq <= 0:
+            return 0
+
+        return int((steps * 1000) / freq)
+
     def get_last_frequencies(self):
         return self.last_left_freq, self.last_right_freq
 
