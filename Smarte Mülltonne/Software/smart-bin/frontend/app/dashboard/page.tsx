@@ -64,17 +64,16 @@ export default function DashboardPage() {
     getPublicConfig().then(setConfig).catch(() => {});
   }, []);
 
-  // Fetch latest route on mount and every 10s (lightweight polling)
+  // Aktive Route + Vorschläge pollen (3s): so erscheinen Auto-Replan-Trips zügig
+  // und abgeschlossene Routen verschwinden schnell.
   useEffect(() => {
-    const fetchRoute = () => getLatestRoute().then(setActiveRoute).catch(() => {});
-    fetchRoute();
-    const id = setInterval(fetchRoute, 10_000);
+    const tick = () => {
+      getLatestRoute().then(setActiveRoute).catch(() => {});
+      getCandidates().then(setCandidates).catch(() => {});
+    };
+    tick();
+    const id = setInterval(tick, 3_000);
     return () => clearInterval(id);
-  }, []);
-
-  // Vorschläge der letzten Planung laden (überleben einen Reload)
-  useEffect(() => {
-    getCandidates().then(setCandidates).catch(() => {});
   }, []);
 
   const bins = live?.bins ?? [];

@@ -513,19 +513,23 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
       line: c.geometry!.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
     }));
 
-  // Fortschritt entlang der Route: gefahren (gedämpft) vs. kommend (gelb), plus
-  // Hervorhebung des nächsten Abschnitts bis zur aktuellen Zieltonne. Baut sich
-  // sichtbar auf, während der Truck fährt.
+  // Render nach Truck-Phase (robust gegen die Depot-Doppeldeutigkeit: das Depot
+  // liegt am Anfang UND Ende der Geometrie, deshalb projizieren wir nur während
+  // des Sammelns, wenn der Truck eindeutig zwischen den Tonnen ist):
+  //   sammeln    → gefahren (grau) + kommend (gelb) + nächster Abschnitt
+  //   Rückfahrt  → alles gedämpft (kein gelbes Neuzeichnen hinter dem Truck)
+  //   Vorschau   → volle gelbe Linie (geplant, noch nicht gestartet)
   const truckPos: LatLng | null = truck ? [truck.lat, truck.lng] : null;
-  const routeActive = Boolean(
-    geometryLine.length > 1 && truckPos && truck?.action && truck.action !== "idle",
-  );
+  const phase = truck?.action ?? "idle";
+  const hasGeom = geometryLine.length > 1;
+  const collecting = hasGeom && (phase === "en_route" || phase === "emptying" || phase === "paused");
+  const returning = hasGeom && (phase === "returning" || phase === "returning_full" || phase === "unloading");
 
   let drivenLine: LatLng[] = [];
   let upcomingLine: LatLng[] = [];
   let nextSegment: LatLng[] = [];
 
-  if (routeActive && truckPos) {
+  if (collecting && truckPos) {
     const proj = projectOnLine(truckPos, geometryLine);
     drivenLine = [...geometryLine.slice(0, proj.segIndex + 1), proj.point];
     upcomingLine = [proj.point, ...geometryLine.slice(proj.segIndex + 1)];
@@ -577,7 +581,7 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
           />
         ))}
 
-        {routeActive ? (
+        {collecting ? (
           <>
             {drivenLine.length > 1 && (
               <Polyline positions={drivenLine} color="#6b7280" weight={4} opacity={0.4} />
@@ -589,8 +593,14 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
               <Polyline positions={nextSegment} color="#ffd866" weight={6} opacity={1} />
             )}
           </>
+        ) : returning ? (
+          // Rückfahrt zum Depot: gedämpft, kein gelbes Neuzeichnen hinter dem Truck
+          hasGeom && (
+            <Polyline positions={geometryLine} color="#6b7280" weight={4} opacity={0.35} />
+          )
         ) : (
-          geometryLine.length > 1 && (
+          // Vorschau (geplant, noch nicht gestartet)
+          hasGeom && (
             <Polyline positions={geometryLine} color="#f2c94c" weight={5} opacity={0.86} />
           )
         )}

@@ -192,14 +192,15 @@ def _exact_perm(matrix: np.ndarray) -> tuple[list[int], float]:
 
 @router.post("/plan")
 async def plan_route(db: Session = Depends(get_db)):
-    """Plant eine Route: Füllstand-Threshold + 2-opt TSP-Heuristik.
+    """Plant mehrere kapazitätsbegrenzte Kandidaten (Default = active + is_default)."""
+    return await generate_route_candidates(db)
 
-    Ablauf:
-      1. Tonnen mit fill_level >= FILL_THRESHOLD und nicht gesperrt
-      2. Distanzmatrix (planar)
-      3. NN als Baseline → Distanz für Badge merken
-      4. 2-opt seeded mit NN → finale Reihenfolge
-      5. OSRM ruft echte Straßen-Geometrie auf der 2-opt-Order ab
+
+async def generate_route_candidates(db: Session) -> list[Route]:
+    """Erzeugt Routen-Kandidaten (Sweep / Optimiert / Volle zuerst), schneidet
+    sie an der Wagenkapazität ab, deaktiviert die bisher aktive Route und macht
+    den Default aktiv. Genutzt vom /plan-Endpunkt UND vom Auto-Replan des
+    Simulators (nächster Trip, nachdem der Wagen am Depot entleert hat).
     """
     bins = (
         db.query(Bin)

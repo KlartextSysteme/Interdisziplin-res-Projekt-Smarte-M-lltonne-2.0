@@ -776,6 +776,7 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
             await asyncio.sleep(TICK_S)
 
         route.completed = True
+        route.active = False
         db.commit()
 
         if load_units > 0:
@@ -783,6 +784,31 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
 
         logger.info("truck simulator route %s completed", route.id)
         return pos, load_units
+    finally:
+        db.close()
+
+
+async def _maybe_plan_next_trip(prev_route_id: int):
+    """Nach Abschluss einer kapazitätsbegrenzten Fahrt: wenn noch volle Tonnen
+    übrig sind, automatisch die nächste Fahrt planen. Beendet die Kette, sobald
+    keine sammelbaren Tonnen mehr da sind."""
+    db = SessionLocal()
+    try:
+        prev = db.query(Route).filter(Route.id == prev_route_id).first()
+        # Nur weiterplanen, wenn die vorige Route wirklich fertig ist (nicht durch
+        # Kandidaten-Auswahl ersetzt wurde).
+        if not prev or not prev.completed:
+            return
+        remaining = sum(1 for b in db.query(Bin).all() if _is_collectable_bin(b))
+        if remaining == 0:
+            logger.info("truck simulator: keine vollen Tonnen mehr → Trip-Kette beendet")
+            return
+        # Lazy import vermeidet Import-Zyklus router<->service.
+        from routers.routes import generate_route_candidates
+        await generate_route_candidates(db)
+        logger.info("truck simulator: Auto-Replan, %d Tonnen übrig → nächster Trip", remaining)
+    except Exception as e:
+        logger.warning("truck simulator auto-replan failed: %s", e)
     finally:
         db.close()
 
@@ -808,6 +834,11 @@ async def run_truck_simulator():
 
         pos, load_units = await _drive_route(route_id, pos, load_units)
         _post_position(pos, "idle", None, load_units)
+
+        # Auto-Replan: hat der Wagen die Route abgeschlossen (nicht durch
+        # Kandidaten-Auswahl ersetzt) und sind noch volle Tonnen übrig, plane die
+        # nächste kapazitätsbegrenzte Fahrt (Mehr-Trip-Kette).
+        await _maybe_plan_next_trip(route_id)
 
 
 def start_truck_simulator() -> asyncio.Task:
