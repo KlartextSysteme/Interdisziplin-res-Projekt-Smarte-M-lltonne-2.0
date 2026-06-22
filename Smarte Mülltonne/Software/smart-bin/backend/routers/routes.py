@@ -261,18 +261,19 @@ async def generate_route_candidates(db: Session) -> list[Route]:
             len(bins), nn_m, opt_m, saved_pct,
         )
 
-    # Mehrere Kandidaten aus billigen Variationen derselben Heuristik — sichtbar
-    # verschiedene Routen, ohne echten VRP-Solver:
-    #   Sweep        = Nearest-Neighbour-Reihenfolge
-    #   Optimiert    = 2-opt-optimierte Reihenfolge
-    #   Volle zuerst = Tonnen nach Füllstand absteigend
+    # Drei Kandidaten nach betrieblichem *Ziel* (nicht nach Algorithmus-Name),
+    # damit die Auswahl für den Bediener eine echte, verständliche Entscheidung ist:
+    #   Kürzeste Strecke   → 2-opt-Reihenfolge, geografisch kürzeste Tour
+    #                        (wenig Sprit/Zeit) → System-Default.
+    #   Dringendste zuerst → vollste Tonnen zuerst (Überlauf-Risiko minimieren).
+    #   Meiste Tonnen      → kleinste Füllstände zuerst, dadurch passen mehr Tonnen
+    #                        in die Kapazität (max. Durchsatz, dafür längere Tour).
     capacity = settings.truck_capacity_units
     orderings: list[tuple[str, list[Bin]]] = [
-        ("Sweep", [bins[i - 1] for i in nn_perm[1:]]),
+        ("Kürzeste Strecke", [bins[i - 1] for i in opt_perm[1:]]),
+        ("Dringendste zuerst", sorted(bins, key=_bin_units, reverse=True)),
+        ("Meiste Tonnen", sorted(bins, key=_bin_units)),
     ]
-    if opt_perm != nn_perm:
-        orderings.append(("Optimiert", [bins[i - 1] for i in opt_perm[1:]]))
-    orderings.append(("Volle zuerst", sorted(bins, key=_bin_units, reverse=True)))
 
     plan_group = datetime.now(timezone.utc).isoformat()
 
@@ -291,9 +292,12 @@ async def generate_route_candidates(db: Session) -> list[Route]:
         seen.add(key)
         candidates.append(cand)
 
-    # Default = kürzeste Fahrt (System-Empfehlung), wird sofort aktiv → der Truck
-    # fährt autonom los; der Bediener kann optional einen anderen Kandidaten wählen.
-    default = min(candidates, key=lambda c: c.distance_m)
+    # Default = "Kürzeste Strecke" (System-Empfehlung), wird sofort aktiv → der
+    # Truck fährt autonom los; der Bediener kann optional ein anderes Ziel wählen.
+    default = next(
+        (c for c in candidates if c.variant_label == "Kürzeste Strecke"),
+        min(candidates, key=lambda c: c.distance_m),
+    )
     default.is_default = True
     default.active = True
     for c in candidates:
