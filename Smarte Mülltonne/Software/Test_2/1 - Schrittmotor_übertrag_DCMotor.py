@@ -21,7 +21,6 @@ class DualStepperMotorPWM:
                  max_freq=4500,
                  left_trim_factor=1.0,
                  right_trim_factor=1.0,
-                 right_backward_trim_factor=1.0,
                  enable_active_value=1,
                  name="DUAL_STEPPER",
                  debug=True):
@@ -40,7 +39,6 @@ class DualStepperMotorPWM:
 
         self.left_trim_factor = left_trim_factor
         self.right_trim_factor = right_trim_factor
-        self.right_backward_trim_factor = right_backward_trim_factor
 
         self.enable_active_value = enable_active_value
         self.disable_value = 0 if enable_active_value == 1 else 1
@@ -90,9 +88,6 @@ class DualStepperMotorPWM:
 
         left_trim = self.left_trim_factor
         right_trim = self.right_trim_factor
-
-        if mode == "backward":
-            right_trim = self.right_backward_trim_factor
 
         left_freq = self._speed_to_frequency(speed, left_trim)
         right_freq = self._speed_to_frequency(speed, right_trim)
@@ -168,7 +163,6 @@ motors = DualStepperMotorPWM(
     max_freq=4500,
     left_trim_factor=1.0,
     right_trim_factor=1.0,
-    right_backward_trim_factor=1.0,
     enable_active_value=1,
     name="Muelltonne"
 )

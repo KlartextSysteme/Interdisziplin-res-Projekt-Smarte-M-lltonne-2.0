@@ -1,68 +1,19 @@
 from machine import Pin, PWM
-from time import sleep_ms, sleep_us, ticks_diff, ticks_ms, ticks_us
-
-from config import PIN_BACKLIGHT
-from display import BLACK, BLUE, GREEN, ILI9341, ORANGE, RED, WHITE
-from touch import XPT2046
-from ui import TouchUi
+from time import sleep, sleep_ms, sleep_us, ticks_diff, ticks_ms, ticks_us
 
 
 # ============================================================
-# Touchpanel + PD-Schrittmotor-Regelung in einer main.py
+# Linienfolger mit PD-Regler
+# Pico + CD74HC4067 Multiplexer + 2 Schrittmotoren per STEP/DIR
 #
-# Start ueber Touchpanel:
-# PIN -> Fahren -> Abholung
+# Motoransteuerung passend zu eurem PWM-Testcode:
+# links:  DIR GP10, STEP GP11, ENABLE GP12
+# rechts: DIR GP13, STEP GP8,  ENABLE GP9
 #
-# Die Motorlogik ist absichtlich direkt in dieser Datei enthalten,
-# damit kein zusaetzliches pd_motor_linien_touch.py importiert werden muss.
+# Wichtig:
+# Bei Schrittmotoren wird die Geschwindigkeit ueber die STEP-Frequenz
+# geregelt. Der PD-Regler veraendert deshalb links/rechts die Frequenz.
 # ============================================================
-
-
-display = None
-touch = None
-ui = None
-motors = None
-_backlight = None
-
-
-# ---------------- TOUCHPANEL / ANZEIGE ----------------
-def set_backlight(enabled):
-    global _backlight
-    if PIN_BACKLIGHT is None:
-        return
-    if _backlight is None:
-        _backlight = Pin(PIN_BACKLIGHT, Pin.OUT, value=1)
-    _backlight.value(1 if enabled else 0)
-
-
-def center_text(text, y, color=BLACK, scale=2):
-    x = (display.width - display.text_width(text, scale)) // 2
-    display.text(text, x, y, color, scale)
-
-
-def draw_drive_screen(title, subtitle="", color=BLUE):
-    display.fill_screen(WHITE)
-    display.rect(4, 4, 312, 232, BLACK, 2)
-    center_text(title, 78, color, 3)
-    if subtitle:
-        center_text(subtitle, 142, BLACK, 2)
-
-
-def draw_result_screen(result):
-    if result == "street":
-        draw_drive_screen("ZIEL", "STRASSE ERREICHT", GREEN)
-        ui.set_status(location="truck", status_kind="full_home", line_ok=True)
-    elif result == "obstacle":
-        draw_drive_screen("STOPP", "HINDERNIS", ORANGE)
-        ui.set_status(status_kind="obstacle", obstacle_cm=0)
-    elif result == "line_lost":
-        draw_drive_screen("STOPP", "LINIE VERLOREN", RED)
-        ui.set_status(status_kind="line_lost", line_ok=False)
-    elif result == "aborted":
-        draw_drive_screen("STOPP", "ABBRUCH", RED)
-    else:
-        draw_drive_screen("STOPP", "UNBEKANNT", RED)
-    sleep_ms(1800)
 
 
 # ---------------- MULTIPLEXER CD74HC4067 ----------------
@@ -78,6 +29,8 @@ s2 = Pin(MUX_S2_PIN, Pin.OUT)
 s3 = Pin(MUX_S3_PIN, Pin.OUT)
 mux_signal = Pin(MUX_SIGNAL_PIN, Pin.IN)
 
+# Vorderer Ultraschallsensor:
+# Trigger direkt an GP6, Echo ueber Multiplexer C5.
 US_TRIGGER_PIN = 6
 US_FRONT_CHANNEL = 5
 US_STOP_CM = 15
@@ -87,8 +40,11 @@ US_TIMEOUT_US = 30000
 us_trigger = Pin(US_TRIGGER_PIN, Pin.OUT)
 us_trigger.value(0)
 
+# C0-C4: Liniensensoren von rechts nach links.
 LINE_CHANNELS = [0, 1, 2, 3, 4]
 LINE_WEIGHTS = [2, 1, 0, -1, -2]
+
+# Falls eure Sensoren auf schwarzer Linie 0 statt 1 liefern, hier 0 eintragen.
 LINE_DETECTED_VALUE = 1
 
 
@@ -102,18 +58,28 @@ RIGHT_STEP_PIN = 8
 RIGHT_ENABLE_PIN = 9
 
 ENABLE_ACTIVE_VALUE = 1
+
+# Richtungen eurer Vorwaertsfahrt:
+# forward: links DIR=0, rechts DIR=1
 LEFT_FORWARD_DIR = 1
 RIGHT_FORWARD_DIR = 0
 
+
+# ---------------- PARAMETER ZUM EINSTELLEN ----------------
+# Werte aus eurem Motortest.
 MIN_FREQ = 2000
 MAX_FREQ = 4500
 LEFT_TRIM_FACTOR = 1.0
 RIGHT_TRIM_FACTOR = 1.0
 
+# Grundgeschwindigkeit in Prozent. Zum ersten Test eher niedrig starten.
 BASE_SPEED = 45
 MIN_SPEED = 0
 MAX_SPEED = 95
 
+# PD-Regler:
+# Sensorposition liegt grob zwischen -2 und +2.
+# Korrektur wird in Prozentpunkten auf links/rechts addiert/subtrahiert.
 KP = 32
 KD = 2
 MAX_CORRECTION = 60
@@ -121,6 +87,9 @@ MAX_DERIVATIVE_PER_S = 45
 
 CONTROL_INTERVAL_MS = 25
 PRINT_INTERVAL_MS = 250
+
+# Wenn die Linie verloren geht, faehrt der Roboter kurz mit der zuletzt
+# berechneten Geschwindigkeit weiter. Danach stoppt er.
 LOST_LINE_STOP_MS = 10000
 
 
@@ -175,6 +144,11 @@ class PDController:
 
 
 class DualStepperMotorPWM:
+    """
+    Ansteuerung fuer zwei Schrittmotoren mit STEP/DIR/ENABLE-Treibern.
+    Die STEP-Signale werden per PWM erzeugt.
+    """
+
     def __init__(
         self,
         left_dir_pin,
@@ -193,20 +167,26 @@ class DualStepperMotorPWM:
     ):
         self.left_dir = Pin(left_dir_pin, Pin.OUT)
         self.right_dir = Pin(right_dir_pin, Pin.OUT)
+
         self.left_step = PWM(Pin(left_step_pin))
         self.right_step = PWM(Pin(right_step_pin))
+
         self.left_enable = Pin(left_enable_pin, Pin.OUT)
         self.right_enable = Pin(right_enable_pin, Pin.OUT)
+
         self.min_freq = min_freq
         self.max_freq = max_freq
         self.left_trim_factor = left_trim_factor
         self.right_trim_factor = right_trim_factor
+
         self.enable_active_value = enable_active_value
         self.disable_value = 0 if enable_active_value == 1 else 1
+
         self.name = name
         self.debug = debug
         self.last_left_speed = None
         self.last_right_speed = None
+
         self.stop()
 
     def enable(self):
@@ -223,14 +203,17 @@ class DualStepperMotorPWM:
         self.disable()
         self.last_left_speed = 0
         self.last_right_speed = 0
+
         if self.debug:
             print(self.name, "STOP")
 
     def _speed_to_frequency(self, speed, trim_factor):
         speed = clamp(speed, 0, 100)
         adjusted_speed = clamp(speed * trim_factor, 0, 100)
+
         if adjusted_speed <= 0:
             return 0
+
         return int(
             self.min_freq
             + (self.max_freq - self.min_freq) * (adjusted_speed / 100)
@@ -250,6 +233,8 @@ class DualStepperMotorPWM:
         self.enable()
         self.left_dir.value(LEFT_FORWARD_DIR)
         self.right_dir.value(RIGHT_FORWARD_DIR)
+
+        # Kleine Pause, damit Richtung/Enable sicher gesetzt sind.
         sleep_ms(2)
 
         if left_freq > 0:
@@ -278,23 +263,26 @@ class DualStepperMotorPWM:
                 right_freq,
             )
 
+    def forward(self, speed):
+        self.drive_forward_differential(speed, speed)
 
-def create_motors(debug=False):
-    return DualStepperMotorPWM(
-        left_dir_pin=LEFT_DIR_PIN,
-        left_step_pin=LEFT_STEP_PIN,
-        left_enable_pin=LEFT_ENABLE_PIN,
-        right_dir_pin=RIGHT_DIR_PIN,
-        right_step_pin=RIGHT_STEP_PIN,
-        right_enable_pin=RIGHT_ENABLE_PIN,
-        min_freq=MIN_FREQ,
-        max_freq=MAX_FREQ,
-        left_trim_factor=LEFT_TRIM_FACTOR,
-        right_trim_factor=RIGHT_TRIM_FACTOR,
-        enable_active_value=ENABLE_ACTIVE_VALUE,
-        name="Muelltonne",
-        debug=debug,
-    )
+    def backward(self, speed):
+        speed = clamp(speed, 0, 100)
+        left_freq = self._speed_to_frequency(speed, self.left_trim_factor)
+        right_freq = self._speed_to_frequency(speed, self.right_trim_factor)
+
+        if left_freq <= 0 or right_freq <= 0:
+            self.stop()
+            return
+
+        self.enable()
+        self.left_dir.value(1 - LEFT_FORWARD_DIR)
+        self.right_dir.value(1 - RIGHT_FORWARD_DIR)
+        sleep(0.02)
+        self.left_step.freq(left_freq)
+        self.right_step.freq(right_freq)
+        self.left_step.duty_u16(32768)
+        self.right_step.duty_u16(32768)
 
 
 def select_channel(channel):
@@ -365,169 +353,133 @@ def calculate_line_position(values):
 
 
 def speeds_from_correction(correction):
+    # Symmetrische PD-Korrektur:
+    # Ein Motor wird langsamer, der andere wird im gleichen Mass schneller.
     left_speed = BASE_SPEED - correction
     right_speed = BASE_SPEED + correction
+
     left_speed = clamp(left_speed, MIN_SPEED, MAX_SPEED)
     right_speed = clamp(right_speed, MIN_SPEED, MAX_SPEED)
+
     return left_speed, right_speed
 
 
-def run_to_street():
-    global motors
+motors = DualStepperMotorPWM(
+    left_dir_pin=LEFT_DIR_PIN,
+    left_step_pin=LEFT_STEP_PIN,
+    left_enable_pin=LEFT_ENABLE_PIN,
+    right_dir_pin=RIGHT_DIR_PIN,
+    right_step_pin=RIGHT_STEP_PIN,
+    right_enable_pin=RIGHT_ENABLE_PIN,
+    min_freq=MIN_FREQ,
+    max_freq=MAX_FREQ,
+    left_trim_factor=LEFT_TRIM_FACTOR,
+    right_trim_factor=RIGHT_TRIM_FACTOR,
+    enable_active_value=ENABLE_ACTIVE_VALUE,
+    name="Muelltonne",
+    debug=False,
+)
 
-    if motors is None:
-        motors = create_motors(debug=False)
+controller = PDController(KP, KD, MAX_CORRECTION, MAX_DERIVATIVE_PER_S)
 
-    controller = PDController(KP, KD, MAX_CORRECTION, MAX_DERIVATIVE_PER_S)
-    last_control_ms = ticks_ms()
-    last_print_ms = ticks_ms()
-    last_us_ms = ticks_ms()
-    last_line_seen_ms = ticks_ms()
-    last_left_speed = BASE_SPEED
-    last_right_speed = BASE_SPEED
-    front_distance_cm = None
+last_control_ms = ticks_ms()
+last_print_ms = ticks_ms()
+last_us_ms = ticks_ms()
+last_line_seen_ms = ticks_ms()
+last_position = 0
+last_left_speed = BASE_SPEED
+last_right_speed = BASE_SPEED
+front_distance_cm = None
 
-    line_values = [0, 0, 0, 0, 0]
-    position = None
-    correction = 0
-    left_speed = 0
-    right_speed = 0
+print("Starte Linienfolger mit PD-Regler und PWM-Schrittmotorsteuerung")
+print("MUX: S0 GP2, S1 GP3, S2 GP4, S3 GP5, SIG GP28")
+print("Liniensensoren: C0-C4")
+print("Ultraschall vorne: Trigger GP6, Echo C5")
+print("Motor links:  DIR GP10, STEP GP11, ENABLE GP12")
+print("Motor rechts: DIR GP13, STEP GP8,  ENABLE GP9")
+print("Zum Stoppen: Strg+C / Reset")
+print("----------------------------------------")
 
-    print("Starte Linienfolger per Touchpanel")
+try:
+    while True:
+        now_ms = ticks_ms()
 
-    try:
-        while True:
-            now_ms = ticks_ms()
+        if ticks_diff(now_ms, last_us_ms) >= US_INTERVAL_MS:
+            last_us_ms = now_ms
+            front_distance_cm = measure_ultrasonic(US_FRONT_CHANNEL)
 
-            if ticks_diff(now_ms, last_us_ms) >= US_INTERVAL_MS:
-                last_us_ms = now_ms
-                front_distance_cm = measure_ultrasonic(US_FRONT_CHANNEL)
+        if ticks_diff(now_ms, last_control_ms) >= CONTROL_INTERVAL_MS:
+            last_control_ms = now_ms
 
-            if ticks_diff(now_ms, last_control_ms) >= CONTROL_INTERVAL_MS:
-                last_control_ms = now_ms
-                line_values = read_line_sensors()
-                position = calculate_line_position(line_values)
+            line_values = read_line_sensors()
+            position = calculate_line_position(line_values)
 
-                if obstacle_detected(front_distance_cm):
-                    motors.stop()
-                    print("Stopp: Hindernis", front_distance_cm, "cm")
-                    return "obstacle"
+            if obstacle_detected(front_distance_cm):
+                controller.reset()
+                correction = 0
+                left_speed = 0
+                right_speed = 0
+                motors.stop()
 
-                if position == "street":
-                    motors.stop()
-                    print("Stopp: Strasse erkannt")
-                    return "street"
+            elif position == "street":
+                controller.reset()
+                correction = 0
+                left_speed = 0
+                right_speed = 0
+                motors.stop()
 
-                if position is not None:
-                    last_line_seen_ms = now_ms
-                    correction = controller.calculate(position, 0, now_ms)
-                    left_speed, right_speed = speeds_from_correction(correction)
-                    last_left_speed = left_speed
-                    last_right_speed = right_speed
+            elif position is not None:
+                last_position = position
+                last_line_seen_ms = now_ms
+
+                correction = controller.calculate(position, 0, now_ms)
+                left_speed, right_speed = speeds_from_correction(correction)
+                last_left_speed = left_speed
+                last_right_speed = right_speed
+                motors.drive_forward_differential(left_speed, right_speed)
+
+            else:
+                controller.reset()
+                correction = 0
+
+                if ticks_diff(now_ms, last_line_seen_ms) < LOST_LINE_STOP_MS:
+                    left_speed = last_left_speed
+                    right_speed = last_right_speed
                     motors.drive_forward_differential(left_speed, right_speed)
                 else:
-                    controller.reset()
-                    correction = 0
-                    if ticks_diff(now_ms, last_line_seen_ms) < LOST_LINE_STOP_MS:
-                        left_speed = last_left_speed
-                        right_speed = last_right_speed
-                        motors.drive_forward_differential(left_speed, right_speed)
-                    else:
-                        motors.stop()
-                        print("Stopp: Linie verloren")
-                        return "line_lost"
+                    left_speed = 0
+                    right_speed = 0
+                    motors.stop()
 
-                if ticks_diff(now_ms, last_print_ms) >= PRINT_INTERVAL_MS:
-                    last_print_ms = now_ms
-                    left_freq = motors._speed_to_frequency(
-                        left_speed,
-                        motors.left_trim_factor,
-                    )
-                    right_freq = motors._speed_to_frequency(
-                        right_speed,
-                        motors.right_trim_factor,
-                    )
-                    print(
-                        "Sensoren:",
-                        line_values,
-                        "Position:",
-                        position,
-                        "Korrektur:",
-                        round(correction, 1),
-                        "Speed L/R:",
-                        round(left_speed, 1),
-                        round(right_speed, 1),
-                        "Frequenz L/R:",
-                        left_freq,
-                        right_freq,
-                        "US vorne:",
-                        front_distance_cm,
-                    )
+            if ticks_diff(now_ms, last_print_ms) >= PRINT_INTERVAL_MS:
+                last_print_ms = now_ms
+                left_freq = motors._speed_to_frequency(
+                    left_speed,
+                    motors.left_trim_factor,
+                )
+                right_freq = motors._speed_to_frequency(
+                    right_speed,
+                    motors.right_trim_factor,
+                )
+                print(
+                    "Sensoren:",
+                    line_values,
+                    "Position:",
+                    position,
+                    "Korrektur:",
+                    round(correction, 1),
+                    "Speed L/R:",
+                    round(left_speed, 1),
+                    round(right_speed, 1),
+                    "Frequenz L/R:",
+                    left_freq,
+                    right_freq,
+                    "US vorne:",
+                    front_distance_cm,
+                )
 
-    except KeyboardInterrupt:
-        return "aborted"
-    finally:
-        motors.stop()
-        print("Linienfolger gestoppt")
-
-
-def handle_action(action):
-    print("Touch action:", action)
-
-    if action == "eco":
-        set_backlight(False)
-        return
-
-    if action in ("connect", "disconnect"):
-        return
-
-    if action == "shutdown":
-        set_backlight(False)
-        return
-
-    if action == "goto_home":
-        draw_drive_screen("TEST", "HEIMFAHRT NICHT AKTIV", ORANGE)
-        sleep_ms(1400)
-        return
-
-    if action == "goto_street":
-        draw_drive_screen("FAEHRT", "PD REGLER AKTIV", BLUE)
-        result = run_to_street()
-        draw_result_screen(result)
-        return
-
-
-def main():
-    global display, touch, ui
-
-    set_backlight(True)
-
-    display = ILI9341()
-    display.init()
-
-    touch = XPT2046(display)
-    ui = TouchUi(display, action_handler=handle_action)
-    ui.draw()
-
-    print("Touchpanel UI + PD-Regler gestartet")
-    print("Start der Fahrt: PIN -> Fahren -> Abholung")
-
-    last_touch = False
-
-    while True:
-        ui.tick()
-        data = touch.read_screen()
-
-        if data is not None:
-            x, y, x_raw, y_raw = data
-            if not last_touch:
-                print("Touch:", x, y, "| Raw:", x_raw, y_raw)
-                ui.handle_touch(x, y)
-                last_touch = True
-        else:
-            last_touch = False
-
-        sleep_ms(60)
-
-
-main()
+except KeyboardInterrupt:
+    pass
+finally:
+    motors.stop()
+    print("Linienfolger gestoppt")

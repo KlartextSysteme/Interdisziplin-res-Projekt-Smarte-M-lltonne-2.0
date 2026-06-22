@@ -13,7 +13,7 @@ s3 = machine.Pin(5, machine.Pin.OUT)
 trigger = machine.Pin(6, machine.Pin.OUT)
 
 # SIG/Z/COM vom Multiplexer am Pico
-mux_signal = machine.Pin(15, machine.Pin.IN)
+mux_signal = machine.Pin(28, machine.Pin.IN)
 
 
 LINE_CHANNELS = [0, 1, 2, 3, 4]
