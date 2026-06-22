@@ -568,8 +568,9 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
         <TruckFocusController truck={truck} active={truckFocusActive} />
         <BinFocusController bin={selectedBin} />
 
-        {/* Nicht gewählte Vorschläge: gedämpft + klickbar */}
-        {candidateLines.map((c) => (
+        {/* Nicht gewählte Vorschläge: nur in der Vorschau-Phase (vor Fahrtbeginn),
+            damit während der Fahrt nur die eine befahrene Route sichtbar ist. */}
+        {!collecting && !returning && candidateLines.map((c) => (
           <Polyline
             key={`cand-${c.id}`}
             positions={c.line}
@@ -616,8 +617,10 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
           const current = binCurrentPosition(bin);
           const home = binHomePosition(bin);
           const pickup = binPickupPosition(bin);
+          // Nur für noch nicht geleerte Tonnen, damit keine gestrichelten Reste
+          // entlang der schon abgefahrenen Strecke kleben bleiben.
           const showMovementPath = Boolean(
-            home && pickup && (activeRouteBins.has(bin.id) || isMovingBin(bin) || bin.location_state === "truck"),
+            home && pickup && bin.fill_level > 0 && (activeRouteBins.has(bin.id) || isMovingBin(bin)),
           );
 
           return (
