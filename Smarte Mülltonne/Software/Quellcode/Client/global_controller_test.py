@@ -8,7 +8,7 @@ class GlobalController:
     """
 
     # --- Pico-Zustände (Interne Logik) --- 
-    STATE_STANDBY = "STANDBY"
+    STATE_AT_HOME = "AT_HOME"
     STATE_LINE_FOLLOWING = "LINE_FOLLOWING"
     STATE_USER_PAUSED = "USER_PAUSED"
     STATE_LINE_LOST = "LINE_LOST"
@@ -17,9 +17,11 @@ class GlobalController:
     STATE_AVOID_LEFT = "AVOID_LEFT"
     STATE_AVOID_NOT_POSSIBLE = "AVOID_NOT_POSSIBLE"
     STATE_WAIT_AT_STREET = "WAIT_AT_STREET"
+    STATE_TURN_AT_HOME = "TURN_AT_HOME"
     # Zustände für manuelle Anforderungen per Touchpanel
     STATE_MANUAL_GOTO_STREET_REQUEST = "MANUAL_GOTO_STREET_REQUEST"
     STATE_MANUAL_RETURN_HOME_REQUEST = "MANUAL_RETURN_HOME_REQUEST"
+    #Zustände aus der Webapp
 
     def __init__(
         self,
@@ -44,7 +46,7 @@ class GlobalController:
         self.min_speed = min_speed
         self.max_speed = max_speed
 
-        self.state = self.STATE_STANDBY
+        self.state = self.STATE_AT_HOME
         self.state_since_ms = time.ticks_ms()
 
         self.last_line_seen_ms = time.ticks_ms()
@@ -60,19 +62,32 @@ class GlobalController:
         self.avoid_speed = 35
         self.avoid_turn_speed = 35
 
-        self.avoid_turn_90_ms = 850
         self.avoid_forward_ms = 900
         self.avoid_side_max_ms = 5000
         self.avoid_line_search_max_ms = 6000
 
+        self.help_front_clear_since_ms = None
+        self.help_resume_delay_ms = 5000
+
+        # müssen noch angepasst werden
+        self.avoid_turn_90_steps = 16000
+        self.turn_home_180_steps = 32000
+
+        self.avoid_turn_90_ms = 0
+        self.turn_home_180_ms = 0
+
         self.avoid_step = 0
         self.avoid_step_since_ms = time.ticks_ms()
 
+        self.state_before_pause = self.STATE_AT_HOME
+
+        #müssen noch konfiguriert werden
         self.side_obstacle_cm = 200
         self.avoid_extra_steps = 15000
         self.avoid_extra_ms = 0
 
         self.help_buzzer_started = False
+        self.drive_target = None
 
         # -------- zum Testen --------
         self.last_debug_ms = time.ticks_ms()
@@ -92,10 +107,13 @@ class GlobalController:
             self.avoid_step_since_ms = self.state_since_ms
         if new_state == self.STATE_AVOID_NOT_POSSIBLE:
             self.help_buzzer_started = False
+            self.help_front_clear_since_ms = None
+        if new_state == self.STATE_TURN_AT_HOME:
+            self.turn_home_180_ms = 0
         
         if new_state in (
             self.STATE_LINE_FOLLOWING,
-            self.STATE_STANDBY,
+            self.STATE_AT_HOME,
             self.STATE_WAIT_AT_STREET,
             self.STATE_USER_PAUSED,
         ):
@@ -114,6 +132,42 @@ class GlobalController:
 
         print(text)
         self.last_debug_ms = now
+
+    def _motor_debug_text(self):
+        if self.motors is None:
+            return ""
+
+        left_speed, right_speed = self.motors.get_last_speeds()
+        left_freq, right_freq = self.motors.get_last_frequencies()
+
+        return (
+            " Speed L/R: "
+            + str(round(left_speed, 1))
+            + " "
+            + str(round(right_speed, 1))
+            + " Freq L/R: "
+            + str(left_freq)
+            + " "
+            + str(right_freq)
+        )
+
+    def _line_debug_text(self):
+        if self.line_sensor is None:
+            return ""
+
+        values = self.line_sensor.read_values()
+        bits = self.line_sensor.get_bits()
+
+        return " Sensoren: " + str(values) + " Bits: " + bin(bits)
+
+    def _debug_state(self, extra=""):
+        text = "State: " + self.state + " Ziel: " + str(self.drive_target)
+
+        if extra:
+            text += " " + extra
+
+        text += self._motor_debug_text()
+        self._debug_print(text)
     
     def _line_found_during_avoidance(self):
         if self.line_sensor is None:
@@ -144,19 +198,27 @@ class GlobalController:
         return not self.obstacle_sensors.right_is_clear()
 
     def request_goto_street(self):
-        if self.state in (
-            self.STATE_STANDBY,
-            self.STATE_WAIT_AT_STREET,
-            self.STATE_MANUAL_GOTO_STREET_REQUEST,
-        ):
-            self.set_state(self.STATE_LINE_FOLLOWING)
+        if self.state == self.STATE_AT_HOME:
+            self.set_state(self.STATE_MANUAL_GOTO_STREET_REQUEST)
+        else:
+            print("Befehl goto_street ignoriert in State:", self.state)
+
+    def _logic_manual_goto_street_request(self):
+        print("Manuelle Anforderung: Fahrt zur Strasse")
+        self.drive_target = "street"
+        self.set_state(self.STATE_LINE_FOLLOWING)
+
 
     def request_return_home(self):
-        if self.state in (
-            self.STATE_WAIT_AT_STREET,
-            self.STATE_MANUAL_RETURN_HOME_REQUEST,
-        ):
-            self.set_state(self.STATE_LINE_FOLLOWING)
+        if self.state == self.STATE_WAIT_AT_STREET:
+            self.set_state(self.STATE_MANUAL_RETURN_HOME_REQUEST)
+        else:
+            print("Befehl goto_home ignoriert in State:", self.state)
+    
+    def _logic_manual_return_home_request(self):
+        print("Manuelle Anforderung: Rueckfahrt nach Hause")
+        self.drive_target = "home"
+        self.set_state(self.STATE_LINE_FOLLOWING)
 
     def pause(self):
         if self.state in (
@@ -168,18 +230,21 @@ class GlobalController:
         ):
             if self.motors:
                 self.motors.stop()
+            self.state_before_pause = self.state
             self.set_state(self.STATE_USER_PAUSED)
 
     def resume(self):
         if self.state == self.STATE_USER_PAUSED:
-            self.set_state(self.STATE_LINE_FOLLOWING)
+            self.set_state(self.state_before_pause)
 
     def stop(self):
         if self.motors:
             self.motors.stop()
-        self.set_state(self.STATE_STANDBY)
+        self.set_state(self.STATE_AT_HOME)
     
     def handle_touch_action(self, action):
+        print("Touch-Action:", action)
+
         if action == "goto_street":
             self.request_goto_street()
             return
@@ -195,8 +260,8 @@ class GlobalController:
     def run(self):
         if self.touchpanel is not None:
             self.touchpanel.tick()
-        if self.state == self.STATE_STANDBY:
-            self._logic_standby()
+        if self.state == self.STATE_AT_HOME:
+            self._logic_at_home()
         elif self.state == self.STATE_LINE_FOLLOWING:
             self._logic_line_following()
         elif self.state == self.STATE_LINE_LOST:
@@ -213,13 +278,27 @@ class GlobalController:
             self._logic_wait_at_street()
         elif self.state == self.STATE_USER_PAUSED:
             self._logic_user_paused()
+        elif self.state == self.STATE_TURN_AT_HOME:
+            self._logic_turn_at_home()
+        elif self.state == self.STATE_MANUAL_GOTO_STREET_REQUEST:
+            self._logic_manual_goto_street_request()
+        elif self.state == self.STATE_MANUAL_RETURN_HOME_REQUEST:
+            self._logic_manual_return_home_request()
 
-    def _logic_standby(self):
+    def _logic_at_home(self):
         if self.motors is not None:
             self.motors.stop()
 
         if self.buzzer is not None:
             self.buzzer.stop()
+
+        if self.touchpanel is not None:
+            self.touchpanel.set_status(
+                status_kind="full_home",
+                location="home",
+            )
+
+        self._debug_state("warte")
             
 
     def _logic_line_following(self):
@@ -240,7 +319,12 @@ class GlobalController:
 
         if position == "street":
             self.motors.stop()
-            self.set_state(self.STATE_WAIT_AT_STREET)
+
+            if self.drive_target == "home":
+                self.set_state(self.STATE_TURN_AT_HOME)
+            else:
+                self.set_state(self.STATE_WAIT_AT_STREET)
+
             return
 
         if position is None:
@@ -262,23 +346,40 @@ class GlobalController:
             max_speed=self.max_speed,
         )
 
+        line_values = self.line_sensor.read_values()
+
+        self._debug_print(
+            "LINE_FOLLOWING | Ziel: "
+            + str(self.drive_target)
+            + " | Sensoren: "
+            + str(line_values)
+            + " | Position: "
+            + str(position)
+            + " | Korrektur: "
+            + str(round(correction, 1))
+            + " | Speed L/R: "
+            + str(round(left_speed, 1))
+            + " / "
+            + str(round(right_speed, 1))
+        )
+
         self.last_left_speed = left_speed
         self.last_right_speed = right_speed
+
+        self.motors.drive_forward_differential(left_speed, right_speed)
 
         self._debug_print(
             "State: "
             + self.state
+            + " Ziel: "
+            + str(self.drive_target)
+            + self._line_debug_text()
             + " Position: "
             + str(position)
-            + " Speed L/R: "
-            + str(round(left_speed, 1))
-            + " "
-            + str(round(right_speed, 1))
             + " Correction: "
             + str(round(correction, 1))
+            + self._motor_debug_text()
         )
-
-        self.motors.drive_forward_differential(left_speed, right_speed)
 
     def _logic_line_lost(self):
         if self.motors is None:
@@ -296,7 +397,12 @@ class GlobalController:
 
         if position == "street":
             self.motors.stop()
-            self.set_state(self.STATE_WAIT_AT_STREET)
+
+            if self.drive_target == "home":
+                self.set_state(self.STATE_TURN_AT_HOME)
+            else:
+                self.set_state(self.STATE_WAIT_AT_STREET)
+
             return
 
         if position is not None:
@@ -304,21 +410,26 @@ class GlobalController:
             return
 
         if time.ticks_diff(time.ticks_ms(), self.last_line_seen_ms) < self.line_lost_timeout_ms:
-            self._debug_print(
-                "State: "
-                + self.state
-                + " Linie verloren, fahre weiter mit letzter Speed L/R: "
-                + str(round(self.last_left_speed, 1))
-                + " "
-                + str(round(self.last_right_speed, 1))
-            )
             self.motors.drive_forward_differential(
                 self.last_left_speed,
                 self.last_right_speed,
             )
+
+            self._debug_print(
+                "State: "
+                + self.state
+                + " Ziel: "
+                + str(self.drive_target)
+                + self._line_debug_text()
+                + " Linie verloren, fahre weiter mit letzter Speed L/R: "
+                + str(round(self.last_left_speed, 1))
+                + " "
+                + str(round(self.last_right_speed, 1))
+                + self._motor_debug_text()
+            )
         else:
             self.motors.stop()
-            self.set_state(self.STATE_STANDBY)
+            self.set_state(self.STATE_AT_HOME)
 
     def _logic_obstacle_wait(self):
         if self.motors is not None:
@@ -331,6 +442,17 @@ class GlobalController:
             )
 
         wait_time_ms = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
+
+        front_distance = None
+        if self.obstacle_sensors is not None:
+            front_distance = self.obstacle_sensors.front.read_distance_cm()
+
+        self._debug_state(
+            "Hindernis vorne: "
+            + str(front_distance)
+            + " cm Wartezeit ms: "
+            + str(wait_time_ms)
+        )
 
         if wait_time_ms < self.obstacle_wait_ms:
             return
@@ -374,17 +496,28 @@ class GlobalController:
         self._debug_print(
             "State: "
             + self.state
+            + " Ziel: "
+            + str(self.drive_target)
             + " Avoid-Step: "
             + str(self.avoid_step)
             + " Elapsed ms: "
             + str(elapsed)
+            + self._line_debug_text()
+            + self._motor_debug_text()
         )
 
         # Schritt 0: 90 Grad nach rechts drehen
         if self.avoid_step == 0:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_right(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self._next_avoid_step()
             return
@@ -394,7 +527,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if self._left_obstacle_detected():
@@ -406,7 +541,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if not self._left_obstacle_detected():
@@ -424,7 +561,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if elapsed >= self.avoid_extra_ms:
@@ -434,9 +573,16 @@ class GlobalController:
 
         # Schritt 4: 90 Grad nach links drehen
         if self.avoid_step == 4:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_left(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self._next_avoid_step()
             return
@@ -446,7 +592,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if self._left_obstacle_detected():
@@ -458,7 +606,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if not self._left_obstacle_detected():
@@ -476,7 +626,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if elapsed >= self.avoid_extra_ms:
@@ -486,9 +638,16 @@ class GlobalController:
 
         # Schritt 8: 90 Grad nach links drehen, zurück Richtung Linie
         if self.avoid_step == 8:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_left(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self._next_avoid_step()
             return
@@ -498,8 +657,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self.motors.stop()
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if elapsed >= self.avoid_line_search_max_ms:
@@ -509,9 +669,16 @@ class GlobalController:
 
         # Schritt 10: 90 Grad nach rechts drehen, danach wieder Linienfolge
         if self.avoid_step == 10:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_right(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self.set_state(self.STATE_LINE_FOLLOWING)
             return
@@ -531,17 +698,28 @@ class GlobalController:
         self._debug_print(
             "State: "
             + self.state
+            + " Ziel: "
+            + str(self.drive_target)
             + " Avoid-Step: "
             + str(self.avoid_step)
             + " Elapsed ms: "
             + str(elapsed)
+            + self._line_debug_text()
+            + self._motor_debug_text()
         )
 
         # Schritt 0: 90 Grad nach links drehen
         if self.avoid_step == 0:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_left(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self._next_avoid_step()
             return
@@ -551,7 +729,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if self._right_obstacle_detected():
@@ -563,7 +743,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if not self._right_obstacle_detected():
@@ -581,7 +763,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if elapsed >= self.avoid_extra_ms:
@@ -591,9 +775,16 @@ class GlobalController:
 
         # Schritt 4: 90 Grad nach rechts drehen
         if self.avoid_step == 4:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_right(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self._next_avoid_step()
             return
@@ -603,7 +794,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if self._right_obstacle_detected():
@@ -615,7 +808,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if not self._right_obstacle_detected():
@@ -633,7 +828,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if elapsed >= self.avoid_extra_ms:
@@ -643,9 +840,16 @@ class GlobalController:
 
         # Schritt 8: 90 Grad nach rechts drehen, zurück Richtung Linie
         if self.avoid_step == 8:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_right(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self._next_avoid_step()
             return
@@ -655,8 +859,9 @@ class GlobalController:
             self.motors.forward(self.avoid_speed)
 
             if self._line_found_during_avoidance():
-                self.motors.stop()
-                self._next_avoid_step()
+                self.avoid_step = 10
+                self.avoid_turn_90_ms = 0
+                self.avoid_step_since_ms = time.ticks_ms()
                 return
 
             if elapsed >= self.avoid_line_search_max_ms:
@@ -666,9 +871,16 @@ class GlobalController:
 
         # Schritt 10: 90 Grad nach links drehen, danach wieder Linienfolge
         if self.avoid_step == 10:
+            if self.avoid_turn_90_ms == 0:
+                self.avoid_turn_90_ms = self.motors.steps_to_ms(
+                    self.avoid_turn_90_steps,
+                    self.avoid_turn_speed
+                )
+
             self.motors.turn_left(self.avoid_turn_speed)
 
             if elapsed >= self.avoid_turn_90_ms:
+                self.avoid_turn_90_ms = 0
                 self.motors.stop()
                 self.set_state(self.STATE_LINE_FOLLOWING)
             return
@@ -697,7 +909,29 @@ class GlobalController:
             self.buzzer.run()
 
         if self.touchpanel is not None:
-            self.touchpanel.set_status(status_kind="obstacle", obstacle_cm=0)
+            self.touchpanel.set_status(status_kind="help")
+        
+        if self.obstacle_sensors is not None:
+            self.obstacle_sensors.run_front(force=True)
+
+            if self.obstacle_sensors.front_obstacle_detected():
+                self.help_front_clear_since_ms = None
+            else:
+                now = time.ticks_ms()
+
+                if self.help_front_clear_since_ms is None:
+                    self.help_front_clear_since_ms = now
+
+                clear_time_ms = time.ticks_diff(now, self.help_front_clear_since_ms)
+
+                if clear_time_ms >= self.help_resume_delay_ms:
+                    if self.buzzer is not None:
+                        self.buzzer.stop()
+
+                    self.set_state(self.STATE_LINE_FOLLOWING)
+                    return
+
+        self._debug_state("Hilfe benoetigt / warte 5s bis vorne frei bleibt")
 
     def _logic_wait_at_street(self):
         if self.motors is not None:
@@ -708,10 +942,38 @@ class GlobalController:
 
         if self.touchpanel is not None:
             self.touchpanel.set_status(
-                location="street",
-                status_kind="full_street",
+                status_kind="full_home",
+                location="truck",
                 line_ok=True,
             )
+
+        self._debug_state("warte an der Strasse")
+
+    def _logic_turn_at_home(self):
+        if self.motors is None:
+            return
+
+        if self.turn_home_180_ms == 0:
+            self.turn_home_180_ms = self.motors.steps_to_ms(
+                self.turn_home_180_steps,
+                self.avoid_turn_speed
+            )
+
+        elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
+
+        self.motors.turn_right(self.avoid_turn_speed)
+
+        self._debug_state(
+            "180-Grad-Drehung zuhause Elapsed ms: "
+            + str(elapsed)
+            + " Zielzeit ms: "
+            + str(self.turn_home_180_ms)
+        )
+
+        if elapsed >= self.turn_home_180_ms:
+            self.motors.stop()
+            self.turn_home_180_ms = 0
+            self.set_state(self.STATE_AT_HOME)
 
     def _logic_user_paused(self):
         if self.motors is not None:
@@ -719,3 +981,5 @@ class GlobalController:
 
         if self.buzzer is not None:
             self.buzzer.stop()
+
+        self._debug_state("pausiert")
