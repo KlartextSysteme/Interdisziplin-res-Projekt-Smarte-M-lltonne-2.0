@@ -19,9 +19,11 @@ import {
   getLatestRoute,
   getPublicConfig,
   getSimSpeed,
+  createBinCommand,
   setSimSpeed,
   setSimPaused,
   type PublicConfig,
+  type BinCommandAction,
 } from "@/lib/api";
 import type { Route } from "@/types";
 
@@ -37,6 +39,10 @@ export default function DashboardPage() {
   const [simSpeed, setSimSpeedState] = useState<number>(1);
   const [simPaused, setSimPausedState] = useState<boolean>(false);
   const [selectedBinId, setSelectedBinId] = useState<number | null>(null);
+  const [hardwareCommandPending, setHardwareCommandPending] = useState<{
+    binId: number;
+    action: BinCommandAction;
+  } | null>(null);
 
   // Load current sim-state once
   useEffect(() => {
@@ -112,6 +118,16 @@ export default function DashboardPage() {
   async function handleLock(binId: number) {
     const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN ?? "changeme";
     await lockBin(binId, token);
+  }
+
+  async function handleHardwareCommand(binId: number, action: BinCommandAction) {
+    if (hardwareCommandPending) return;
+    setHardwareCommandPending({ binId, action });
+    try {
+      await createBinCommand(binId, action);
+    } finally {
+      setHardwareCommandPending(null);
+    }
   }
 
   const energyData = bins.map((b) => ({
@@ -283,6 +299,8 @@ export default function DashboardPage() {
             alerts={alerts}
             selectedBinId={selectedBinId}
             onSelectBin={setSelectedBinId}
+            onHardwareCommand={handleHardwareCommand}
+            hardwareCommandPending={hardwareCommandPending}
           />
         </div>
 

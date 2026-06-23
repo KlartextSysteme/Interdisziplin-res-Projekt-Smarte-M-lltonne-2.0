@@ -1,7 +1,15 @@
 from machine import Pin, PWM
 from time import sleep_ms, sleep_us, ticks_diff, ticks_ms, ticks_us
 
-from config import PIN_BACKLIGHT
+from config import (
+    BRIDGE_HOST,
+    BRIDGE_PORT,
+    ENABLE_TCP_BRIDGE,
+    PIN_BACKLIGHT,
+    TCP_STATUS_MS,
+    WLAN_PASSWORD,
+    WLAN_SSID,
+)
 from display import BLACK, BLUE, GREEN, ILI9341, ORANGE, RED, WHITE
 from touch import XPT2046
 from ui import TouchUi
@@ -23,6 +31,12 @@ touch = None
 ui = None
 motors = None
 _backlight = None
+bridge_client = None
+pico_state = "STANDBY"
+
+CMD_GOTO_STREET = "CMD_GOTO_STREET"
+CMD_RETURN_HOME = "CMD_RETURN_HOME"
+CMD_STOP = "CMD_STOP"
 
 
 # ---------------- TOUCHPANEL / ANZEIGE ----------------
@@ -63,6 +77,102 @@ def draw_result_screen(result):
     else:
         draw_drive_screen("STOPP", "UNBEKANNT", RED)
     sleep_ms(1800)
+
+
+def send_bridge_line(line):
+    if bridge_client is None:
+        return
+    try:
+        bridge_client.send_line(line)
+    except Exception as exc:
+        print("Bridge send failed:", exc)
+
+
+def set_pico_state(state, notify=True):
+    global pico_state
+    pico_state = state
+    if notify:
+        send_bridge_line("STATUS:" + state)
+
+
+def get_pico_state():
+    return pico_state
+
+
+def finish_drive_result(result):
+    if result == "street":
+        set_pico_state("WAIT_AT_STREET", notify=False)
+        send_bridge_line("ARRIVED: STREET")
+    elif result == "obstacle":
+        set_pico_state("OBSTACLE")
+    elif result == "line_lost":
+        set_pico_state("LINE_LOST")
+    elif result == "aborted":
+        set_pico_state("USER_PAUSED")
+    else:
+        set_pico_state("USER_PAUSED")
+
+
+def start_goto_street(source):
+    if source == "bridge":
+        send_bridge_line("ACK " + CMD_GOTO_STREET)
+    else:
+        send_bridge_line("STATUS:MANUAL_GOTO_STREET_REQUEST")
+
+    set_pico_state("LINE_FOLLOWING")
+    draw_drive_screen("FAEHRT", "PD REGLER AKTIV", BLUE)
+    result = run_to_street()
+    finish_drive_result(result)
+    draw_result_screen(result)
+
+
+def handle_bridge_command(cmd):
+    print("Bridge command:", cmd)
+
+    if cmd == CMD_GOTO_STREET:
+        start_goto_street("bridge")
+        return
+
+    if cmd == CMD_RETURN_HOME:
+        send_bridge_line("ACK " + CMD_RETURN_HOME)
+        draw_drive_screen("TEST", "HEIMFAHRT NICHT AKTIV", ORANGE)
+        set_pico_state("STANDBY")
+        send_bridge_line("ARRIVED: HOME")
+        sleep_ms(1400)
+        return
+
+    if cmd == CMD_STOP:
+        send_bridge_line("ACK " + CMD_STOP)
+        if motors is not None:
+            motors.stop()
+        set_pico_state("USER_PAUSED")
+        draw_drive_screen("STOPP", "PAUSIERT", ORANGE)
+        sleep_ms(900)
+        if ui is not None:
+            ui.draw()
+        return
+
+    print("Unknown bridge command:", cmd)
+
+
+def create_bridge_client():
+    if not ENABLE_TCP_BRIDGE:
+        return None
+    try:
+        from tcp_bridge_client import TcpBridgeClient
+    except Exception as exc:
+        print("TCP bridge client import failed:", exc)
+        return None
+
+    return TcpBridgeClient(
+        WLAN_SSID,
+        WLAN_PASSWORD,
+        BRIDGE_HOST,
+        BRIDGE_PORT,
+        handle_bridge_command,
+        status_provider=get_pico_state,
+        status_interval_ms=TCP_STATUS_MS,
+    )
 
 
 # ---------------- MULTIPLEXER CD74HC4067 ----------------
@@ -487,18 +597,17 @@ def handle_action(action):
 
     if action == "goto_home":
         draw_drive_screen("TEST", "HEIMFAHRT NICHT AKTIV", ORANGE)
+        send_bridge_line("STATUS:MANUAL_RETURN_HOME_REQUEST")
         sleep_ms(1400)
         return
 
     if action == "goto_street":
-        draw_drive_screen("FAEHRT", "PD REGLER AKTIV", BLUE)
-        result = run_to_street()
-        draw_result_screen(result)
+        start_goto_street("touchpanel")
         return
 
 
 def main():
-    global display, touch, ui
+    global bridge_client, display, touch, ui
 
     set_backlight(True)
 
@@ -508,14 +617,21 @@ def main():
     touch = XPT2046(display)
     ui = TouchUi(display, action_handler=handle_action)
     ui.draw()
+    bridge_client = create_bridge_client()
+    if bridge_client is not None:
+        bridge_client.start()
 
     print("Touchpanel UI + PD-Regler gestartet")
     print("Start der Fahrt: PIN -> Fahren -> Abholung")
+    if bridge_client is not None:
+        print("TCP bridge client aktiv:", BRIDGE_HOST, BRIDGE_PORT)
 
     last_touch = False
 
     while True:
         ui.tick()
+        if bridge_client is not None:
+            bridge_client.tick()
         data = touch.read_screen()
 
         if data is not None:

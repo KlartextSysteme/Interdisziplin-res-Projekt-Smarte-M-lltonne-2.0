@@ -34,9 +34,12 @@ DEFAULT_POLL_INTERVAL_S = 1.0
 BACKEND_TO_PICO_COMMAND = {
     "goto_street": "CMD_GOTO_STREET",
     "go_to_street": "CMD_GOTO_STREET",
+    "goto_pickup": "CMD_GOTO_STREET",
+    "go_to_pickup": "CMD_GOTO_STREET",
     "start": "CMD_GOTO_STREET",
     "return_home": "CMD_RETURN_HOME",
     "go_home": "CMD_RETURN_HOME",
+    "goto_home": "CMD_RETURN_HOME",
     "stop": "CMD_STOP",
     "pause": "CMD_STOP",
     "lock": "CMD_STOP",

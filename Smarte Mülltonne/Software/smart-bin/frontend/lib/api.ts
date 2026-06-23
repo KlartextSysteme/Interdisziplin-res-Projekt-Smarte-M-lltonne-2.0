@@ -23,6 +23,23 @@ async function post<T>(path: string, body?: unknown, headers?: HeadersInit): Pro
 export const getBins = () => get<Bin[]>("/bins");
 export const getBin = (id: number) => get<Bin>(`/bins/${id}`);
 
+export type BinCommandAction = "goto_street" | "return_home" | "stop";
+
+export interface BinCommandResponse {
+  id: number;
+  bin_id: number;
+  action: BinCommandAction | string;
+  params?: Record<string, unknown> | null;
+  created_at: string;
+  ack_at?: string | null;
+}
+
+export const createBinCommand = (
+  binId: number,
+  action: BinCommandAction,
+  params?: Record<string, unknown>,
+) => post<BinCommandResponse>(`/bins/${binId}/command`, { action, params });
+
 // --- Routes ---
 // Planung liefert mehrere Kandidaten (Default ist active + is_default).
 export const planRoute = () => post<Route[]>("/routes/plan");

@@ -1,8 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Battery, BatteryLow, Lock, Plus, Sparkles, Trash2, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  Battery,
+  BatteryLow,
+  Home,
+  Loader2,
+  Lock,
+  MapPin,
+  Plus,
+  Sparkles,
+  Square,
+  Trash2,
+  Wrench,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { binLocationLabel, binStatusLabel, eventTone, securityEventLabel } from "@/lib/labels";
+import type { BinCommandAction } from "@/lib/api";
 import type { Bin, LiveData } from "@/types";
 import PairingModal from "./PairingModal";
 
@@ -11,6 +26,8 @@ interface Props {
   alerts?: LiveData["alerts"];
   selectedBinId?: number | null;
   onSelectBin?: (id: number | null) => void;
+  onHardwareCommand?: (binId: number, action: BinCommandAction) => void | Promise<void>;
+  hardwareCommandPending?: { binId: number; action: BinCommandAction } | null;
 }
 
 function fillColor(pct: number) {
@@ -41,8 +58,20 @@ function reportIcon(eventType: string) {
   return <AlertTriangle className="h-3 w-3" />;
 }
 
-export default function FleetPanel({ bins, alerts = [], selectedBinId, onSelectBin }: Props) {
+export default function FleetPanel({
+  bins,
+  alerts = [],
+  selectedBinId,
+  onSelectBin,
+  onHardwareCommand,
+  hardwareCommandPending,
+}: Props) {
   const [pairingOpen, setPairingOpen] = useState(false);
+  const hardwareActions: { action: BinCommandAction; label: string; icon: LucideIcon }[] = [
+    { action: "goto_street", label: "Abholung", icon: MapPin },
+    { action: "return_home", label: "Heim", icon: Home },
+    { action: "stop", label: "Stopp", icon: Square },
+  ];
 
   return (
     <>
@@ -145,6 +174,32 @@ export default function FleetPanel({ bins, alerts = [], selectedBinId, onSelectB
                   </span>
                 )}
               </div>
+
+              {isSelected && onHardwareCommand && (
+                <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-3">
+                  {hardwareActions.map(({ action, label, icon: Icon }) => {
+                    const isPending =
+                      hardwareCommandPending?.binId === b.id &&
+                      hardwareCommandPending.action === action;
+                    return (
+                      <button
+                        key={action}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onHardwareCommand(b.id, action);
+                        }}
+                        disabled={Boolean(hardwareCommandPending)}
+                        title={`Hardware-Befehl: ${label}`}
+                        className="flex min-h-8 items-center justify-center gap-1 rounded border border-white/10 bg-[#111214] px-2 text-[11px] font-semibold text-slate-300 transition hover:border-[#f2c94c]/50 hover:text-[#f2c94c] disabled:cursor-wait disabled:opacity-55"
+                      >
+                        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                        <span className="truncate">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
