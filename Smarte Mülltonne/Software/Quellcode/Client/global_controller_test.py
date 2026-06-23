@@ -192,16 +192,22 @@ class GlobalController:
             self.STATE_WAIT_AT_STREET,
             self.STATE_MANUAL_GOTO_STREET_REQUEST,
         ):
+            print("Befehl: goto_street -> LINE_FOLLOWING")
             self.drive_target = "street"
             self.set_state(self.STATE_LINE_FOLLOWING)
+        else:
+            print("Befehl goto_street ignoriert in State:", self.state)
 
     def request_return_home(self):
         if self.state in (
             self.STATE_WAIT_AT_STREET,
             self.STATE_MANUAL_RETURN_HOME_REQUEST,
         ):
+            print("Befehl: goto_home -> LINE_FOLLOWING")
             self.drive_target = "home"
             self.set_state(self.STATE_LINE_FOLLOWING)
+        else:
+            print("Befehl goto_home ignoriert in State:", self.state)
 
     def pause(self):
         if self.state in (
@@ -225,6 +231,8 @@ class GlobalController:
         self.set_state(self.STATE_STANDBY)
     
     def handle_touch_action(self, action):
+        print("Touch-Action:", action)
+
         if action == "goto_street":
             self.request_goto_street()
             return
