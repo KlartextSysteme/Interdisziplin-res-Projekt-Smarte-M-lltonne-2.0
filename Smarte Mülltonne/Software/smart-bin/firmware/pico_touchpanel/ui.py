@@ -180,7 +180,10 @@ class TouchUi:
             except Exception as exc:
                 print("Action failed:", action, exc)
 
-        self.show_confirm(asset)
+        if action in ("goto_street", "goto_home"):
+            self.show_confirm(asset, return_screen=SCREEN_STATUS)
+        else:
+            self.show_confirm(asset)
 
     def show_confirm(self, asset="confirm_generic", return_screen=None):
         self.confirm_asset = asset
