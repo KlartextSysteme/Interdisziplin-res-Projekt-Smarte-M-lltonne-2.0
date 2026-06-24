@@ -101,6 +101,14 @@ class GlobalController:
         self.state = new_state
         self.state_since_ms = time.ticks_ms()
 
+        if new_state == self.STATE_LINE_FOLLOWING:
+            self.last_line_seen_ms = self.state_since_ms
+            self.last_left_speed = self.base_speed
+            self.last_right_speed = self.base_speed
+
+        if new_state == self.STATE_AT_HOME:
+            self.drive_target = None
+
         if new_state in (self.STATE_AVOID_RIGHT, self.STATE_AVOID_LEFT):
             self.avoid_step = 0
             self.avoid_extra_ms = 0
