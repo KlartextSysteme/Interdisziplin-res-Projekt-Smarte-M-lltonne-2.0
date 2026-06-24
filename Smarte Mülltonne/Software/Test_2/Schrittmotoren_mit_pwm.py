@@ -77,8 +77,8 @@ motors = DualStepperPWM(
     left_step_pin=11,
     left_enable_pin=12,
     right_dir_pin=13,
-    right_step_pin=14,
-    right_enable_pin=15,
+    right_step_pin=8,
+    right_enable_pin=9,
     frequency=5000,
     enable_active_value=1
 )
