@@ -30,6 +30,7 @@ class GlobalController:
         pd_controller=None,
         motors=None,
         buzzer=None,
+        fuellstand_sensor=None,
         touchpanel=None,
         base_speed=45,
         min_speed=0,
@@ -40,6 +41,7 @@ class GlobalController:
         self.pd_controller = pd_controller
         self.motors = motors
         self.buzzer = buzzer
+        self.fuellstand_sensor = fuellstand_sensor
         self.touchpanel = touchpanel
 
         self.base_speed = base_speed
@@ -140,6 +142,24 @@ class GlobalController:
 
         print(text)
         self.last_debug_ms = now
+
+    def _read_fuellstand_for_status(self):
+        if self.fuellstand_sensor is None:
+            return None
+
+        self.fuellstand_sensor.run()
+        fill_level = self.fuellstand_sensor.get_fuellstand_prozent()
+
+        self._debug_print(
+            "Fuellstand-Test | Abstand cm: "
+            + str(self.fuellstand_sensor.last_distance_cm)
+            + " | Fuellstand: "
+            + str(fill_level)
+            + " | Deckel offen: "
+            + str(self.fuellstand_sensor.is_deckel_offen())
+        )
+
+        return fill_level
 
     def _motor_debug_text(self):
         if self.motors is None:
@@ -300,11 +320,20 @@ class GlobalController:
         if self.buzzer is not None:
             self.buzzer.stop()
 
+        fill_level = self._read_fuellstand_for_status()
+
         if self.touchpanel is not None:
-            self.touchpanel.set_status(
-                status_kind="full_home",
-                location="home",
-            )
+            if fill_level is None:
+                self.touchpanel.set_status(
+                    status_kind="full_home",
+                    location="home",
+                )
+            else:
+                self.touchpanel.set_status(
+                    status_kind="full_home",
+                    location="home",
+                    fill_level=fill_level,
+                )
 
         self._debug_state("warte")
             
@@ -948,12 +977,22 @@ class GlobalController:
         if self.buzzer is not None:
             self.buzzer.stop()
 
+        fill_level = self._read_fuellstand_for_status()
+
         if self.touchpanel is not None:
-            self.touchpanel.set_status(
-                status_kind="full_home",
-                location="truck",
-                line_ok=True,
-            )
+            if fill_level is None:
+                self.touchpanel.set_status(
+                    status_kind="full_home",
+                    location="truck",
+                    line_ok=True,
+                )
+            else:
+                self.touchpanel.set_status(
+                    status_kind="full_home",
+                    location="truck",
+                    line_ok=True,
+                    fill_level=fill_level,
+                )
 
         self._debug_state("warte an der Strasse")
 

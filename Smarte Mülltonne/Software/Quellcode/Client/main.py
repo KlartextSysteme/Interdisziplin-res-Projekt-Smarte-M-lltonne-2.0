@@ -7,7 +7,7 @@ from multiplexer import Multiplexer
 from PDcontroller import PDController
 from steppermotor import DualStepperMotorPWM
 from touchpanel import Touchpanel
-from ultraschallsensor import HindernisSensoren
+from ultraschallsensor import FuellstandSensor, HindernisSensoren
 
 
 # Pins laut aktuellem Pico-Pinout
@@ -21,6 +21,11 @@ US_TRIGGER_PIN = 6
 US_FRONT_CHANNEL = 5
 US_LEFT_CHANNEL = 6
 US_RIGHT_CHANNEL = 7
+
+# Testweise nutzt der Füllstand aktuell den vorderen US-Sensor.
+# Werte nach dem Test am realen Aufbau kalibrieren.
+FUELLSTAND_LEER_CM = 40
+FUELLSTAND_VOLL_CM = 5
 
 BUZZER_PIN = 0
 
@@ -62,6 +67,12 @@ def create_controller():
         side_clear_cm=200,
     )
 
+    fuellstand_sensor = FuellstandSensor(
+        ultrasonic=obstacle_sensors.front,
+        leer_abstand_cm=FUELLSTAND_LEER_CM,
+        voll_abstand_cm=FUELLSTAND_VOLL_CM,
+    )
+
     pd_controller = PDController(
         kp=32,
         kd=2,
@@ -92,6 +103,7 @@ def create_controller():
         pd_controller=pd_controller,
         motors=motors,
         buzzer=buzzer,
+        fuellstand_sensor=fuellstand_sensor,
         touchpanel=None,
         base_speed=45,
         min_speed=0,
