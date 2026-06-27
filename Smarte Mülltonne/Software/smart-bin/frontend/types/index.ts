@@ -77,6 +77,7 @@ export interface TruckPosition {
   load_units?: number;
   capacity_units?: number;
   load_percent?: number;
+  route_progress?: number | null;   // 0..1 = exakte Position entlang der Route (vom Backend)
 }
 
 // --- Chat / LLM agent ---
