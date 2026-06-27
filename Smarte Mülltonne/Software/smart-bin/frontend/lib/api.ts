@@ -76,6 +76,40 @@ async function putSim(body: { speed?: number; paused?: boolean }): Promise<SimSp
 export const setSimSpeed = (speed: number) => putSim({ speed });
 export const setSimPaused = (paused: boolean) => putSim({ paused });
 
+// --- Admin demo controls ---
+export type DemoProfile = "realistic_shift" | "hardware_focus" | "high_load" | "quiet_day" | "random";
+
+export interface DemoResetRequest {
+  profile: DemoProfile;
+  seed?: number | null;
+  fh_bin_id?: number;
+  clear_history?: boolean;
+  include_alerts?: boolean;
+  sim_speed?: number;
+  sim_paused?: boolean;
+}
+
+export interface DemoStatus {
+  profile?: string | null;
+  seed?: number | null;
+  bins_total: number;
+  collectable_bins: number;
+  critical_bins: number;
+  locked_bins: number;
+  open_alerts: number;
+  pending_commands: number;
+  routes: number;
+  fh_bin_id: number;
+  fh_fill_level?: number | null;
+  sim_speed: number;
+  sim_paused: boolean;
+  truck_action?: string | null;
+}
+
+export const getDemoStatus = () => get<DemoStatus>("/admin/demo/status");
+export const resetDemoScenario = (body: DemoResetRequest) =>
+  post<DemoStatus>("/admin/demo/reset", body);
+
 // --- Security ---
 export const getSecurityEvents = () => get<SecurityEvent[]>("/security/events");
 export const createSecurityEvent = (binId: number, eventType: string) =>

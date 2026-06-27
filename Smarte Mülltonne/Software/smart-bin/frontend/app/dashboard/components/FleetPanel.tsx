@@ -176,7 +176,7 @@ export default function FleetPanel({
               </div>
 
               {isSelected && onHardwareCommand && (
-                <div className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-3">
+                <div data-tour="hardware-actions" className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-3">
                   {hardwareActions.map(({ action, label, icon: Icon }) => {
                     const isPending =
                       hardwareCommandPending?.binId === b.id &&

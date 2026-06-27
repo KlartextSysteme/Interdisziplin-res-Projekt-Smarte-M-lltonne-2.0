@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node ./node_modules/next/dist/bin/next dev --turbopack",
-    "build": "node ./node_modules/next/dist/bin/next build",
+    "dev": "node ./node_modules/next/dist/bin/next dev",
+    "dev:turbo": "node ./node_modules/next/dist/bin/next dev --turbopack",
+    "demo": "npm run build && node ./node_modules/serve/build/main.js out -l 3000",
+    "serve:out": "node ./node_modules/serve/build/main.js out -l 3000",
+    "build": "node ./node_modules/next/dist/bin/next build && mkdir -p out/_next/static && cp -R .next/static/* out/_next/static/",
     "start": "node ./node_modules/next/dist/bin/next start"
   },
   "dependencies": {

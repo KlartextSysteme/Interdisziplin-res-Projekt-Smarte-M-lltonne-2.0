@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
-import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Inbox } from "lucide-react";
+import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Inbox, CircleHelp } from "lucide-react";
 import { useLiveData } from "@/lib/useWebSocket";
 import AlertBanner from "./components/AlertBanner";
+import OperatorTour from "./components/OperatorTour";
 import FleetPanel from "./components/FleetPanel";
 import MapView from "./components/MapView";
 import ChatInterface from "./components/ChatInterface";
@@ -39,6 +40,7 @@ export default function DashboardPage() {
   const [simSpeed, setSimSpeedState] = useState<number>(1);
   const [simPaused, setSimPausedState] = useState<boolean>(false);
   const [selectedBinId, setSelectedBinId] = useState<number | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
   const [hardwareCommandPending, setHardwareCommandPending] = useState<{
     binId: number;
     action: BinCommandAction;
@@ -148,7 +150,10 @@ export default function DashboardPage() {
     <div className="flex h-screen flex-col bg-[#151619] text-slate-100">
       <AlertBanner alerts={alerts} bins={bins} />
 
-      <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#1e2024] px-5 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+      <header
+        data-tour="app-shell"
+        className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#1e2024] px-5 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]"
+      >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded bg-[#f2c94c] text-[#171717] shadow-[0_0_22px_rgba(242,201,76,0.22)]">
             <RouteIcon className="h-5 w-5" />
@@ -160,7 +165,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex max-w-full items-center gap-3 overflow-x-auto pb-1 lg:pb-0">
-          <div className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-[#111214] px-2 py-1.5">
+          <div
+            data-tour="sim-controls"
+            className="flex shrink-0 items-center gap-1 rounded border border-white/10 bg-[#111214] px-2 py-1.5"
+          >
             <button
               onClick={togglePause}
               className={`flex h-8 w-8 items-center justify-center rounded transition ${
@@ -269,10 +277,20 @@ export default function DashboardPage() {
                       </span>
                     </button>
                   );
-                })}
+              })}
             </div>
           )}
           <button
+            onClick={() => setTourOpen(true)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-white/10 bg-[#111214] text-slate-300 transition hover:border-[#f2c94c]/50 hover:text-[#f2c94c] sm:w-auto sm:px-3"
+            title="Einführung öffnen"
+            aria-label="Einführung öffnen"
+          >
+            <CircleHelp className="h-4 w-4" />
+            <span className="hidden text-xs font-semibold sm:ml-2 sm:inline">Einführung</span>
+          </button>
+          <button
+            data-tour="route-plan"
             onClick={handlePlan}
             disabled={planning}
             className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded bg-[#f2c94c] text-sm font-semibold text-[#171717] transition hover:bg-[#ffd866] disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto sm:px-4"
@@ -282,6 +300,7 @@ export default function DashboardPage() {
             <span className="hidden sm:inline">Route planen</span>
           </button>
           <span
+            data-tour="live-status"
             className={`hidden items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs font-semibold sm:flex ${
               live ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-white/10 bg-white/5 text-slate-400"
             }`}
@@ -293,7 +312,10 @@ export default function DashboardPage() {
       </header>
 
       <div className="flex flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
-        <div className="h-64 w-full shrink-0 overflow-y-auto border-b border-white/10 bg-[#1a1c20] lg:h-auto lg:w-[19rem] lg:border-r lg:border-b-0">
+        <div
+          data-tour="fleet-panel"
+          className="h-64 w-full shrink-0 overflow-y-auto border-b border-white/10 bg-[#1a1c20] lg:h-auto lg:w-[19rem] lg:border-r lg:border-b-0"
+        >
           <FleetPanel
             bins={[...bins].sort((a, b) => b.fill_level - a.fill_level)}
             alerts={alerts}
@@ -304,7 +326,10 @@ export default function DashboardPage() {
           />
         </div>
 
-        <div className="relative h-[28rem] shrink-0 bg-[#111214] lg:h-auto lg:flex-1 lg:shrink">
+        <div
+          data-tour="map"
+          className="relative h-[28rem] shrink-0 bg-[#111214] lg:h-auto lg:flex-1 lg:shrink"
+        >
           <MapView
             bins={bins}
             truck={truck}
@@ -320,7 +345,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex min-h-[36rem] w-full shrink-0 flex-col border-t border-white/10 bg-[#1a1c20] lg:min-h-0 lg:w-[25rem] lg:border-t-0 lg:border-l">
-          <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-[#151619] p-2">
+          <div data-tour="side-tabs" className="grid grid-cols-3 gap-1 border-b border-white/10 bg-[#151619] p-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -349,6 +374,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <OperatorTour open={tourOpen} onOpenChange={setTourOpen} />
     </div>
   );
 }

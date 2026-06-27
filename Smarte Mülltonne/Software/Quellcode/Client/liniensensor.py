@@ -17,14 +17,17 @@ class Liniensensor:
         line_detected_value=1,
         target_position=0,
         min_read_interval_ms=8,
-        samples_per_read=3,
-        sample_delay_us=80,
+        samples_per_read=1,
+        sample_delay_us=0,
+        read_delay_us=300,
     ):
         """
         Initialisiert das Liniensensor-Array.
 
         - multiplexer: Instanz der Klasse Multiplexer.
         - channels: Multiplexer-Kanaele der 5 Liniensensoren.
+          Die Demo-Hardware aus Test_2/1 - pd_motor_linien.py verdrahtet
+          C0-C4 von rechts nach links.
         - weights: Gewichtung für die Positionsberechnung.
         - line_detected_value: Sensorwert bei erkannter Linie.
         - target_position: Zielposition für den Regler, meistens 0.
@@ -52,6 +55,10 @@ class Liniensensor:
         if self._sample_delay_us < 0:
             self._sample_delay_us = 0
 
+        self._read_delay_us = int(read_delay_us)
+        if self._read_delay_us < 0:
+            self._read_delay_us = 0
+
         self._last_read_ms = 0
         self._cached_values = [0, 0, 0, 0, 0]
         self._cached_position = None
@@ -66,6 +73,8 @@ class Liniensensor:
         n = self._samples_per_read
 
         self.mux.select_channel(channel)
+        if self._read_delay_us:
+            time.sleep_us(self._read_delay_us)
 
         if n == 1:
             return 1 if self.mux.value() else 0

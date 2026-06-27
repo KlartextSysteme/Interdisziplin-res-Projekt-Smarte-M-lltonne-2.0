@@ -230,6 +230,14 @@ class TouchUi:
             asset = "status_line_lost"
         elif self.location == "truck":
             asset = "status_full_truck_clean"
+        # Positions-Symbol in der oberen Leiste an die Fahrtrichtung anpassen:
+        # unterwegs zur Abholpos (truck) -> Muellwagen statt Haus auf den Fahr-Screens.
+        if self.location == "truck" and asset in (
+            "status_obstacle",
+            "status_line_ok",
+            "status_line_lost",
+        ):
+            asset += "_truck"
         show_fill = asset in ("status_full_home_clean", "status_full_truck_clean")
         if self.light_mode:
             asset += "_light"

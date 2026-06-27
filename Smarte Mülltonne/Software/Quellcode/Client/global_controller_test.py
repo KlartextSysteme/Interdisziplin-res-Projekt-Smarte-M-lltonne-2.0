@@ -18,10 +18,32 @@ class GlobalController:
     STATE_AVOID_NOT_POSSIBLE = "AVOID_NOT_POSSIBLE"
     STATE_WAIT_AT_STREET = "WAIT_AT_STREET"
     STATE_TURN_AT_HOME = "TURN_AT_HOME"
+    STATE_TURN_AT_STREET = "TURN_AT_STREET"
     # Zustände für manuelle Anforderungen per Touchpanel
     STATE_MANUAL_GOTO_STREET_REQUEST = "MANUAL_GOTO_STREET_REQUEST"
     STATE_MANUAL_RETURN_HOME_REQUEST = "MANUAL_RETURN_HOME_REQUEST"
-    #Zustände aus der Webapp
+    # Zustände und Befehle aus der Webapp/TCP-Bridge
+    STATE_CONNECTED = "CONNECTED"
+    STATE_NOT_CONNECTED = "NOT_CONNECTED"
+    STATE_CONNECTING = "CONNECTING"
+
+    CMD_GOTO_STREET = "CMD_GOTO_STREET"
+    CMD_RETURN_HOME = "CMD_RETURN_HOME"
+    CMD_STOP = "CMD_STOP"
+
+    OVERRIDE_DRIVE_STATES = (
+        STATE_LINE_FOLLOWING,
+        STATE_LINE_LOST,
+        STATE_OBSTACLE_WAIT,
+        STATE_AVOID_RIGHT,
+        STATE_AVOID_LEFT,
+        STATE_AVOID_NOT_POSSIBLE,
+        STATE_USER_PAUSED,
+        STATE_TURN_AT_HOME,
+        STATE_TURN_AT_STREET,
+        STATE_MANUAL_GOTO_STREET_REQUEST,
+        STATE_MANUAL_RETURN_HOME_REQUEST,
+    )
 
     def __init__(
         self,
@@ -71,12 +93,19 @@ class GlobalController:
         self.help_front_clear_since_ms = None
         self.help_resume_delay_ms = 5000
 
-        # müssen noch angepasst werden
+        # avoid_turn_90 noch zu kalibrieren; turn_home_180 = 43000 aus Handtest (~180 Grad)
         self.avoid_turn_90_steps = 16000
-        self.turn_home_180_steps = 32000
+        self.turn_home_180_steps = 43000
 
         self.avoid_turn_90_ms = 0
         self.turn_home_180_ms = 0
+        self.turn_street_180_ms = 0
+
+        # Leave-Pad-Guard: End-Pad (5 Sensoren) wird erst als Ziel gewertet,
+        # nachdem die Tonne das Start-Pad einmal verlassen hat (Linie gesehen).
+        # Default True (normaler go_to_street-Start steht knapp neben dem Heim-Pad);
+        # nur die 180-Grad-Drehung an der Abholpos setzt ihn auf False.
+        self.end_pad_armed = True
 
         self.avoid_step = 0
         self.avoid_step_since_ms = time.ticks_ms()
@@ -90,6 +119,10 @@ class GlobalController:
 
         self.help_buzzer_started = False
         self.drive_target = None
+        self.network_manager = None
+        self.connection_state = self.STATE_NOT_CONNECTED
+        self.last_status_send_ms = 0
+        self.status_send_interval_ms = 2000
 
         # -------- zum Testen --------
         self.last_debug_ms = time.ticks_ms()
@@ -99,7 +132,8 @@ class GlobalController:
         if self.state == new_state:
             return
 
-        print("State:", self.state, "->", new_state)
+        old_state = self.state
+        print("State:", old_state, "->", new_state)
         self.state = new_state
         self.state_since_ms = time.ticks_ms()
 
@@ -120,6 +154,8 @@ class GlobalController:
             self.help_front_clear_since_ms = None
         if new_state == self.STATE_TURN_AT_HOME:
             self.turn_home_180_ms = 0
+        if new_state == self.STATE_TURN_AT_STREET:
+            self.turn_street_180_ms = 0
         
         if new_state in (
             self.STATE_LINE_FOLLOWING,
@@ -129,6 +165,10 @@ class GlobalController:
         ):
             if self.buzzer is not None:
                 self.buzzer.stop()
+
+        self._send_status()
+        if new_state == self.STATE_WAIT_AT_STREET:
+            self._send_server_line("ARRIVED: STREET")
     
     def _next_avoid_step(self):
         self.avoid_step += 1
@@ -228,6 +268,16 @@ class GlobalController:
     def request_goto_street(self):
         if self.state == self.STATE_AT_HOME:
             self.set_state(self.STATE_MANUAL_GOTO_STREET_REQUEST)
+        elif self.state == self.STATE_WAIT_AT_STREET:
+            print("Befehl goto_street ignoriert: Tonne ist bereits an der Strasse")
+        elif self.state == self.STATE_LINE_FOLLOWING:
+            self.drive_target = "street"
+            print("Manueller Override: Ziel ist jetzt Strasse")
+            self._send_status()
+        elif self.state in self.OVERRIDE_DRIVE_STATES:
+            if self.motors:
+                self.motors.stop()
+            self.set_state(self.STATE_MANUAL_GOTO_STREET_REQUEST)
         else:
             print("Befehl goto_street ignoriert in State:", self.state)
 
@@ -239,6 +289,18 @@ class GlobalController:
 
     def request_return_home(self):
         if self.state == self.STATE_WAIT_AT_STREET:
+            # An der Abholpos zuerst 180 Grad drehen, dann zurueck der Linie folgen.
+            self.drive_target = "home"
+            self.set_state(self.STATE_TURN_AT_STREET)
+        elif self.state == self.STATE_AT_HOME:
+            print("Befehl goto_home ignoriert: Tonne ist bereits zuhause")
+        elif self.state == self.STATE_LINE_FOLLOWING:
+            self.drive_target = "home"
+            print("Manueller Override: Ziel ist jetzt zuhause")
+            self._send_status()
+        elif self.state in self.OVERRIDE_DRIVE_STATES:
+            if self.motors:
+                self.motors.stop()
             self.set_state(self.STATE_MANUAL_RETURN_HOME_REQUEST)
         else:
             print("Befehl goto_home ignoriert in State:", self.state)
@@ -269,6 +331,76 @@ class GlobalController:
         if self.motors:
             self.motors.stop()
         self.set_state(self.STATE_AT_HOME)
+
+    def set_network_manager(self, network_manager):
+        self.network_manager = network_manager
+
+    def set_connection_state(self, new_state):
+        if self.connection_state == new_state:
+            return
+        print("Connection:", self.connection_state, "->", new_state)
+        self.connection_state = new_state
+
+    def notify_connection_lost(self):
+        self.set_connection_state(self.STATE_NOT_CONNECTED)
+
+    def _send_server_line(self, line):
+        if self.network_manager is None:
+            return False
+
+        sock = self.network_manager.get_socket()
+        if not sock:
+            return False
+
+        try:
+            sock.send((line + "\n").encode())
+            return True
+        except OSError:
+            try:
+                self.network_manager.mark_server_disconnected()
+            except Exception:
+                pass
+            return False
+
+    def _send_status(self):
+        return self._send_server_line("STATUS:" + self.state)
+
+    def _network_heartbeat(self):
+        now = time.ticks_ms()
+        if time.ticks_diff(now, self.last_status_send_ms) < self.status_send_interval_ms:
+            return
+        if self._send_status():
+            self.last_status_send_ms = now
+
+    def handle_network_command(self, cmd):
+        print("Network-Command:", cmd)
+
+        if cmd.startswith("ACK_RECEIVED "):
+            return
+
+        if cmd in ("GO_TO_STREET", "goto_street"):
+            cmd = self.CMD_GOTO_STREET
+        elif cmd in ("RETURN_HOME", "goto_home", "return_home"):
+            cmd = self.CMD_RETURN_HOME
+        elif cmd in ("STOP", "stop"):
+            cmd = self.CMD_STOP
+
+        if cmd == self.CMD_GOTO_STREET:
+            self._send_server_line("ACK CMD_GOTO_STREET")
+            self.request_goto_street()
+            return
+
+        if cmd == self.CMD_RETURN_HOME:
+            self._send_server_line("ACK CMD_RETURN_HOME")
+            self.request_return_home()
+            return
+
+        if cmd == self.CMD_STOP:
+            self._send_server_line("ACK CMD_STOP")
+            self.stop()
+            return
+
+        print("Unbekannter Netzwerkbefehl:", cmd)
     
     def handle_touch_action(self, action):
         print("Touch-Action:", action)
@@ -308,10 +440,14 @@ class GlobalController:
             self._logic_user_paused()
         elif self.state == self.STATE_TURN_AT_HOME:
             self._logic_turn_at_home()
+        elif self.state == self.STATE_TURN_AT_STREET:
+            self._logic_turn_at_street()
         elif self.state == self.STATE_MANUAL_GOTO_STREET_REQUEST:
             self._logic_manual_goto_street_request()
         elif self.state == self.STATE_MANUAL_RETURN_HOME_REQUEST:
             self._logic_manual_return_home_request()
+
+        self._network_heartbeat()
 
     def _logic_at_home(self):
         if self.motors is not None:
@@ -355,6 +491,15 @@ class GlobalController:
         position = self.line_sensor.get_position()
 
         if position == "street":
+            if not self.end_pad_armed:
+                # Noch auf dem Start-Pad (z.B. direkt nach der 180-Grad-Drehung):
+                # geradeaus weiterfahren, bis das Pad verlassen ist.
+                self.last_line_seen_ms = time.ticks_ms()
+                self.last_left_speed = self.base_speed
+                self.last_right_speed = self.base_speed
+                self.motors.drive_forward_differential(self.base_speed, self.base_speed)
+                return
+
             self.motors.stop()
 
             if self.drive_target == "home":
@@ -367,7 +512,10 @@ class GlobalController:
         if position is None:
             self.set_state(self.STATE_LINE_LOST)
             return
-        
+
+        # Linie erkannt -> Start-Pad ist verlassen, End-Pad-Erkennung scharf schalten.
+        self.end_pad_armed = True
+
         if self.touchpanel is not None:
             self.touchpanel.set_status(
                 status_kind="line_ok",
@@ -433,6 +581,12 @@ class GlobalController:
             )
 
         if position == "street":
+            if not self.end_pad_armed:
+                # Start-Pad noch nicht verlassen -> zurueck zur Linienfolge,
+                # die faehrt geradeaus, bis das Pad verlassen ist.
+                self.set_state(self.STATE_LINE_FOLLOWING)
+                return
+
             self.motors.stop()
 
             if self.drive_target == "home":
@@ -1021,6 +1175,39 @@ class GlobalController:
             self.motors.stop()
             self.turn_home_180_ms = 0
             self.set_state(self.STATE_AT_HOME)
+            self._send_server_line("ARRIVED: HOME")
+
+    def _logic_turn_at_street(self):
+        # 180-Grad-Drehung an der Abholposition, bevor die Tonne der Linie
+        # zurueck nach Hause folgt. Gleiche Drehdauer wie _logic_turn_at_home.
+        if self.motors is None:
+            return
+
+        if self.turn_street_180_ms == 0:
+            self.turn_street_180_ms = self.motors.steps_to_ms(
+                self.turn_home_180_steps,
+                self.avoid_turn_speed
+            )
+
+        elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
+
+        self.motors.turn_right(self.avoid_turn_speed)
+
+        self._debug_state(
+            "180-Grad-Drehung an der Abholpos Elapsed ms: "
+            + str(elapsed)
+            + " Zielzeit ms: "
+            + str(self.turn_street_180_ms)
+        )
+
+        if elapsed >= self.turn_street_180_ms:
+            self.motors.stop()
+            self.turn_street_180_ms = 0
+            self.drive_target = "home"
+            # Start-Pad (Abholpos) muss erst verlassen werden, bevor das
+            # Heim-Pad als Ziel zaehlt.
+            self.end_pad_armed = False
+            self.set_state(self.STATE_LINE_FOLLOWING)
 
     def _logic_user_paused(self):
         if self.motors is not None:

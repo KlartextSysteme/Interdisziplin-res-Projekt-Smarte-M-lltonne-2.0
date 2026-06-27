@@ -12,7 +12,7 @@ from config import (
 )
 from display import BLACK, BLUE, GREEN, ILI9341, ORANGE, RED, WHITE
 from touch import XPT2046
-from ui import TouchUi
+from ui import SCREEN_STATUS, TouchUi
 
 
 # ============================================================
@@ -34,6 +34,10 @@ _backlight = None
 bridge_client = None
 pico_state = "STANDBY"
 
+# Fahr-/Abbruch-Steuerung: erlaubt Stopp per Bridge MITTEN in einer Fahrt.
+_driving = False
+_abort_drive = False
+
 CMD_GOTO_STREET = "CMD_GOTO_STREET"
 CMD_RETURN_HOME = "CMD_RETURN_HOME"
 CMD_STOP = "CMD_STOP"
@@ -49,34 +53,30 @@ def set_backlight(enabled):
     _backlight.value(1 if enabled else 0)
 
 
-def center_text(text, y, color=BLACK, scale=2):
-    x = (display.width - display.text_width(text, scale)) // 2
-    display.text(text, x, y, color, scale)
+def show_status(location=None, status_kind=None, **kw):
+    """Zeigt den echten Wireframe-Status-Screen (ersetzt die alten Text-Screens).
+
+    location="home" -> Haus-Symbol oben, location="truck" -> Muellwagen-Symbol.
+    status_kind="position" laesst draw_status auf das Positions-Vollbild fallen.
+    """
+    if ui is None:
+        return
+    if ui.screen != SCREEN_STATUS:
+        ui.go(SCREEN_STATUS)
+    ui.set_status(location=location, status_kind=status_kind, **kw)
 
 
-def draw_drive_screen(title, subtitle="", color=BLUE):
-    display.fill_screen(WHITE)
-    display.rect(4, 4, 312, 232, BLACK, 2)
-    center_text(title, 78, color, 3)
-    if subtitle:
-        center_text(subtitle, 142, BLACK, 2)
-
-
-def draw_result_screen(result):
+def show_drive_result(result):
     if result == "street":
-        draw_drive_screen("ZIEL", "STRASSE ERREICHT", GREEN)
-        ui.set_status(location="truck", status_kind="full_home", line_ok=True)
+        # an der Abholposition angekommen -> Muellwagen-Symbol
+        show_status(location="truck", status_kind="position")
     elif result == "obstacle":
-        draw_drive_screen("STOPP", "HINDERNIS", ORANGE)
-        ui.set_status(status_kind="obstacle", obstacle_cm=0)
+        show_status(status_kind="obstacle")
     elif result == "line_lost":
-        draw_drive_screen("STOPP", "LINIE VERLOREN", RED)
-        ui.set_status(status_kind="line_lost", line_ok=False)
-    elif result == "aborted":
-        draw_drive_screen("STOPP", "ABBRUCH", RED)
+        show_status(status_kind="line_lost", line_ok=False)
     else:
-        draw_drive_screen("STOPP", "UNBEKANNT", RED)
-    sleep_ms(1800)
+        # aborted / unbekannt -> zurueck auf den Positions-Screen
+        show_status(status_kind="position")
 
 
 def send_bridge_line(line):
@@ -113,32 +113,94 @@ def finish_drive_result(result):
         set_pico_state("USER_PAUSED")
 
 
+def _drive_pump():
+    # Waehrend einer (blockierenden) Fahrt die Bridge weiter bedienen:
+    # eingehende Befehle lesen (z.B. Stopp) + Status senden.
+    # Rueckgabe True, wenn die Fahrt abgebrochen werden soll.
+    if bridge_client is not None:
+        try:
+            bridge_client.tick()
+        except Exception as exc:
+            print("bridge tick failed:", exc)
+    return _abort_drive
+
+
 def start_goto_street(source):
+    global _driving, _abort_drive
+    _abort_drive = False
+    _driving = True
+    try:
+        _run_goto_street(source)
+    finally:
+        _driving = False
+
+
+def _run_goto_street(source):
     if source == "bridge":
         send_bridge_line("ACK " + CMD_GOTO_STREET)
     else:
         send_bridge_line("STATUS:MANUAL_GOTO_STREET_REQUEST")
 
     set_pico_state("LINE_FOLLOWING")
-    draw_drive_screen("FAEHRT", "PD REGLER AKTIV", BLUE)
-    result = run_to_street()
+    # Waehrend der Fahrt zur Abholpos: "Linie erkannt"-Screen mit Muellwagen-Symbol oben
+    show_status(location="truck", status_kind="line_ok")
+    result = follow_line(leave_pad_first=False)
     finish_drive_result(result)
-    draw_result_screen(result)
+    show_drive_result(result)
+
+
+def start_return_home(source):
+    global _driving, _abort_drive
+    _abort_drive = False
+    _driving = True
+    try:
+        _run_return_home(source)
+    finally:
+        _driving = False
+
+
+def _run_return_home(source):
+    if source == "bridge":
+        send_bridge_line("ACK " + CMD_RETURN_HOME)
+    else:
+        send_bridge_line("STATUS:MANUAL_RETURN_HOME_REQUEST")
+
+    set_pico_state("LINE_FOLLOWING")
+    # Heimwaerts: Haus-Symbol oben + "Linie erkannt"
+    show_status(location="home", status_kind="line_ok")
+    result = run_to_home()
+
+    if result == "home":
+        send_bridge_line("ARRIVED: HOME")
+        set_pico_state("STANDBY")
+        show_status(location="home", status_kind="position")
+    else:
+        # obstacle / line_lost / aborted -> bestehende Ergebnis-Behandlung
+        finish_drive_result(result)
+        show_drive_result(result)
 
 
 def handle_bridge_command(cmd):
+    global _abort_drive
     print("Bridge command:", cmd)
+
+    if _driving:
+        # Mitten in einer Fahrt: nur Stopp wird sofort beachtet -> Abbruch.
+        if cmd == CMD_STOP:
+            send_bridge_line("ACK " + CMD_STOP)
+            _abort_drive = True
+            if motors is not None:
+                motors.stop()
+        else:
+            print("Befehl waehrend Fahrt ignoriert:", cmd)
+        return
 
     if cmd == CMD_GOTO_STREET:
         start_goto_street("bridge")
         return
 
     if cmd == CMD_RETURN_HOME:
-        send_bridge_line("ACK " + CMD_RETURN_HOME)
-        draw_drive_screen("TEST", "HEIMFAHRT NICHT AKTIV", ORANGE)
-        set_pico_state("STANDBY")
-        send_bridge_line("ARRIVED: HOME")
-        sleep_ms(1400)
+        start_return_home("bridge")
         return
 
     if cmd == CMD_STOP:
@@ -146,10 +208,8 @@ def handle_bridge_command(cmd):
         if motors is not None:
             motors.stop()
         set_pico_state("USER_PAUSED")
-        draw_drive_screen("STOPP", "PAUSIERT", ORANGE)
-        sleep_ms(900)
-        if ui is not None:
-            ui.draw()
+        # aktuellen Positions-Screen zeigen (kein Text-Screen)
+        show_status()
         return
 
     print("Unknown bridge command:", cmd)
@@ -226,12 +286,19 @@ MAX_SPEED = 95
 
 KP = 32
 KD = 2
-MAX_CORRECTION = 60
+MAX_CORRECTION = 80
 MAX_DERIVATIVE_PER_S = 45
 
 CONTROL_INTERVAL_MS = 25
 PRINT_INTERVAL_MS = 250
 LOST_LINE_STOP_MS = 10000
+
+# 180-Grad-Drehung auf der Stelle (aus dem Handtest kalibriert).
+TURN_SPEED = 35
+TURN_180_STEPS = 43000
+# Kurze Pause (Motoren aus) vor jeder 180-Grad-Drehung, damit sichtbar ist,
+# dass das 5-Sensor-End-Pad erkannt wurde.
+PIVOT_PAUSE_MS = 1000
 
 
 def clamp(value, low, high):
@@ -388,6 +455,42 @@ class DualStepperMotorPWM:
                 right_freq,
             )
 
+    def turn_in_place(self, speed, clockwise=True):
+        # Drehung auf der Stelle: eine Kette vorwaerts, die andere rueckwaerts.
+        speed = clamp(speed, 0, 100)
+        if speed <= 0:
+            self.stop()
+            return
+
+        left_freq = self._speed_to_frequency(speed, self.left_trim_factor)
+        right_freq = self._speed_to_frequency(speed, self.right_trim_factor)
+
+        self.enable()
+        if clockwise:
+            # Rechtsdrehung: linke Kette vorwaerts, rechte rueckwaerts
+            self.left_dir.value(LEFT_FORWARD_DIR)
+            self.right_dir.value(1 - RIGHT_FORWARD_DIR)
+        else:
+            self.left_dir.value(1 - LEFT_FORWARD_DIR)
+            self.right_dir.value(RIGHT_FORWARD_DIR)
+        sleep_ms(2)
+
+        if left_freq > 0:
+            self.left_step.freq(left_freq)
+            self.left_step.duty_u16(32768)
+        if right_freq > 0:
+            self.right_step.freq(right_freq)
+            self.right_step.duty_u16(32768)
+
+        self.last_left_speed = speed
+        self.last_right_speed = speed
+
+    def steps_to_ms(self, steps, speed):
+        freq = self._speed_to_frequency(speed, 1.0)
+        if freq <= 0:
+            return 0
+        return int((steps * 1000) / freq)
+
 
 def create_motors(debug=False):
     return DualStepperMotorPWM(
@@ -482,7 +585,7 @@ def speeds_from_correction(correction):
     return left_speed, right_speed
 
 
-def run_to_street():
+def follow_line(leave_pad_first=False):
     global motors
 
     if motors is None:
@@ -497,13 +600,18 @@ def run_to_street():
     last_right_speed = BASE_SPEED
     front_distance_cm = None
 
+    # Leave-Pad-Guard: Das End-T-Pad zaehlt erst als Ziel, nachdem das
+    # Start-Pad einmal verlassen wurde (Linie gesehen). Wichtig fuer die
+    # Rueckfahrt, weil die Tonne nach der 180-Grad-Drehung noch auf dem Pad steht.
+    armed = not leave_pad_first
+
     line_values = [0, 0, 0, 0, 0]
     position = None
     correction = 0
     left_speed = 0
     right_speed = 0
 
-    print("Starte Linienfolger per Touchpanel")
+    print("Starte Linienfolger (leave_pad_first=" + str(leave_pad_first) + ")")
 
     try:
         while True:
@@ -515,6 +623,13 @@ def run_to_street():
 
             if ticks_diff(now_ms, last_control_ms) >= CONTROL_INTERVAL_MS:
                 last_control_ms = now_ms
+
+                # Bridge bedienen (Stopp mitten in der Fahrt moeglich)
+                if _drive_pump():
+                    motors.stop()
+                    print("Fahrt per Stopp abgebrochen")
+                    return "aborted"
+
                 line_values = read_line_sensors()
                 position = calculate_line_position(line_values)
 
@@ -524,11 +639,20 @@ def run_to_street():
                     return "obstacle"
 
                 if position == "street":
-                    motors.stop()
-                    print("Stopp: Strasse erkannt")
-                    return "street"
-
-                if position is not None:
+                    if armed:
+                        motors.stop()
+                        print("Stopp: T-Pad erkannt")
+                        return "street"
+                    # Noch auf dem Start-Pad -> geradeaus, bis verlassen
+                    last_line_seen_ms = now_ms
+                    correction = 0
+                    left_speed = BASE_SPEED
+                    right_speed = BASE_SPEED
+                    last_left_speed = left_speed
+                    last_right_speed = right_speed
+                    motors.drive_forward_differential(BASE_SPEED, BASE_SPEED)
+                elif position is not None:
+                    armed = True
                     last_line_seen_ms = now_ms
                     correction = controller.calculate(position, 0, now_ms)
                     left_speed, right_speed = speeds_from_correction(correction)
@@ -549,14 +673,6 @@ def run_to_street():
 
                 if ticks_diff(now_ms, last_print_ms) >= PRINT_INTERVAL_MS:
                     last_print_ms = now_ms
-                    left_freq = motors._speed_to_frequency(
-                        left_speed,
-                        motors.left_trim_factor,
-                    )
-                    right_freq = motors._speed_to_frequency(
-                        right_speed,
-                        motors.right_trim_factor,
-                    )
                     print(
                         "Sensoren:",
                         line_values,
@@ -567,9 +683,8 @@ def run_to_street():
                         "Speed L/R:",
                         round(left_speed, 1),
                         round(right_speed, 1),
-                        "Frequenz L/R:",
-                        left_freq,
-                        right_freq,
+                        "armed:",
+                        armed,
                         "US vorne:",
                         front_distance_cm,
                     )
@@ -579,6 +694,57 @@ def run_to_street():
     finally:
         motors.stop()
         print("Linienfolger gestoppt")
+
+
+def pivot_180():
+    # 180-Grad-Drehung auf der Stelle, Dauer aus TURN_180_STEPS kalibriert.
+    global motors
+
+    if motors is None:
+        motors = create_motors(debug=False)
+
+    # Kurz mit gestoppten Motoren stehen bleiben -> sichtbares Zeichen, dass
+    # das 5-Sensor-End-Pad erkannt wurde, bevor sich die Tonne dreht.
+    motors.stop()
+    pause_start = ticks_ms()
+    while ticks_diff(ticks_ms(), pause_start) < PIVOT_PAUSE_MS:
+        if _drive_pump():
+            print("Drehung per Stopp abgebrochen (Pause)")
+            return
+        sleep_ms(20)
+
+    duration_ms = motors.steps_to_ms(TURN_180_STEPS, TURN_SPEED)
+    print("Starte 180-Grad-Drehung:", duration_ms, "ms")
+    start = ticks_ms()
+    motors.turn_in_place(TURN_SPEED, clockwise=True)
+    try:
+        while ticks_diff(ticks_ms(), start) < duration_ms:
+            if _drive_pump():
+                print("Drehung per Stopp abgebrochen")
+                break
+            sleep_ms(20)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        motors.stop()
+    print("180-Grad-Drehung fertig")
+
+
+def run_to_home():
+    # Gegenstueck zu follow_line(goto_street):
+    # 1) an der Abholpos 180 Grad drehen
+    # 2) der Linie zurueck folgen bis zum Heim-T-Pad
+    # 3) am Heim-T-Pad nochmal 180 Grad drehen
+    pivot_180()
+    if _abort_drive:
+        return "aborted"
+    result = follow_line(leave_pad_first=True)
+    if result != "street":
+        return result
+    pivot_180()
+    if _abort_drive:
+        return "aborted"
+    return "home"
 
 
 def handle_action(action):
@@ -596,9 +762,7 @@ def handle_action(action):
         return
 
     if action == "goto_home":
-        draw_drive_screen("TEST", "HEIMFAHRT NICHT AKTIV", ORANGE)
-        send_bridge_line("STATUS:MANUAL_RETURN_HOME_REQUEST")
-        sleep_ms(1400)
+        start_return_home("touchpanel")
         return
 
     if action == "goto_street":

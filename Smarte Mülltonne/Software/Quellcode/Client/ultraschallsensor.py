@@ -256,10 +256,10 @@ class FuellstandSensor:
 
         self.last_distance_cm = distance
 
-        if distance > (self.leer_abstand_cm + self.deckel_offen_margin_cm):
-            self.deckel_offen = True
-            self.fuellstand_prozent = None
-            self._no_echo_count = self.no_echo_for_deckel_offen
+        if distance >= self.leer_abstand_cm:
+            self.deckel_offen = False
+            self.fuellstand_prozent = 0
+            self._no_echo_count = 0
             return
 
         self._no_echo_count = 0

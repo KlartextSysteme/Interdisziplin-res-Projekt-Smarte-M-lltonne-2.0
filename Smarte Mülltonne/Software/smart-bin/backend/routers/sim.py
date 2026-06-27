@@ -22,6 +22,16 @@ class SimUpdate(BaseModel):
     paused: bool | None = Field(None, description="Globale Pause für alle Simulatoren")
 
 
+def set_state(*, speed: float | None = None, paused: bool | None = None):
+    if speed is not None:
+        if not (MIN_SPEED <= speed <= MAX_SPEED):
+            raise HTTPException(400, f"speed must be in [{MIN_SPEED}, {MAX_SPEED}]")
+        _state["speed"] = float(speed)
+    if paused is not None:
+        _state["paused"] = bool(paused)
+    return dict(_state)
+
+
 @router.get("/speed")
 def get_speed():
     return {
@@ -34,10 +44,5 @@ def get_speed():
 
 @router.put("/speed")
 def set_sim(body: SimUpdate):
-    if body.speed is not None:
-        if not (MIN_SPEED <= body.speed <= MAX_SPEED):
-            raise HTTPException(400, f"speed must be in [{MIN_SPEED}, {MAX_SPEED}]")
-        _state["speed"] = float(body.speed)
-    if body.paused is not None:
-        _state["paused"] = bool(body.paused)
+    set_state(speed=body.speed, paused=body.paused)
     return {"speed": _state["speed"], "paused": _state["paused"]}

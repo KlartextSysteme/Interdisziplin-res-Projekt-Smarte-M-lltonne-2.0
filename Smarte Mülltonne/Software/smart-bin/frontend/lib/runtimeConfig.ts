@@ -5,8 +5,18 @@ function isRenderHost() {
   return typeof window !== "undefined" && window.location.hostname.endsWith(".onrender.com");
 }
 
+function getNetworkLocalApiUrl() {
+  if (typeof window === "undefined") return LOCAL_API_URL;
+
+  const { hostname, protocol } = window.location;
+  const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+  if (isLoopback) return LOCAL_API_URL;
+  return `${protocol}//${hostname}:8000`;
+}
+
 export function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL || (isRenderHost() ? RENDER_API_URL : LOCAL_API_URL);
+  return process.env.NEXT_PUBLIC_API_URL || (isRenderHost() ? RENDER_API_URL : getNetworkLocalApiUrl());
 }
 
 export function getWebSocketUrl() {

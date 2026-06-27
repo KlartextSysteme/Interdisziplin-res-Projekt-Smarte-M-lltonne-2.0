@@ -177,5 +177,5 @@ while True:
     motors.move_steps(29980, "turn_left", 80)
     sleep(1)
 
-    motors.move_steps(29980, "turn_right", 80)
-    sleep(1)
+    #motors.move_steps(29980, "turn_right", 80)
+    #sleep(1)

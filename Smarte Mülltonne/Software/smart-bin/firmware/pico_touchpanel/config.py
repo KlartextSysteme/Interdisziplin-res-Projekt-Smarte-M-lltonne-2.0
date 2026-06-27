@@ -45,12 +45,11 @@ POST_STATUS_MS = 8000
 ENABLE_BACKEND_ACTIONS = False
 ADMIN_TOKEN = ""
 
-# Optional TCP bridge demo path. Keep disabled until WLAN and laptop IP are
-# verified on the real demo network.
-ENABLE_TCP_BRIDGE = False
-WLAN_SSID = "TP-Link_889A"
-WLAN_PASSWORD = ""
-BRIDGE_HOST = "192.168.0.10"
+# TCP bridge demo path for the current SmartBinDemo test network.
+ENABLE_TCP_BRIDGE = True
+WLAN_SSID = "SmartBinDemo"
+WLAN_PASSWORD = "SmartBin2026!"
+BRIDGE_HOST = "192.168.50.10"
 BRIDGE_PORT = 50002
 TCP_STATUS_MS = 2000
 
