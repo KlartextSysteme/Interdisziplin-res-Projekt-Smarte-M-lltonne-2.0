@@ -52,8 +52,9 @@ def _post_position(
     action: str,
     bin_id: int | None,
     load_units: float,
+    route_progress: float | None = None,
 ):
-    truck_state.update(
+    fields = dict(
         lat=round(pos[0], 6),
         lng=round(pos[1], 6),
         action=action,
@@ -61,6 +62,11 @@ def _post_position(
         load_units=round(load_units, 1),
         capacity_units=TRUCK_CAPACITY_UNITS,
     )
+    # Nur setzen, wenn bekannt — sonst bleibt der letzte Wert erhalten (z. B.
+    # während einer Entleerungs-Pause). So hat das Frontend immer einen Fortschritt.
+    if route_progress is not None:
+        fields["route_progress"] = round(route_progress, 4)
+    truck_state.update(**fields)
 
 
 def _latest_active_route(db: Session) -> Route | None:
@@ -366,78 +372,6 @@ def _send_skipped_bins_home(db: Session, bin_ids: list[int]):
             _schedule_bin_move(b.id, "home")
 
 
-def _next_unvisited_waypoint(waypoints: list[int], visited: set[int]) -> int | None:
-    for bin_id in waypoints:
-        if bin_id not in visited:
-            return bin_id
-    return None
-
-
-def _position_at_route_progress(
-    coords: list[tuple[float, float]],
-    progress: list[float],
-    target_m: float,
-) -> tuple[tuple[float, float], int]:
-    if not coords:
-        return (0.0, 0.0), 0
-    if len(coords) == 1 or not progress:
-        return coords[0], 0
-    if target_m <= 0:
-        return coords[0], 0
-    if target_m >= progress[-1]:
-        return coords[-1], len(coords) - 1
-
-    for index in range(len(coords) - 1):
-        start_m = progress[index]
-        end_m = progress[index + 1]
-        if target_m > end_m:
-            continue
-
-        seg_len = max(end_m - start_m, 0.0)
-        ratio = (target_m - start_m) / seg_len if seg_len > 0 else 0.0
-        return (
-            (
-                coords[index][0] + (coords[index + 1][0] - coords[index][0]) * ratio,
-                coords[index][1] + (coords[index + 1][1] - coords[index][1]) * ratio,
-            ),
-            index,
-        )
-
-    return coords[-1], len(coords) - 1
-
-
-def _advance_with_planned_stop(
-    pos: tuple[float, float],
-    coords: list[tuple[float, float]],
-    progress: list[float],
-    seg_index: int,
-    route_progress_m: float,
-    budget_m: float,
-    stop_progress_m: float | None,
-) -> tuple[tuple[float, float], int, float, bool]:
-    if len(coords) < 2:
-        return pos, seg_index, route_progress_m, False
-
-    target_progress_m = min(progress[-1], route_progress_m + budget_m)
-    if stop_progress_m is not None:
-        if stop_progress_m <= route_progress_m + 0.5:
-            return pos, seg_index, route_progress_m, True
-        if stop_progress_m <= target_progress_m:
-            stop_pos, stop_seg_index = _position_at_route_progress(
-                coords,
-                progress,
-                stop_progress_m,
-            )
-            return stop_pos, stop_seg_index, stop_progress_m, True
-
-    next_pos, next_seg_index = _position_at_route_progress(
-        coords,
-        progress,
-        target_progress_m,
-    )
-    return next_pos, next_seg_index, target_progress_m, False
-
-
 def _coords_for_route(route: Route, bin_coords: dict[int, tuple[float, float]]) -> list[tuple[float, float]]:
     geometry = route.geometry
     if geometry and geometry.get("coordinates"):
@@ -712,9 +646,10 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
         route.duration_s = int(route.distance_m / SPEED_MPS)
         db.commit()
         _schedule_route_bins_to_pickup(db, waypoints, stop_progress_by_bin)
+        route_bin_ids = set(waypoints)
+        total_m = route_progress[-1] if route_progress else 0.0
         visited: set[int] = set()
         seg_index = 0
-        route_progress_m = 0.0
         pos = coords[0]
 
         while seg_index < len(coords) - 1:
@@ -731,47 +666,88 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
                 _post_position(pos, "en_route", None, load_units)
                 return pos, load_units
 
+            # Positionsbasiertes (opportunistisches) Sammeln: jede volle, freigegebene
+            # Tonne (Route ODER nicht), an deren Abholposition der Wagen vorbeikommt
+            # und für die noch Kapazität frei ist, wird mitgenommen — unabhängig von
+            # der geplanten Reihenfolge. So fährt der Wagen nicht mehr an vollen
+            # Tonnen vorbei. Passt eine Tonne nicht mehr rein, bleibt sie für die
+            # nächste Runde (der Wagen wird nie überladen).
+            remaining_cap = TRUCK_CAPACITY_UNITS - load_units
+
+            # Wagen voll? Sobald nicht mal die kleinstmögliche sammelbare Tonne
+            # (>= COLLECT_FILL_THRESHOLD) noch reinpasst, lohnt sich kein weiterer
+            # Stopp. Dann NICHT die restliche geplante Route durch die Seitenstraßen
+            # abklappern, sondern die Fahrt beenden → direkt zum Depot (geschieht nach
+            # der Schleife via _unload_at_depot, OSRM-direkte Strecke). Die nicht
+            # gesammelten vollen Tonnen werden im nächsten Trip neu geplant.
+            if load_units > 0 and remaining_cap < COLLECT_FILL_THRESHOLD:
+                logger.info(
+                    "truck voll (%d/%d Einheiten) → direkt zum Depot, Rest neu planen",
+                    int(load_units), int(TRUCK_CAPACITY_UNITS),
+                )
+                break
+
+            passable: dict[int, tuple[float, float]] = {}
+            for b in db.query(Bin).all():
+                if b.id in visited or b.id not in bin_coords:
+                    continue
+                if not _is_collectable_bin(b):
+                    continue
+                if _bin_fill_value(b) > remaining_cap:
+                    continue
+                passable[b.id] = bin_coords[b.id]
+
             budget_m = SPEED_MPS * TICK_S * speed
-            next_bin = _next_unvisited_waypoint(waypoints, visited)
-            next_stop_m = stop_progress_by_bin.get(next_bin) if next_bin is not None else None
-            pos, seg_index, route_progress_m, reached_stop = _advance_with_planned_stop(
+            pos, seg_index, hit_bin = _advance_with_arrival_check(
                 pos,
                 coords,
-                route_progress,
                 seg_index,
-                route_progress_m,
                 budget_m,
-                next_stop_m,
+                list(passable.keys()),
+                visited,
+                passable,
             )
-            hit_bin = next_bin if reached_stop else None
+
+            # Exakter Fortschritt entlang der Route (0..1) — das Frontend teilt
+            # damit eindeutig in gefahren/kommend, ohne Projektion.
+            prog_m = route_progress[seg_index] + _haversine_m(coords[seg_index], pos)
+            progress = min(1.0, prog_m / total_m) if total_m > 0 else 1.0
 
             if hit_bin is not None:
-                pos = bin_coords.get(hit_bin, pos)
-                await _wait_for_bin_at_pickup(hit_bin, pos, load_units)
+                pos = passable.get(hit_bin, pos)
+                # Geplante Route-Tonnen sind ggf. noch auf dem Weg zur Abholposition
+                # → kurz warten. Opportunistisch erfasste Tonnen stehen am Haus und
+                # werden direkt mitgenommen (kein Warten).
+                if hit_bin in route_bin_ids:
+                    await _wait_for_bin_at_pickup(hit_bin, pos, load_units)
                 db.expire_all()
                 hit = db.query(Bin).filter(Bin.id == hit_bin).first()
                 if not _is_collectable_bin(hit):
-                    logger.info("truck simulator skipped non-collectable bin %s at pickup", hit_bin)
                     visited.add(hit_bin)
                     _schedule_bin_move(hit_bin, "home")
-                    _post_position(pos, "en_route", None, load_units)
+                    _post_position(pos, "en_route", None, load_units, progress)
                     await asyncio.sleep(TICK_S)
                     continue
 
-                waste_units = _bin_fill_value(hit)
-                if load_units > 0 and load_units + waste_units > TRUCK_CAPACITY_UNITS:
-                    pos, load_units = await _unload_at_depot(pos, load_units, resume_pos=pos)
-
-                _post_position(pos, "emptying", hit_bin, load_units)
+                _post_position(pos, "emptying", hit_bin, load_units, progress)
                 await _hold_position(pos, "emptying", hit_bin, load_units, EMPTY_PAUSE_S)
                 collected_units = _empty_bin(db, hit_bin)
                 load_units = min(TRUCK_CAPACITY_UNITS, load_units + collected_units)
                 visited.add(hit_bin)
                 _schedule_bin_move(hit_bin, "home", delay_s=2.0)
-                _post_position(pos, "en_route", None, load_units)
+                _post_position(pos, "en_route", None, load_units, progress)
             else:
-                action = "returning" if len(visited) == len(waypoints) else "en_route"
-                _post_position(pos, action, None, load_units)
+                # Rückfahrt = nichts mehr zu sammeln (alle erreichbaren/passenden
+                # Tonnen erledigt). Robuster als „alle Waypoints besucht", weil mit
+                # Kapazitäts-Grenze geplante Tonnen übrig bleiben können.
+                returning_now = not passable
+                _post_position(
+                    pos,
+                    "returning" if returning_now else "en_route",
+                    None,
+                    load_units,
+                    progress,
+                )
 
             await asyncio.sleep(TICK_S)
 

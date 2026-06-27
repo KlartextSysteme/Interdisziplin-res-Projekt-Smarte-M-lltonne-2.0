@@ -9,6 +9,7 @@ _state: dict = {
     "load_units": 0.0,
     "capacity_units": 600.0,
     "load_percent": 0,
+    "route_progress": None,  # 0..1 = exakte Position des Wagens entlang der Route
     "updated_at": None,
 }
 

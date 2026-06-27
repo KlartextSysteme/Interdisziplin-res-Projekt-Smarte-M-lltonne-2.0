@@ -432,45 +432,58 @@ function BinDetailCard({
   );
 }
 
-// ── Routen-Geometrie: Truck-Position auf die Route projizieren ─────────────────
-// Damit sich die Route sichtbar aufbaut (gefahren vs. kommend) und der nächste
-// Streckenabschnitt bis zur nächsten Abholposition hervorgehoben werden kann.
-// Abschnittsgrenzen sind die Abholpositionen der Tonnen, die exakt auf der Route
-// liegen. Rein clientseitig aus dem vorhandenen Positionsstrom — kein Polling.
+// ── Routen-Geometrie: gefahren vs. kommend per Backend-Fortschritt ────────────
+// Das Backend meldet die exakte Position des Wagens als Bruchteil (0..1) der
+// Routenlänge (truck.route_progress). Damit teilen wir eindeutig in gefahren/
+// kommend — ohne Projektion, also robust gegen Depot-Doppeldeutigkeit und
+// selbstkreuzende Zickzack-Routen.
 
 type LatLng = [number, number];
 
-/** Projiziert Punkt p auf das Segment a–b, equirektangulär (lokal genau genug). */
-function projectOnSegment(p: LatLng, a: LatLng, b: LatLng): { t: number; point: LatLng; d2: number } {
-  const cos = Math.cos((a[0] * Math.PI) / 180);
-  const ax = a[1] * cos, ay = a[0];
-  const bx = b[1] * cos, by = b[0];
-  const px = p[1] * cos, py = p[0];
-  const dx = bx - ax, dy = by - ay;
-  const len2 = dx * dx + dy * dy;
-  let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
-  t = Math.max(0, Math.min(1, t));
-  const point: LatLng = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-  const ddx = p[1] * cos - point[1] * cos;
-  const ddy = p[0] - point[0];
-  return { t, point, d2: ddx * ddx + ddy * ddy };
+/** Planare Distanz in Metern (lokal genau genug). */
+function segMeters(a: LatLng, b: LatLng): number {
+  const dy = (b[0] - a[0]) * 111_000;
+  const dx = (b[1] - a[1]) * 111_000 * Math.cos((a[0] * Math.PI) / 180);
+  return Math.hypot(dx, dy);
 }
 
-/** Fortschritt eines Punktes entlang der Polylinie: Segmentindex + Projektion. */
-function projectOnLine(p: LatLng, line: LatLng[]): { segIndex: number; point: LatLng } {
-  let best = { segIndex: 0, point: line[0], d2: Infinity };
-  for (let i = 0; i < line.length - 1; i++) {
-    const r = projectOnSegment(p, line[i], line[i + 1]);
-    if (r.d2 < best.d2) best = { segIndex: i, point: r.point, d2: r.d2 };
+/** Teilt die Linie am Bruchteil 0..1 der Gesamtlänge in gefahren/kommend. */
+function splitAtFraction(line: LatLng[], fraction: number): { driven: LatLng[]; upcoming: LatLng[] } {
+  if (line.length < 2) return { driven: line, upcoming: [] };
+  const cum: number[] = [0];
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + segMeters(line[i - 1], line[i]));
+  const total = cum[cum.length - 1];
+  const target = Math.max(0, Math.min(1, fraction)) * total;
+  let i = 0;
+  while (i < cum.length - 1 && cum[i + 1] < target) i++;
+  const segLen = cum[i + 1] - cum[i] || 1;
+  const t = (target - cum[i]) / segLen;
+  const point: LatLng = [
+    line[i][0] + (line[i + 1][0] - line[i][0]) * t,
+    line[i][1] + (line[i + 1][1] - line[i][1]) * t,
+  ];
+  return { driven: [...line.slice(0, i + 1), point], upcoming: [point, ...line.slice(i + 1)] };
+}
+
+/** Erste ~maxMeters einer Linie — Hervorhebung des nächsten Streckenabschnitts. */
+function prefixByMeters(line: LatLng[], maxMeters: number): LatLng[] {
+  if (line.length < 2) return [];
+  const out: LatLng[] = [line[0]];
+  let acc = 0;
+  for (let i = 1; i < line.length; i++) {
+    const d = segMeters(line[i - 1], line[i]);
+    if (acc + d >= maxMeters) {
+      const t = (maxMeters - acc) / (d || 1);
+      out.push([
+        line[i - 1][0] + (line[i][0] - line[i - 1][0]) * t,
+        line[i - 1][1] + (line[i][1] - line[i - 1][1]) * t,
+      ]);
+      return out;
+    }
+    out.push(line[i]);
+    acc += d;
   }
-  return { segIndex: best.segIndex, point: best.point };
-}
-
-/** Teil-Polylinie zwischen zwei Projektionen (a vor b auf derselben Linie). */
-function subLine(line: LatLng[], aIdx: number, aPt: LatLng, bIdx: number, bPt: LatLng): LatLng[] {
-  if (bIdx < aIdx) return [];
-  if (aIdx === bIdx) return [aPt, bPt];
-  return [aPt, ...line.slice(aIdx + 1, bIdx + 1), bPt];
+  return out;
 }
 
 interface Props {
@@ -513,38 +526,30 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
       line: c.geometry!.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
     }));
 
-  // Render nach Truck-Phase (robust gegen die Depot-Doppeldeutigkeit: das Depot
-  // liegt am Anfang UND Ende der Geometrie, deshalb projizieren wir nur während
-  // des Sammelns, wenn der Truck eindeutig zwischen den Tonnen ist):
+  // Render nach Truck-Phase + exaktem Backend-Fortschritt (truck.route_progress):
   //   sammeln    → gefahren (grau) + kommend (gelb) + nächster Abschnitt
   //   Rückfahrt  → alles gedämpft (kein gelbes Neuzeichnen hinter dem Truck)
   //   Vorschau   → volle gelbe Linie (geplant, noch nicht gestartet)
-  const truckPos: LatLng | null = truck ? [truck.lat, truck.lng] : null;
   const phase = truck?.action ?? "idle";
   const hasGeom = geometryLine.length > 1;
   const collecting = hasGeom && (phase === "en_route" || phase === "emptying" || phase === "paused");
   const returning = hasGeom && (phase === "returning" || phase === "returning_full" || phase === "unloading");
+  const progress = typeof truck?.route_progress === "number" ? truck.route_progress : null;
 
   let drivenLine: LatLng[] = [];
   let upcomingLine: LatLng[] = [];
   let nextSegment: LatLng[] = [];
 
-  if (collecting && truckPos) {
-    const proj = projectOnLine(truckPos, geometryLine);
-    drivenLine = [...geometryLine.slice(0, proj.segIndex + 1), proj.point];
-    upcomingLine = [proj.point, ...geometryLine.slice(proj.segIndex + 1)];
-
-    // Nächster Abschnitt = bis zur Abholposition der aktuellen Zieltonne.
-    const targetBin =
-      truck?.current_bin_id != null ? bins.find((b) => b.id === truck.current_bin_id) : null;
-    const targetPickup = (targetBin ? binPickupPosition(targetBin) : null) as LatLng | null;
-    if (targetPickup) {
-      const tp = projectOnLine(targetPickup, geometryLine);
-      if (tp.segIndex >= proj.segIndex) {
-        nextSegment = subLine(geometryLine, proj.segIndex, proj.point, tp.segIndex, tp.point);
-      }
-    }
+  if (collecting && progress !== null) {
+    const split = splitAtFraction(geometryLine, progress);
+    drivenLine = split.driven;
+    upcomingLine = split.upcoming;
+    nextSegment = prefixByMeters(upcomingLine, 180);
   }
+
+  // Aufteilung nur zeigen, wenn wir einen echten Fortschritt haben; sonst (z. B.
+  // direkt nach Planung, noch ohne Fortschritt) wie Vorschau die volle Linie.
+  const showSplit = collecting && drivenLine.length > 1;
 
   function handleSelectBin(id: number) {
     // Bin-Selektion deaktiviert Truck-Fokus (Selektion hat Priorität)
@@ -582,7 +587,7 @@ export default function LeafletMap({ bins, truck, activeRoute, candidates = [], 
           />
         ))}
 
-        {collecting ? (
+        {showSplit ? (
           <>
             {drivenLine.length > 1 && (
               <Polyline positions={drivenLine} color="#6b7280" weight={4} opacity={0.4} />
