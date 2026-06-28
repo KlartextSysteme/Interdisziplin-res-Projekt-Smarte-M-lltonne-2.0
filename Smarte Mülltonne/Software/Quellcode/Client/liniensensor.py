@@ -9,6 +9,8 @@ class Liniensensor:
     berechnet daraus eine relative Linienposition.
     """
 
+    END_MARKER = "end_marker"
+
     def __init__(
         self,
         multiplexer,
@@ -56,7 +58,7 @@ class Liniensensor:
         self._cached_values = [0, 0, 0, 0, 0]
         self._cached_position = None
         self._cached_bits = 0
-        self._cached_street_detected = False
+        self._cached_end_marker_detected = False
 
     def _read_channel_majority(self, channel):
         """
@@ -104,12 +106,12 @@ class Liniensensor:
 
         self._cached_values = values
         self._cached_bits = self._values_to_bits(values)
-        self._cached_street_detected = active_count == 5
+        self._cached_end_marker_detected = active_count == 5
 
         if active_count == 0:
             self._cached_position = None
-        elif self._cached_street_detected:
-            self._cached_position = "street"
+        elif self._cached_end_marker_detected:
+            self._cached_position = self.END_MARKER
         else:
             self._cached_position = weighted_sum / active_count
 
@@ -142,17 +144,24 @@ class Liniensensor:
         Rückgabe:
         - Zahl von ca. -2 bis +2: relative Linienposition.
         - None: keine Linie erkannt.
-        - "street": alle 5 Sensoren erkennen Linie.
+        - "end_marker": alle 5 Sensoren erkennen die Endmarkierung.
         """
         self.update(force)
         return self._cached_position
 
-    def is_street_detected(self, force=False):
+    def is_end_marker_detected(self, force=False):
         """
-        True, wenn alle 5 Sensoren gleichzeitig Linie erkennen.
+        True, wenn alle 5 Sensoren gleichzeitig die Endmarkierung erkennen.
         """
         self.update(force)
-        return self._cached_street_detected
+        return self._cached_end_marker_detected
+
+    def is_street_detected(self, force=False):
+        """
+        Kompatibilitaetsmethode fuer alten Code.
+        Inhaltlich ist damit die Endmarkierung gemeint.
+        """
+        return self.is_end_marker_detected(force)
 
     def get_bits(self, force=False):
         """

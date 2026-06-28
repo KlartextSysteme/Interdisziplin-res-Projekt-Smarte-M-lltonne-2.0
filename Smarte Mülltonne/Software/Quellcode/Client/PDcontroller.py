@@ -44,12 +44,12 @@ class PDController:
         Rückgabe:
         - correction > 0: linker Motor wird langsamer, rechter schneller.
         - correction < 0: linker Motor wird schneller, rechter langsamer.
-        - 0 bei None oder Sonderwerten wie "street".
+        - 0 bei None oder Sonderwerten wie "end_marker".
         """
         if target_position is None:
             target_position = self.target_position
 
-        if current_position is None or current_position == "street":
+        if current_position is None or current_position == "end_marker":
             self.reset()
             return 0
 
