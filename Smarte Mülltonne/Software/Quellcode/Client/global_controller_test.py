@@ -17,6 +17,7 @@ class GlobalController:
     STATE_AVOID_LEFT = "AVOID_LEFT"
     STATE_AVOID_NOT_POSSIBLE = "AVOID_NOT_POSSIBLE"
     STATE_WAIT_AT_STREET = "WAIT_AT_STREET"
+    STATE_TURN_AT_STREET = "TURN_AT_STREET"
     STATE_TURN_AT_HOME = "TURN_AT_HOME"
     # Zustände für manuelle Anforderungen per Touchpanel
     STATE_MANUAL_GOTO_STREET_REQUEST = "MANUAL_GOTO_STREET_REQUEST"
@@ -72,11 +73,14 @@ class GlobalController:
         self.help_resume_delay_ms = 5000
 
         # müssen noch angepasst werden
-        self.avoid_turn_90_steps = 16000
-        self.turn_home_180_steps = 32000
+        self.avoid_turn_90_steps = 22000
+        self.turn_home_180_steps = 44000
 
         self.avoid_turn_90_ms = 0
         self.turn_home_180_ms = 0
+        self.turn_street_180_ms = 0
+        self.turn_home_back_to_line = False
+        self.turn_home_back_timeout_ms = 5000
 
         self.avoid_step = 0
         self.avoid_step_since_ms = time.ticks_ms()
@@ -120,6 +124,9 @@ class GlobalController:
             self.help_front_clear_since_ms = None
         if new_state == self.STATE_TURN_AT_HOME:
             self.turn_home_180_ms = 0
+            self.turn_home_back_to_line = False
+        if new_state == self.STATE_TURN_AT_STREET:
+            self.turn_street_180_ms = 0
         
         if new_state in (
             self.STATE_LINE_FOLLOWING,
@@ -246,7 +253,7 @@ class GlobalController:
     def _logic_manual_return_home_request(self):
         print("Manuelle Anforderung: Rueckfahrt nach Hause")
         self.drive_target = "home"
-        self.set_state(self.STATE_LINE_FOLLOWING)
+        self.set_state(self.STATE_TURN_AT_STREET)
 
     def pause(self):
         if self.state in (
@@ -308,6 +315,8 @@ class GlobalController:
             self._logic_user_paused()
         elif self.state == self.STATE_TURN_AT_HOME:
             self._logic_turn_at_home()
+        elif self.state == self.STATE_TURN_AT_STREET:
+            self._logic_turn_at_street()
         elif self.state == self.STATE_MANUAL_GOTO_STREET_REQUEST:
             self._logic_manual_goto_street_request()
         elif self.state == self.STATE_MANUAL_RETURN_HOME_REQUEST:
@@ -1008,6 +1017,27 @@ class GlobalController:
 
         elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
 
+        if self.turn_home_back_to_line:
+            self.motors.backward(self.avoid_turn_speed)
+
+            position = None
+            if self.line_sensor is not None:
+                position = self.line_sensor.get_position(force=True)
+
+            self._debug_state(
+                "Rueckwaerts bis Home-Marker erkannt Position: "
+                + str(position)
+                + " Elapsed ms: "
+                + str(elapsed)
+            )
+
+            if position == "street" or elapsed >= self.turn_home_back_timeout_ms:
+                self.motors.stop()
+                self.turn_home_180_ms = 0
+                self.turn_home_back_to_line = False
+                self.set_state(self.STATE_AT_HOME)
+            return
+
         self.motors.turn_right(self.avoid_turn_speed)
 
         self._debug_state(
@@ -1020,7 +1050,34 @@ class GlobalController:
         if elapsed >= self.turn_home_180_ms:
             self.motors.stop()
             self.turn_home_180_ms = 0
-            self.set_state(self.STATE_AT_HOME)
+            self.turn_home_back_to_line = True
+            self.state_since_ms = time.ticks_ms()
+
+    def _logic_turn_at_street(self):
+        if self.motors is None:
+            return
+
+        if self.turn_street_180_ms == 0:
+            self.turn_street_180_ms = self.motors.steps_to_ms(
+                self.turn_home_180_steps,
+                self.avoid_turn_speed
+            )
+
+        elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
+
+        self.motors.turn_right(self.avoid_turn_speed)
+
+        self._debug_state(
+            "180-Grad-Drehung an der Strasse Elapsed ms: "
+            + str(elapsed)
+            + " Zielzeit ms: "
+            + str(self.turn_street_180_ms)
+        )
+
+        if elapsed >= self.turn_street_180_ms:
+            self.motors.stop()
+            self.turn_street_180_ms = 0
+            self.set_state(self.STATE_LINE_FOLLOWING)
 
     def _logic_user_paused(self):
         if self.motors is not None:
