@@ -329,6 +329,32 @@ class GlobalController:
             self.stop()
             return
 
+    # def handle_network_command(self, cmd):
+    #     cmd = str(cmd).strip()
+
+    #     print("Network-Command:", cmd)
+
+    #     if cmd in ("CMD_GOTO_STREET", "GOTO_STREET", "goto_street", "goto_pickup"):
+    #         self.request_goto_street()
+    #         return
+
+    #     if cmd in ("CMD_RETURN_HOME", "RETURN_HOME", "goto_home", "return_home"):
+    #         self.request_return_home()
+    #         return
+
+    #     if cmd in ("CMD_STOP", "STOP", "stop", "pause"):
+    #         self.pause()
+    #         return
+
+    #     if cmd in ("CMD_RESUME", "RESUME", "resume"):
+    #         self.resume()
+    #         return
+
+    #     print("Unbekannter Network-Command:", cmd)
+    
+    # def get_network_status(self):
+    #     return self.state
+    
     def run(self):
         if self.touchpanel is not None:
             self.touchpanel.tick()

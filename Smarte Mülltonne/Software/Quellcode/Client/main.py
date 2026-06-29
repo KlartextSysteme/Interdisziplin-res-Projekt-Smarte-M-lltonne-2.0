@@ -9,6 +9,8 @@ from steppermotor import DualStepperMotorPWM
 from touchpanel import Touchpanel
 from ultraschallsensor import FuellstandSensor, HindernisSensoren
 
+from tcp_bridge_client import TcpBridgeClient
+
 
 # Pins laut aktuellem Pico-Pinout
 MUX_S0_PIN = 2
@@ -110,11 +112,23 @@ def create_controller():
         max_speed=95,
     )
 
+    network_client = TcpBridgeClient(
+        ssid="DEIN_WLAN_NAME",
+        password="DEIN_WLAN_PASSWORT",
+        bridge_host="IP_DES_LAPTOPS",
+        bridge_port=50002,
+        command_handler=controller.handle_network_command,
+        status_provider=controller.get_network_status,
+    )
+    
+    network_client.start()
+
     touchpanel = Touchpanel(action_handler=controller.handle_touch_action)
     touchpanel.init()
     controller.touchpanel = touchpanel
 
     return controller
+
 
 
 controller = create_controller()
@@ -126,6 +140,7 @@ print("Zum Stoppen: Strg+C / Reset")
 try:
     while True:
         controller.run()
+        network_client.tick()
         sleep_ms(20)
 except KeyboardInterrupt:
     controller.stop()
