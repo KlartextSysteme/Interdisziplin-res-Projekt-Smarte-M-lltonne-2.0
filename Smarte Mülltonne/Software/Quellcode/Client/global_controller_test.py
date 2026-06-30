@@ -85,7 +85,7 @@ class GlobalController:
         self.line_lost_timeout_ms = 10000
         
         self.obstacle_wait_ms = 10000
-        self.obstacle_stop_cm = 30
+        self.obstacle_stop_cm = 15
         self.avoid_side = None
 
         self.avoid_speed = 35
@@ -114,8 +114,8 @@ class GlobalController:
         self.state_before_pause = self.STATE_AT_HOME
 
         #müssen noch konfiguriert werden
-        self.side_obstacle_cm = 200
-        self.avoid_extra_steps = 15000
+        self.side_obstacle_cm = 80
+        self.avoid_extra_steps = 40000
         self.avoid_extra_ms = 0
 
         self.help_buzzer_started = False
@@ -226,6 +226,26 @@ class GlobalController:
         bits = self.line_sensor.get_bits()
 
         return " Sensoren: " + str(values) + " Bits: " + bin(bits)
+
+    def _us_debug_text(self):
+        if self.obstacle_sensors is None:
+            return ""
+
+        # Fuer die Debug-Ausgabe bewusst frisch messen.
+        # Achtung: Ultraschallmessungen sind blockierend und verlangsamen den Loop.
+        front = self.obstacle_sensors.run_front(force=True)
+        left = self.obstacle_sensors.measure_left()
+        right = self.obstacle_sensors.measure_right()
+
+        return (
+            " US vorne/links/rechts cm: "
+            + str(front)
+            + " / "
+            + str(left)
+            + " / "
+            + str(right)
+        )
+
 
     def _debug_state(self, extra=""):
         text = "State: " + self.state + " Ziel: " + str(self.drive_target)
@@ -638,13 +658,10 @@ class GlobalController:
         self._debug_print(
             "State: "
             + self.state
-            + " Ziel: "
-            + str(self.drive_target)
             + " Avoid-Step: "
             + str(self.avoid_step)
-            + " Elapsed ms: "
-            + str(elapsed)
             + self._line_debug_text()
+            + self._us_debug_text()
             + self._motor_debug_text()
         )
 
@@ -668,11 +685,11 @@ class GlobalController:
         if self.avoid_step == self.AVOID_RIGHT_FIND_OBSTACLE:
             self.motors.forward(self.avoid_speed)
 
-            if self._line_found_during_avoidance():
-                self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
-                self.avoid_turn_90_ms = 0
-                self.avoid_step_since_ms = time.ticks_ms()
-                return
+            # if self._line_found_during_avoidance():
+            #     self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
+            #     self.avoid_turn_90_ms = 0
+            #     self.avoid_step_since_ms = time.ticks_ms()
+            #     return
 
             if self._left_obstacle_detected():
                 self._next_avoid_step()
@@ -682,11 +699,11 @@ class GlobalController:
         if self.avoid_step == self.AVOID_RIGHT_PASS_OBSTACLE:
             self.motors.forward(self.avoid_speed)
 
-            if self._line_found_during_avoidance():
-                self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
-                self.avoid_turn_90_ms = 0
-                self.avoid_step_since_ms = time.ticks_ms()
-                return
+            # if self._line_found_during_avoidance():
+            #     self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
+            #     self.avoid_turn_90_ms = 0
+            #     self.avoid_step_since_ms = time.ticks_ms()
+            #     return
 
             if not self._left_obstacle_detected():
                 self._next_avoid_step()
@@ -702,11 +719,11 @@ class GlobalController:
 
             self.motors.forward(self.avoid_speed)
 
-            if self._line_found_during_avoidance():
-                self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
-                self.avoid_turn_90_ms = 0
-                self.avoid_step_since_ms = time.ticks_ms()
-                return
+            # if self._line_found_during_avoidance():
+            #     self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
+            #     self.avoid_turn_90_ms = 0
+            #     self.avoid_step_since_ms = time.ticks_ms()
+            #     return
 
             if elapsed >= self.avoid_extra_ms:
                 self.avoid_extra_ms = 0
@@ -733,11 +750,11 @@ class GlobalController:
         if self.avoid_step == self.AVOID_RIGHT_FIND_OBSTACLE_AGAIN:
             self.motors.forward(self.avoid_speed)
 
-            if self._line_found_during_avoidance():
-                self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
-                self.avoid_turn_90_ms = 0
-                self.avoid_step_since_ms = time.ticks_ms()
-                return
+            # if self._line_found_during_avoidance():
+            #     self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
+            #     self.avoid_turn_90_ms = 0
+            #     self.avoid_step_since_ms = time.ticks_ms()
+            #     return
 
             if self._left_obstacle_detected():
                 self._next_avoid_step()
@@ -747,11 +764,11 @@ class GlobalController:
         if self.avoid_step == self.AVOID_RIGHT_PASS_OBSTACLE_AGAIN:
             self.motors.forward(self.avoid_speed)
 
-            if self._line_found_during_avoidance():
-                self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
-                self.avoid_turn_90_ms = 0
-                self.avoid_step_since_ms = time.ticks_ms()
-                return
+            # if self._line_found_during_avoidance():
+            #     self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
+            #     self.avoid_turn_90_ms = 0
+            #     self.avoid_step_since_ms = time.ticks_ms()
+            #     return
 
             if not self._left_obstacle_detected():
                 self._next_avoid_step()
@@ -767,11 +784,11 @@ class GlobalController:
 
             self.motors.forward(self.avoid_speed)
 
-            if self._line_found_during_avoidance():
-                self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
-                self.avoid_turn_90_ms = 0
-                self.avoid_step_since_ms = time.ticks_ms()
-                return
+            # if self._line_found_during_avoidance():
+            #     self.avoid_step = self.AVOID_RIGHT_ALIGN_ON_LINE
+            #     self.avoid_turn_90_ms = 0
+            #     self.avoid_step_since_ms = time.ticks_ms()
+            #     return
 
             if elapsed >= self.avoid_extra_ms:
                 self.avoid_extra_ms = 0
@@ -847,6 +864,7 @@ class GlobalController:
             + " Elapsed ms: "
             + str(elapsed)
             + self._line_debug_text()
+            + self._us_debug_text()
             + self._motor_debug_text()
         )
 

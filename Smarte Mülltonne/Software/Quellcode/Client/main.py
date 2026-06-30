@@ -21,8 +21,8 @@ MUX_SIGNAL_PIN = 28
 
 US_TRIGGER_PIN = 6
 US_FRONT_CHANNEL = 5
-US_LEFT_CHANNEL = 6
-US_RIGHT_CHANNEL = 7
+US_LEFT_CHANNEL = 7
+US_RIGHT_CHANNEL = 6
 
 # Testweise nutzt der Füllstand aktuell den vorderen US-Sensor.
 # Werte nach dem Test am realen Aufbau kalibrieren.
@@ -112,16 +112,16 @@ def create_controller():
         max_speed=95,
     )
 
-    network_client = TcpBridgeClient(
-        ssid="DEIN_WLAN_NAME",
-        password="DEIN_WLAN_PASSWORT",
-        bridge_host="IP_DES_LAPTOPS",
-        bridge_port=50002,
-        command_handler=controller.handle_network_command,
-        status_provider=controller.get_network_status,
-    )
+    # network_client = TcpBridgeClient(
+    #     ssid="DEIN_WLAN_NAME",
+    #     password="DEIN_WLAN_PASSWORT",
+    #     bridge_host="IP_DES_LAPTOPS",
+    #     bridge_port=50002,
+    #     command_handler=controller.handle_network_command,
+    #     status_provider=controller.get_network_status,
+    # )
     
-    network_client.start()
+    #network_client.start()
 
     touchpanel = Touchpanel(action_handler=controller.handle_touch_action)
     touchpanel.init()
