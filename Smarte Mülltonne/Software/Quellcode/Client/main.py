@@ -66,7 +66,7 @@ def create_controller():
         left_channel=US_LEFT_CHANNEL,
         right_channel=US_RIGHT_CHANNEL,
         stop_cm=30,
-        side_clear_cm=200,
+        side_clear_cm=80,
     )
 
     fuellstand_sensor = FuellstandSensor(

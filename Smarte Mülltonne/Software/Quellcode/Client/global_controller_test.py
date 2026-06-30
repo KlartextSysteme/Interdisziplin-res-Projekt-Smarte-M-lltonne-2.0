@@ -118,6 +118,14 @@ class GlobalController:
         self.avoid_extra_steps = 40000
         self.avoid_extra_ms = 0
 
+        self.obstacle_side_min_samples = 3
+        self.obstacle_right_clear_count = 0
+        self.obstacle_right_blocked_count = 0
+        self.obstacle_left_clear_count = 0
+        self.obstacle_left_blocked_count = 0
+        self.obstacle_last_right_cm = None
+        self.obstacle_last_left_cm = None
+
         self.help_buzzer_started = False
         self.line_lost_alarm_started = False
         self.drive_target = None
@@ -141,6 +149,9 @@ class GlobalController:
 
         if new_state == self.STATE_LINE_LOST:
             self.line_lost_alarm_started = False
+
+        if new_state == self.STATE_OBSTACLE_WAIT:
+            self._reset_obstacle_side_samples()
 
         if new_state == self.STATE_AT_HOME:
             self.drive_target = None
@@ -256,6 +267,58 @@ class GlobalController:
         text += self._motor_debug_text()
         self._debug_print(text)
     
+    def _reset_obstacle_side_samples(self):
+        self.obstacle_right_clear_count = 0
+        self.obstacle_right_blocked_count = 0
+        self.obstacle_left_clear_count = 0
+        self.obstacle_left_blocked_count = 0
+        self.obstacle_last_right_cm = None
+        self.obstacle_last_left_cm = None
+
+    def _update_obstacle_side_samples(self):
+        if self.obstacle_sensors is None:
+            return
+
+        self.obstacle_last_right_cm = self.obstacle_sensors.measure_right()
+        if self.obstacle_sensors.right_is_clear():
+            self.obstacle_right_clear_count += 1
+        else:
+            self.obstacle_right_blocked_count += 1
+
+        self.obstacle_last_left_cm = self.obstacle_sensors.measure_left()
+        if self.obstacle_sensors.left_is_clear():
+            self.obstacle_left_clear_count += 1
+        else:
+            self.obstacle_left_blocked_count += 1
+
+    def _right_confirmed_free(self):
+        return (
+            self.obstacle_right_clear_count >= self.obstacle_side_min_samples
+            and self.obstacle_right_clear_count > self.obstacle_right_blocked_count
+        )
+
+    def _left_confirmed_free(self):
+        return (
+            self.obstacle_left_clear_count >= self.obstacle_side_min_samples
+            and self.obstacle_left_clear_count > self.obstacle_left_blocked_count
+        )
+
+    def _obstacle_side_debug_text(self):
+        return (
+            " US rechts: "
+            + str(self.obstacle_last_right_cm)
+            + " frei/blockiert: "
+            + str(self.obstacle_right_clear_count)
+            + "/"
+            + str(self.obstacle_right_blocked_count)
+            + " | US links: "
+            + str(self.obstacle_last_left_cm)
+            + " frei/blockiert: "
+            + str(self.obstacle_left_clear_count)
+            + "/"
+            + str(self.obstacle_left_blocked_count)
+        )
+
     def _line_found_during_avoidance(self):
         if self.line_sensor is None:
             return False
@@ -598,36 +661,44 @@ class GlobalController:
 
         wait_time_ms = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
 
-        front_distance = None
-        if self.obstacle_sensors is not None:
-            front_distance = self.obstacle_sensors.front.read_distance_cm()
+        if self.obstacle_sensors is None:
+            self.set_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
+
+        front_distance = self.obstacle_sensors.run_front(force=True)
+
+        if not self.obstacle_sensors.front_obstacle_detected():
+            self.set_state(self.STATE_LINE_FOLLOWING)
+            return
+
+        self._update_obstacle_side_samples()
 
         self._debug_state(
             "Hindernis vorne: "
             + str(front_distance)
             + " cm Wartezeit ms: "
             + str(wait_time_ms)
+            + self._obstacle_side_debug_text()
         )
-
-        if self.obstacle_sensors is not None:
-            self.obstacle_sensors.run_front(force=True)
-
-            if not self.obstacle_sensors.front_obstacle_detected():
-                self.set_state(self.STATE_LINE_FOLLOWING)
-                return
 
         if wait_time_ms < self.obstacle_wait_ms:
             return
 
-        if self.obstacle_sensors is None:
-            self.set_state(self.STATE_AVOID_NOT_POSSIBLE)
-            return
+        right_free = self._right_confirmed_free()
+        left_free = self._left_confirmed_free()
 
-        self.obstacle_sensors.measure_right()
-        right_free = self.obstacle_sensors.right_is_clear()
-
-        self.obstacle_sensors.measure_left()
-        left_free = self.obstacle_sensors.left_is_clear()
+        print(
+            "Umfahrentscheidung | rechts frei:",
+            right_free,
+            "Werte frei/blockiert:",
+            self.obstacle_right_clear_count,
+            self.obstacle_right_blocked_count,
+            "| links frei:",
+            left_free,
+            "Werte frei/blockiert:",
+            self.obstacle_left_clear_count,
+            self.obstacle_left_blocked_count,
+        )
 
         if right_free:
             self.avoid_side = "right"
