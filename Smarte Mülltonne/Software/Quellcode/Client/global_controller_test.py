@@ -507,7 +507,9 @@ class GlobalController:
                 self.set_state(self.STATE_OBSTACLE_WAIT)
                 return
 
+        self.line_sensor.update(force=True)
         position = self.line_sensor.get_position()
+        line_values = self.line_sensor.read_values()
 
         if position == "end_marker":
             self.motors.stop()
@@ -537,8 +539,6 @@ class GlobalController:
             min_speed=self.min_speed,
             max_speed=self.max_speed,
         )
-
-        line_values = self.line_sensor.read_values()
 
         self._debug_print(
             "LINE_FOLLOWING | Ziel: "
@@ -579,6 +579,7 @@ class GlobalController:
 
         position = None
         if self.line_sensor is not None:
+            self.line_sensor.update(force=True)
             position = self.line_sensor.get_position()
 
         if self.touchpanel is not None:
