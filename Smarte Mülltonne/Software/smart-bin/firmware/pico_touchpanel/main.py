@@ -1,3 +1,20 @@
+# =============================================================================
+# >>> LIVE-FIRMWARE  ·  Smarte Mülltonne 2.0  ·  Pico (Touchpanel + Fahrlogik) <<<
+#
+# DAS IST DER PRODUKTIVE, ZULETZT GETESTETE STAND (Inline-Stack).
+# GENAU DIESE DATEI WIRD AUF DEN PICO GEFLASHT.
+#
+# Pfad: Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/main.py
+#
+# Enthält self-contained: Touchpanel-UI, Liniensensor-PD-Regelung, Motor-
+# steuerung, echte Heimfahrt (run_to_home: 180° → zurück → 180°), Sofort-Stopp
+# während der Fahrt und den TCP-Bridge-Client (Web-App-Steuerung, Tonne 22).
+#
+# NICHT verwechseln mit dem MODULAREN Stack unter Quellcode/Client/main.py –
+# der läuft NICHT auf dem Pico. Vollständige Einordnung:
+# smart-bin/docs/handoff_fahrlogik_2026-06-27.md  (§1 „Welcher Code läuft wirklich")
+# =============================================================================
+
 from machine import Pin, PWM
 from time import sleep_ms, sleep_us, ticks_diff, ticks_ms, ticks_us
 
