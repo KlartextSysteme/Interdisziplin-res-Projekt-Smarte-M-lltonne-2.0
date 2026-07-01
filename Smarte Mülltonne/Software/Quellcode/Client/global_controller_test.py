@@ -119,6 +119,14 @@ class GlobalController:
         self.avoid_extra_ms = 0
 
         self.obstacle_side_min_samples = 3
+
+        # Entlangphase (PASS_OBSTACLE_AGAIN): "Hindernis passiert" erst nach
+        # mehreren KONSEKUTIVEN Frei-Messungen bestaetigen. Eine einzelne
+        # None-Messung (kein Echo direkt neben dem Hindernis) darf das
+        # Vorbeifahren NICHT vorzeitig beenden -> sonst dreht sie ins Hindernis.
+        self.avoid_along_clear_needed = 5
+        self._avoid_along_clear_count = 0
+
         self.obstacle_right_clear_count = 0
         self.obstacle_right_blocked_count = 0
         self.obstacle_left_clear_count = 0
@@ -132,20 +140,74 @@ class GlobalController:
 
         # -------- zum Testen --------
         self.last_debug_ms = time.ticks_ms()
-        self.debug_interval_ms = 500
+        self.debug_interval_ms = 250
+
+        # Touchpanel-Tick waehrend der Fahrt drosseln, damit der SPI-Touch-Read
+        # die PD-Regelung nicht jeden Zyklus ausbremst (enges Regel-Raster).
+        self.last_touch_tick_ms = time.ticks_ms()
+        self.touch_tick_interval_ms = 150
+
+        # Der Fahr-Status wird nur EINMAL pro Fahrt aufs Display geschrieben.
+        # set_status() loest sofort ein volles ILI9341-Redraw (~30-80ms) aus;
+        # pro Regeltakt aufgerufen bricht das die PD-Regelung komplett ein.
+        self._drive_panel_shown = False
+
+        # Zuletzt gesehene (numerische) Linienposition. Bei kurzem Linienverlust
+        # dreht die Recovery in diese Richtung fest nach, statt gerade zu coasten.
+        self.last_known_position = None
+        self.line_lost_recover_correction = 60
+
+        # TCP-Bridge-Client (Web-App-Steuerung). Wird von main.py via
+        # set_network_client gesetzt; None = rein lokal ueber Touchpanel.
+        self.network_client = None
+
+        # Anfahr-Rampe (exponentieller Anlauf): das Reisetempo ist self.base_speed,
+        # bei jeder frischen Fahrt startet die Geschwindigkeit bei ramp_start_speed
+        # und naehert sich exponentiell (Zeitkonstante ramp_tau_ms) dem Reisetempo.
+        # Zeitbasiert (IIR) -> ruckfrei und robust gegen Loop-Jitter.
+        self.ramp_start_speed = 20
+        self.ramp_tau_ms = 500
+        self._current_base = self.base_speed
+        self._last_ramp_ms = time.ticks_ms()
+
+        # Kurven-adaptives Reisetempo: self.base_speed gilt auf der Geraden,
+        # in der schaerfsten Kurve wird bis auf speed_curve heruntergedrosselt.
+        # Adaption neutralisiert: speed_curve == base_speed -> konstantes Tempo.
+        # (Beim Tempo-Test nur EINE Variable aendern.)
+        self.speed_curve = 60
 
     def set_state(self, new_state):
         if self.state == new_state:
             return
 
         print("State:", self.state, "->", new_state)
+        previous_state = self.state
         self.state = new_state
         self.state_since_ms = time.ticks_ms()
+
+        # Bridge/Web-App ueber das Erreichen eines Ziels informieren.
+        # ARRIVED: STREET beim Anhalten an der Abholpos, ARRIVED: HOME wenn die
+        # Ruecktour (ueber TURN_AT_HOME) im Heim-Zustand endet.
+        if new_state == self.STATE_WAIT_AT_STREET:
+            self._bridge_send("ARRIVED: STREET")
+        if new_state == self.STATE_AT_HOME and previous_state == self.STATE_TURN_AT_HOME:
+            self._bridge_send("ARRIVED: HOME")
+
+        # Sobald ein Nicht-Fahr-Zustand einen eigenen Screen zeigt, muss der
+        # Fahr-Status bei der naechsten Fahrt erneut (einmalig) gesetzt werden.
+        if new_state not in (self.STATE_LINE_FOLLOWING, self.STATE_LINE_LOST):
+            self._drive_panel_shown = False
 
         if new_state == self.STATE_LINE_FOLLOWING:
             self.last_line_seen_ms = self.state_since_ms
             self.last_left_speed = self.base_speed
             self.last_right_speed = self.base_speed
+
+            # Anlauframpe nur bei einer FRISCHEN Fahrt neu starten, nicht wenn wir
+            # nur aus einem kurzen Linienverlust zurueckkommen (sonst Dauer-Kriechen).
+            if previous_state != self.STATE_LINE_LOST:
+                self._current_base = self.ramp_start_speed
+                self._last_ramp_ms = self.state_since_ms
 
         if new_state == self.STATE_LINE_LOST:
             self.line_lost_alarm_started = False
@@ -183,6 +245,21 @@ class GlobalController:
     def _next_avoid_step(self):
         self.avoid_step += 1
         self.avoid_step_since_ms = time.ticks_ms()
+        self._avoid_along_clear_count = 0
+
+    def _confirm_side_clear_along(self, still_detected):
+        """Entprellt die 'Hindernis passiert'-Erkennung in der Entlangphase.
+
+        still_detected=True (Hindernis seitlich noch da) setzt den Zaehler
+        zurueck. Erst nach avoid_along_clear_needed KONSEKUTIVEN Frei-Messungen
+        gilt das Hindernis als passiert -> ein einzelnes fehlendes Echo (None)
+        neben dem Hindernis beendet das Vorbeifahren nicht mehr vorzeitig.
+        """
+        if still_detected:
+            self._avoid_along_clear_count = 0
+            return False
+        self._avoid_along_clear_count += 1
+        return self._avoid_along_clear_count >= self.avoid_along_clear_needed
 
     def _debug_print(self, text):
         now = time.ticks_ms()
@@ -412,35 +489,88 @@ class GlobalController:
             self.stop()
             return
 
-    # def handle_network_command(self, cmd):
-    #     cmd = str(cmd).strip()
+    def set_network_client(self, client):
+        """Verknuepft den TCP-Bridge-Client fuer Web-App-Steuerung/Status."""
+        self.network_client = client
 
-    #     print("Network-Command:", cmd)
+    def _bridge_send(self, line):
+        """Sendet eine Zeile an die Bridge, sofern verbunden (fehlertolerant)."""
+        if self.network_client is None:
+            return
+        try:
+            self.network_client.send_line(line)
+        except Exception as exc:
+            print("Bridge send failed:", exc)
 
-    #     if cmd in ("CMD_GOTO_STREET", "GOTO_STREET", "goto_street", "goto_pickup"):
-    #         self.request_goto_street()
-    #         return
+    def handle_network_command(self, cmd):
+        """Von der Bridge eingehende Befehle. Sendet ACK (sonst gilt der
+        Web-App-Befehl als offen) und loest die passende Aktion aus."""
+        cmd = str(cmd).strip()
+        print("Network-Command:", cmd)
 
-    #     if cmd in ("CMD_RETURN_HOME", "RETURN_HOME", "goto_home", "return_home"):
-    #         self.request_return_home()
-    #         return
+        if cmd.startswith("ACK_RECEIVED"):
+            return
 
-    #     if cmd in ("CMD_STOP", "STOP", "stop", "pause"):
-    #         self.pause()
-    #         return
+        if cmd in ("CMD_GOTO_STREET", "GOTO_STREET", "goto_street", "goto_pickup"):
+            self._bridge_send("ACK CMD_GOTO_STREET")
+            self._bridge_send("STATUS:MANUAL_GOTO_STREET_REQUEST")
+            self.request_goto_street()
+            return
 
-    #     if cmd in ("CMD_RESUME", "RESUME", "resume"):
-    #         self.resume()
-    #         return
+        if cmd in ("CMD_RETURN_HOME", "RETURN_HOME", "goto_home", "return_home"):
+            self._bridge_send("ACK CMD_RETURN_HOME")
+            self._bridge_send("STATUS:MANUAL_RETURN_HOME_REQUEST")
+            self.request_return_home()
+            return
 
-    #     print("Unbekannter Network-Command:", cmd)
-    
-    # def get_network_status(self):
-    #     return self.state
-    
+        if cmd in ("CMD_STOP", "STOP", "stop", "pause"):
+            self._bridge_send("ACK CMD_STOP")
+            self.pause()
+            return
+
+        if cmd in ("CMD_RESUME", "RESUME", "resume"):
+            self.resume()
+            return
+
+        print("Unbekannter Network-Command:", cmd)
+
+    def get_network_status(self):
+        """Liefert den periodischen STATUS-String fuer die Bridge. Auf die
+        von Backend/Web-App bekannten Werte der Inline-Firmware gemappt."""
+        s = self.state
+        if s == self.STATE_AT_HOME:
+            return "STANDBY"
+        if s == self.STATE_OBSTACLE_WAIT:
+            return "OBSTACLE"
+        # Transiente Fahr-/Dreh-/Ausweich-Zustaende bleiben nach aussen "unterwegs".
+        if s in (
+            self.STATE_LINE_LOST,
+            self.STATE_TURN_AT_HOME,
+            self.STATE_TURN_AT_STREET,
+            self.STATE_AVOID_RIGHT,
+            self.STATE_AVOID_LEFT,
+            self.STATE_AVOID_NOT_POSSIBLE,
+        ):
+            return "LINE_FOLLOWING"
+        return s
+
     def run(self):
         if self.touchpanel is not None:
-            self.touchpanel.tick()
+            # Waehrend der Fahrt den Touch-Read drosseln (er blockiert sonst die
+            # Regelung); im Leerlauf jeden Zyklus, damit das Menue flott bleibt.
+            driving = self.state in (
+                self.STATE_LINE_FOLLOWING,
+                self.STATE_LINE_LOST,
+                self.STATE_TURN_AT_HOME,
+                self.STATE_TURN_AT_STREET,
+                self.STATE_AVOID_RIGHT,
+                self.STATE_AVOID_LEFT,
+                self.STATE_AVOID_NOT_POSSIBLE,
+            )
+            now = time.ticks_ms()
+            if (not driving) or time.ticks_diff(now, self.last_touch_tick_ms) >= self.touch_tick_interval_ms:
+                self.last_touch_tick_ms = now
+                self.touchpanel.tick()
         if self.state == self.STATE_AT_HOME:
             self._logic_at_home()
         elif self.state == self.STATE_LINE_FOLLOWING:
@@ -522,18 +652,51 @@ class GlobalController:
         if position is None:
             self.set_state(self.STATE_LINE_LOST)
             return
-        
-        if self.touchpanel is not None:
+
+        # Fahr-Status GENAU EINMAL pro Fahrt setzen. Ein set_status() pro
+        # Regeltakt wuerde jedes Mal ein volles Display-Redraw ausloesen und
+        # die PD-Regelung ausbremsen (Ueberschwingen -> Linie verloren).
+        if not self._drive_panel_shown and self.touchpanel is not None:
             self.touchpanel.set_status(
                 status_kind="line_ok",
                 line_ok=True,
             )
+            self._drive_panel_shown = True
 
-        self.last_line_seen_ms = time.ticks_ms()
+        now_ms = time.ticks_ms()
+        self.last_line_seen_ms = now_ms
+        self.last_known_position = position
+
+        # Exponentieller Anlauf: _current_base naehert sich pro Tick dem Reisetempo
+        # (self.base_speed). alpha = dt/tau ist die zeitbasierte Annaeherungsrate.
+        # --- Kurven-adaptives Reisetempo mit Anlauframpe ---
+        # Kurvenschaerfe aus der vorigen PD-Korrektur ableiten (grosse Korrektur =
+        # Linie weit aussen = Kurve). Ziel: base_speed auf der Geraden, linear
+        # heruntergedrosselt bis speed_curve in der schaerfsten Kurve.
+        prev_corr = abs(self.pd_controller.last_correction)
+        curve_factor = prev_corr / self.pd_controller.max_correction
+        if curve_factor > 1.0:
+            curve_factor = 1.0
+        target_base = self.speed_curve + (self.base_speed - self.speed_curve) * (1.0 - curve_factor)
+
+        dt_ms = time.ticks_diff(now_ms, self._last_ramp_ms)
+        self._last_ramp_ms = now_ms
+        if dt_ms < 0:
+            dt_ms = 0
+        if target_base <= self._current_base:
+            # In die Kurve abbremsen: sofort (Sicherheit vor Tempo).
+            self._current_base = target_base
+        else:
+            # Beschleunigen (Anfahrt / Kurvenausgang): exponentiell gerampt,
+            # damit die Schrittmotoren nicht durchrutschen / Schritte verlieren.
+            alpha = dt_ms / self.ramp_tau_ms
+            if alpha > 1.0:
+                alpha = 1.0
+            self._current_base += (target_base - self._current_base) * alpha
 
         left_speed, right_speed, correction = self.pd_controller.get_motor_speeds(
             current_position=position,
-            base_speed=self.base_speed,
+            base_speed=self._current_base,
             min_speed=self.min_speed,
             max_speed=self.max_speed,
         )
@@ -581,11 +744,9 @@ class GlobalController:
         if self.line_sensor is not None:
             position = self.line_sensor.get_position()
 
-        if self.touchpanel is not None:
-            self.touchpanel.set_status(
-                status_kind="line_lost",
-                line_ok=False,
-            )
+        # Kein set_status pro Tick: LINE_LOST flattert bei duenner Linie staendig,
+        # ein Redraw je Tick wuerde die Wiedererfassung der Linie ausbremsen.
+        # Der "Linie verloren"-Screen kommt erst beim echten Timeout-Alarm (unten).
 
         if position == "end_marker":
             self.motors.stop()
@@ -602,10 +763,22 @@ class GlobalController:
             return
 
         if time.ticks_diff(time.ticks_ms(), self.last_line_seen_ms) < self.line_lost_timeout_ms:
-            self.motors.drive_forward_differential(
-                self.last_left_speed,
-                self.last_right_speed,
-            )
+            # In Richtung der zuletzt gesehenen Linienseite fest nachdrehen,
+            # damit Kurven/Luecken schnell wieder eingefangen werden. Nur wenn
+            # die Linie zuletzt mittig (0) war, geradeaus mit letzter Speed.
+            if self.last_known_position is not None and self.last_known_position != 0:
+                sign = 1.0 if self.last_known_position > 0 else -1.0
+                c = self.line_lost_recover_correction * sign
+                recover_left = self._current_base - c
+                recover_right = self._current_base + c
+                recover_left = min(self.max_speed, max(self.min_speed, recover_left))
+                recover_right = min(self.max_speed, max(self.min_speed, recover_right))
+                self.motors.drive_forward_differential(recover_left, recover_right)
+            else:
+                self.motors.drive_forward_differential(
+                    self.last_left_speed,
+                    self.last_right_speed,
+                )
 
             self._debug_print(
                 "State: "
@@ -613,14 +786,18 @@ class GlobalController:
                 + " Ziel: "
                 + str(self.drive_target)
                 + self._line_debug_text()
-                + " Linie verloren, fahre weiter mit letzter Speed L/R: "
-                + str(round(self.last_left_speed, 1))
-                + " "
-                + str(round(self.last_right_speed, 1))
+                + " Linie verloren, Recovery Richtung "
+                + str(self.last_known_position)
                 + self._motor_debug_text()
             )
         else:
             self.motors.stop()
+
+            if not self.line_lost_alarm_started and self.touchpanel is not None:
+                self.touchpanel.set_status(
+                    status_kind="line_lost",
+                    line_ok=False,
+                )
 
             if self.buzzer is not None:
                 if not self.line_lost_alarm_started:
@@ -736,6 +913,27 @@ class GlobalController:
             + self._motor_debug_text()
         )
 
+        # Sicherheits-Timeout (#2): die sensor-abhaengigen Vorwaerts-Schritte
+        # duerfen nicht endlos fahren (z.B. dauerhaft kein Echo neben dem
+        # Hindernis). Nach avoid_side_max_ms bzw. avoid_line_search_max_ms ->
+        # Nothalt + Hilfe-Zustand statt Endlosfahrt/Drehen ins Hindernis.
+        if self.avoid_step in (
+            self.AVOID_RIGHT_FIND_OBSTACLE,
+            self.AVOID_RIGHT_PASS_OBSTACLE,
+            self.AVOID_RIGHT_FIND_OBSTACLE_AGAIN,
+            self.AVOID_RIGHT_PASS_OBSTACLE_AGAIN,
+        ) and elapsed >= self.avoid_side_max_ms:
+            self.motors.stop()
+            self.set_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
+        if (
+            self.avoid_step == self.AVOID_RIGHT_SEARCH_LINE
+            and elapsed >= self.avoid_line_search_max_ms
+        ):
+            self.motors.stop()
+            self.set_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
+
         # AVOID_RIGHT_TURN_OUT: 90 Grad nach rechts drehen
         if self.avoid_step == self.AVOID_RIGHT_TURN_OUT:
             if self.avoid_turn_90_ms == 0:
@@ -841,7 +1039,9 @@ class GlobalController:
             #     self.avoid_step_since_ms = time.ticks_ms()
             #     return
 
-            if not self._left_obstacle_detected():
+            # Entlangphase: erst nach mehreren konsekutiven Frei-Messungen weiter
+            # (einzelnes fehlendes Echo neben dem Hindernis zaehlt nicht als "weg").
+            if self._confirm_side_clear_along(self._left_obstacle_detected()):
                 self._next_avoid_step()
             return
 
@@ -938,6 +1138,25 @@ class GlobalController:
             + self._us_debug_text()
             + self._motor_debug_text()
         )
+
+        # Sicherheits-Timeout (#2): siehe _logic_avoid_right. Nothalt + Hilfe,
+        # wenn ein sensor-abhaengiger Schritt zu lange nicht bestaetigt wird.
+        if self.avoid_step in (
+            self.AVOID_LEFT_FIND_OBSTACLE,
+            self.AVOID_LEFT_PASS_OBSTACLE,
+            self.AVOID_LEFT_FIND_OBSTACLE_AGAIN,
+            self.AVOID_LEFT_PASS_OBSTACLE_AGAIN,
+        ) and elapsed >= self.avoid_side_max_ms:
+            self.motors.stop()
+            self.set_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
+        if (
+            self.avoid_step == self.AVOID_LEFT_SEARCH_LINE
+            and elapsed >= self.avoid_line_search_max_ms
+        ):
+            self.motors.stop()
+            self.set_state(self.STATE_AVOID_NOT_POSSIBLE)
+            return
 
         # AVOID_LEFT_TURN_OUT: 90 Grad nach links drehen
         if self.avoid_step == self.AVOID_LEFT_TURN_OUT:
@@ -1044,7 +1263,9 @@ class GlobalController:
                 self.avoid_step_since_ms = time.ticks_ms()
                 return
 
-            if not self._right_obstacle_detected():
+            # Entlangphase: erst nach mehreren konsekutiven Frei-Messungen weiter
+            # (einzelnes fehlendes Echo neben dem Hindernis zaehlt nicht als "weg").
+            if self._confirm_side_clear_along(self._right_obstacle_detected()):
                 self._next_avoid_step()
             return
 

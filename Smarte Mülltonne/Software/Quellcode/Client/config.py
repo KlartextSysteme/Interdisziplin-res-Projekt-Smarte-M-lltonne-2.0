@@ -45,6 +45,14 @@ POST_STATUS_MS = 8000
 ENABLE_BACKEND_ACTIONS = False
 ADMIN_TOKEN = ""
 
+# WLAN + TCP-Bridge (Demo-Netz "SmartBinDemo"). Diese Werte sind mit der
+# erprobten Inline-Firmware identisch, damit Bridge/Web-App unveraendert laufen.
+ENABLE_TCP_BRIDGE = True
+WLAN_SSID = "SmartBinDemo"
+WLAN_PASSWORD = "SmartBin2026!"
+BRIDGE_HOST = "192.168.50.10"
+BRIDGE_PORT = 50002
+
 # Local maintenance PIN. The on-screen keypad supports digits plus * and #.
 MAINTENANCE_PIN = "12#"
 

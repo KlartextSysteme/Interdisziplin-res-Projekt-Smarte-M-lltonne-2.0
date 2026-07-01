@@ -1,4 +1,4 @@
-from time import sleep_ms
+from time import sleep_ms, ticks_ms, ticks_diff
 
 from buzzer import Buzzer
 from global_controller_test import GlobalController
@@ -9,7 +9,14 @@ from steppermotor import DualStepperMotorPWM
 from touchpanel import Touchpanel
 from ultraschallsensor import FuellstandSensor, HindernisSensoren
 
-#from tcp_bridge_client import TcpBridgeClient
+from tcp_bridge_client import TcpBridgeClient
+from config import (
+    ENABLE_TCP_BRIDGE,
+    WLAN_SSID,
+    WLAN_PASSWORD,
+    BRIDGE_HOST,
+    BRIDGE_PORT,
+)
 
 
 # Pins laut aktuellem Pico-Pinout
@@ -66,7 +73,10 @@ def create_controller():
         left_channel=US_LEFT_CHANNEL,
         right_channel=US_RIGHT_CHANNEL,
         stop_cm=30,
-        side_clear_cm=80,
+        side_clear_cm=40,
+        # Ohne Echo (freie Fahrt) sonst 30ms Block pro Messung -> Regel-Jitter.
+        # 8000us decken ~138cm ab, mehr wird fuers Hindernis nicht gebraucht.
+        timeout_us=8000,
     )
 
     fuellstand_sensor = FuellstandSensor(
@@ -107,42 +117,57 @@ def create_controller():
         buzzer=buzzer,
         fuellstand_sensor=fuellstand_sensor,
         touchpanel=None,
-        base_speed=45,
+        base_speed=60,
         min_speed=0,
         max_speed=95,
     )
-
-    # network_client = TcpBridgeClient(
-    #     ssid="DEIN_WLAN_NAME",
-    #     password="DEIN_WLAN_PASSWORT",
-    #     bridge_host="IP_DES_LAPTOPS",
-    #     bridge_port=50002,
-    #     command_handler=controller.handle_network_command,
-    #     status_provider=controller.get_network_status,
-    # )
-    
-    #network_client.start()
 
     touchpanel = Touchpanel(action_handler=controller.handle_touch_action)
     touchpanel.init()
     controller.touchpanel = touchpanel
 
-    return controller#, network_client
+    network_client = None
+    if ENABLE_TCP_BRIDGE:
+        network_client = TcpBridgeClient(
+            ssid=WLAN_SSID,
+            password=WLAN_PASSWORD,
+            bridge_host=BRIDGE_HOST,
+            bridge_port=BRIDGE_PORT,
+            command_handler=controller.handle_network_command,
+            status_provider=controller.get_network_status,
+        )
+        controller.set_network_client(network_client)
+        network_client.start()
+
+    return controller, network_client
 
 
 
-#controller, network_client = create_controller()
-controller = create_controller()
+controller, network_client = create_controller()
 
 print("Main gestartet")
 print("Touchpanel: ABHOLUNG -> goto_street, HEIM -> goto_home")
 print("Zum Stoppen: Strg+C / Reset")
 
+last_net_ms = ticks_ms()
+
 try:
     while True:
         controller.run()
-        #network_client.tick()
-        sleep_ms(20)
+
+        # Netzwerk gedrosselt bedienen (nicht-blockierend): Befehle empfangen +
+        # STATUS senden. So bleibt der enge Regeltakt der Fahrt ungestoert und
+        # ein CMD_STOP aus der Web-App greift trotzdem mitten in der Fahrt.
+        if network_client is not None:
+            now = ticks_ms()
+            if ticks_diff(now, last_net_ms) >= 40:
+                last_net_ms = now
+                try:
+                    network_client.tick()
+                except Exception as exc:
+                    print("network tick failed:", exc)
+
+        sleep_ms(5)
 except KeyboardInterrupt:
     controller.stop()
     print("Main gestoppt")
