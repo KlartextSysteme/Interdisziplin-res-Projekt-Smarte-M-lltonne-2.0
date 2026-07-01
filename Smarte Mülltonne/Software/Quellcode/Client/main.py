@@ -86,10 +86,10 @@ def create_controller():
     )
 
     pd_controller = PDController(
-        kp=18,
+        kp=32,
         kd=2,
         target_position=0,
-        max_correction=28,
+        max_correction=60,
     )
 
     motors = DualStepperMotorPWM(

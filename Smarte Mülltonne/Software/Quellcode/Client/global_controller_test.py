@@ -637,9 +637,7 @@ class GlobalController:
                 self.set_state(self.STATE_OBSTACLE_WAIT)
                 return
 
-        self.line_sensor.update(force=True)
         position = self.line_sensor.get_position()
-        line_values = self.line_sensor.read_values()
 
         if position == "end_marker":
             self.motors.stop()
@@ -703,6 +701,8 @@ class GlobalController:
             max_speed=self.max_speed,
         )
 
+        line_values = self.line_sensor.read_values()
+
         self._debug_print(
             "LINE_FOLLOWING | Ziel: "
             + str(self.drive_target)
@@ -742,7 +742,6 @@ class GlobalController:
 
         position = None
         if self.line_sensor is not None:
-            self.line_sensor.update(force=True)
             position = self.line_sensor.get_position()
 
         # Kein set_status pro Tick: LINE_LOST flattert bei duenner Linie staendig,
