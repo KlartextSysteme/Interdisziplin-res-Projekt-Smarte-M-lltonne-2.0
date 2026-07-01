@@ -271,6 +271,12 @@ US_STOP_CM = 15
 US_INTERVAL_MS = 120
 US_TIMEOUT_US = 30000
 
+# Füllstandsanzeige über den vorderen Ultraschallsensor (portiert aus dem
+# modularen FuellstandSensor): leerer Abstand -> 0 %, voller Abstand -> 100 %.
+FUELLSTAND_LEER_CM = 40.0
+FUELLSTAND_VOLL_CM = 5.0
+FILL_MEASURE_INTERVAL_MS = 2000
+
 us_trigger = Pin(US_TRIGGER_PIN, Pin.OUT)
 us_trigger.value(0)
 
@@ -576,6 +582,25 @@ def obstacle_detected(distance_cm):
     return distance_cm is not None and distance_cm <= US_STOP_CM
 
 
+def measure_fill_percent():
+    # Füllstand aus dem vorderen Ultraschallsensor: leer -> 0 %, voll -> 100 %.
+    # Rueckgabe None bei fehlendem Echo (z.B. Deckel offen / kein Reflex).
+    distance = measure_ultrasonic(US_FRONT_CHANNEL)
+    if distance is None:
+        return None
+    if distance >= FUELLSTAND_LEER_CM:
+        return 0
+    if distance <= FUELLSTAND_VOLL_CM:
+        return 100
+    span = FUELLSTAND_LEER_CM - FUELLSTAND_VOLL_CM
+    ratio = (FUELLSTAND_LEER_CM - distance) / span
+    if ratio < 0.0:
+        ratio = 0.0
+    if ratio > 1.0:
+        ratio = 1.0
+    return int(round(ratio * 100))
+
+
 def calculate_line_position(values):
     if all(value == LINE_DETECTED_VALUE for value in values):
         return "street"
@@ -808,11 +833,24 @@ def main():
         print("TCP bridge client aktiv:", BRIDGE_HOST, BRIDGE_PORT)
 
     last_touch = False
+    last_fill_ms = ticks_ms()
+    last_fill_shown = None
 
     while True:
         ui.tick()
         if bridge_client is not None:
             bridge_client.tick()
+
+        # Füllstand periodisch messen und im Status-Screen anzeigen. Laeuft nur
+        # im Leerlauf (waehrend einer Fahrt blockiert diese Schleife ohnehin) und
+        # zeichnet nur bei Aenderung neu (kein Flackern).
+        if ticks_diff(ticks_ms(), last_fill_ms) >= FILL_MEASURE_INTERVAL_MS:
+            last_fill_ms = ticks_ms()
+            fill = measure_fill_percent()
+            if fill is not None and fill != last_fill_shown and ui is not None:
+                last_fill_shown = fill
+                ui.set_status(fill_level=fill)
+
         data = touch.read_screen()
 
         if data is not None:
