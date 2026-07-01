@@ -47,19 +47,19 @@ class DualStepper:
         self.move_together(steps, left_dir=1, right_dir=0)
 
     def rueckwaerts_fahrt(self, steps):
-        self.move_together(steps, left_dir=1, right_dir=0)
+        self.move_together(steps, left_dir=0, right_dir=1)
 
     def drehung_90_links(self):
-        self.move_together(STEPS_90_GRAD, left_dir=0, right_dir=1)
+        self.move_together(STEPS_90_GRAD, left_dir=0, right_dir=0)
 
     def drehung_90_rechts(self):
-        self.move_together(STEPS_90_GRAD, left_dir=1, right_dir=0)
+        self.move_together(STEPS_90_GRAD, left_dir=1, right_dir=1)
 
     def drehung_180_links(self):
-        self.move_together(STEPS_180_GRAD, left_dir=0, right_dir=1)
+        self.move_together(STEPS_180_GRAD, left_dir=0, right_dir=0)
 
     def drehung_180_rechts(self):
-        self.move_together(STEPS_180_GRAD, left_dir=1, right_dir=0)
+        self.move_together(STEPS_180_GRAD, left_dir=1, right_dir=1)
 
 
 # -------------------------------------------------

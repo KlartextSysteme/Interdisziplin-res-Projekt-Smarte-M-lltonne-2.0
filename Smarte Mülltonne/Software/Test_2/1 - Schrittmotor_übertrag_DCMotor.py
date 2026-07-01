@@ -166,16 +166,22 @@ motors = DualStepperMotorPWM(
     enable_active_value=1,
     name="Muelltonne"
 )
+try: 
+    while True:
+        motors.move_steps(20000, "forward", 80)
+        sleep(1)
 
-while True:
-    motors.move_steps(20000, "forward", 80)
-    sleep(1)
+        motors.move_steps(20000, "backward", 80)
+        sleep(1)
 
-    motors.move_steps(20000, "backward", 80)
-    sleep(1)
+        motors.move_steps(20000, "turn_left", 80)
+        sleep(1)
 
-    motors.move_steps(29980, "turn_left", 80)
-    sleep(1)
+        motors.move_steps(20000, "turn_right", 80)
+        sleep(1)
 
-    #motors.move_steps(29980, "turn_right", 80)
-    #sleep(1)
+except KeyboardInterrupt:
+    pass
+finally:
+    motors.stop()
+    print("Linienfolger gestoppt")

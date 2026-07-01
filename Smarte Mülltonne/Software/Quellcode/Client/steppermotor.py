@@ -173,16 +173,16 @@ class DualStepperMotorPWM:
         self._apply_pwm(
             speed,
             speed,
-            1 - self.left_forward_dir,
-            self.right_forward_dir,
+            self.left_forward_dir,
+            1 - self.right_forward_dir,
         )
 
     def turn_right(self, speed):
         self._apply_pwm(
             speed,
             speed,
-            self.left_forward_dir,
-            1 - self.right_forward_dir,
+            1 - self.left_forward_dir,
+            self.right_forward_dir,
         )
 
     def steps_to_ms(self, steps, speed):
