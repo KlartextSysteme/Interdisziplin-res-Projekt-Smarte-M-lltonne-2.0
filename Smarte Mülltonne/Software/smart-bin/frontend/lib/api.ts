@@ -107,8 +107,8 @@ export interface DemoStatus {
 }
 
 export const getDemoStatus = () => get<DemoStatus>("/admin/demo/status");
-export const resetDemoScenario = (body: DemoResetRequest) =>
-  post<DemoStatus>("/admin/demo/reset", body);
+export const resetDemoScenario = (body: DemoResetRequest, token: string) =>
+  post<DemoStatus>("/admin/demo/reset", body, { "X-Admin-Token": token });
 
 // --- Security ---
 export const getSecurityEvents = () => get<SecurityEvent[]>("/security/events");

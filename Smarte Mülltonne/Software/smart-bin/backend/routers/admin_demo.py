@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -182,7 +182,9 @@ def get_demo_status(db: Session = Depends(get_db)):
 
 
 @router.post("/reset", response_model=DemoStatus)
-def reset_demo(payload: DemoResetRequest, db: Session = Depends(get_db)):
+def reset_demo(payload: DemoResetRequest, x_admin_token: str = Header(default=""), db: Session = Depends(get_db)):
+    if x_admin_token != settings.admin_token:
+        raise HTTPException(status_code=403, detail="Invalid admin token")
     seed = payload.seed if payload.seed is not None else int(time.time())
     rng = random.Random(seed)
     now = datetime.now(timezone.utc)

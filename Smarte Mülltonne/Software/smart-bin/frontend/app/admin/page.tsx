@@ -107,7 +107,7 @@ export default function AdminPage() {
         include_alerts: includeAlerts,
         sim_speed: simSpeed,
         sim_paused: simPaused,
-      });
+      }, process.env.NEXT_PUBLIC_ADMIN_TOKEN ?? "changeme");
       setStatus(result);
       setSeed(nextSeed());
     } catch (err) {

@@ -147,7 +147,7 @@ def dispatch_truck(focus: str = "") -> str:
     chosen, _ = _plan_and_select(focus)
     if not chosen:
         return "Keine vollen Tonnen — keine Abholung nötig."
-    httpx.post(f"{BASE_URL}/truck/command", json={"action": "start"}, timeout=10)
+    httpx.post(f"{BASE_URL}/truck/command", json={"action": "start"}, headers=_admin_headers(), timeout=10)
     km = (chosen.get("distance_m") or 0) / 1000
     mins = round((chosen.get("duration_s") or 0) / 60)
     return (
@@ -159,7 +159,7 @@ def dispatch_truck(focus: str = "") -> str:
 @tool
 def send_command(action: str) -> str:
     """Fahrzeug steuern. action: start | pause | stop."""
-    resp = httpx.post(f"{BASE_URL}/truck/command", json={"action": action}, timeout=10)
+    resp = httpx.post(f"{BASE_URL}/truck/command", json={"action": action}, headers=_admin_headers(), timeout=10)
     return resp.text
 
 

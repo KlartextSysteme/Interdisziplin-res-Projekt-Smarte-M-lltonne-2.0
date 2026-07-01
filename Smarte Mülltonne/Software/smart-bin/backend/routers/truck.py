@@ -1,9 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 import truck_state
+from config import settings
 
 router = APIRouter()
+
+ALLOWED_ACTIONS = {"start", "pause", "stop"}
 
 
 class TruckPosition(BaseModel):
@@ -30,6 +33,10 @@ def update_position(payload: TruckPosition):
 
 
 @router.post("/command")
-def command(payload: TruckCommand):
+def command(payload: TruckCommand, x_admin_token: str = Header(default="")):
+    if x_admin_token != settings.admin_token:
+        raise HTTPException(status_code=403, detail="Invalid admin token")
+    if payload.action not in ALLOWED_ACTIONS:
+        raise HTTPException(status_code=400, detail=f"Invalid truck action: {payload.action}")
     # TODO: forward command to RPi; for now just update state
     return truck_state.update(action=payload.action)
