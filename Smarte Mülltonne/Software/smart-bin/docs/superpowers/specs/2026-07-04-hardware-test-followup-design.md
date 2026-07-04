@@ -10,8 +10,9 @@ Sechs unabhängige Punkte über Backend, Frontend und Firmware.
 - **Frontend** (`smart-bin/frontend`): Next.js Leitstand (`app/dashboard`).
 - **Firmware** (`Quellcode/Client` = laufender Stack, `smart-bin/firmware/pico_touchpanel/ui.py` = laufende UI).
 
-Reihenfolge: **A+B (Web, per pytest/Preview testbar)** → **C+D (Firmware Diagnose)**
-→ **E+F (Hardware-Kalibrierung am Pico, gemeinsame Session)**.
+Reihenfolge: **A+B (Web, per pytest/Preview testbar)** → **D (Firmware Diagnose-Werte)**
+→ **E+F (Hardware-Kalibrierung am Pico, gemeinsame Session)**. (C reklassifiziert →
+in E aufgegangen.)
 
 ---
 
@@ -55,15 +56,17 @@ Pydantic/ORM gibt den Wert ohne Offset aus. Das Frontend
 interpretiert den offset-losen String als lokal → 2 h Versatz.
 
 **Design (Backend UTC-aware):**
-- Gemeinsamer Helper, der Zeitwerte als UTC-aware ISO-8601 mit `Z`/`+00:00` ausgibt.
-- Anwenden auf die im Leitstand sichtbaren Zeitfelder: `SecurityEvent.timestamp`
-  und `Bin.last_seen` — über Pydantic-Response-Schemas mit Field-Serializer
-  (Endpoints geben aktuell rohe ORM-Objekte zurück; hier Response-Modelle einführen
-  bzw. Serializer ergänzen).
-- Frontend bleibt unverändert (`toLocaleString` konvertiert dann korrekt nach CEST).
+- Pydantic-Response-Schema `SecurityEventOut` mit Field-Serializer, der `timestamp`
+  als UTC-aware ISO-8601 mit `Z` ausgibt (Endpoints geben aktuell rohe ORM-Objekte
+  zurück → `response_model` einführen).
+- **Scope-Fokus (bei Plan-Erstellung verifiziert):** Nur `SecurityEvent.timestamp`.
+  `Bin.last_seen` wird im echten Leitstand **nirgends als Uhrzeit** angezeigt (nur in
+  `lib/demo.ts`-Mockdaten), daher **nicht** Teil des Fixes (kein `BinOut`-Umbau, YAGNI).
+- Fixt beide Anzeigen: `SecurityPanel.tsx:62` und `AlertBanner.tsx:36` hängen beide
+  an `event.timestamp`. Frontend bleibt unverändert (`toLocaleString` konvertiert
+  dann korrekt nach CEST).
 
-**Betroffene Dateien:** `backend/routers/security.py`, `backend/routers/bins.py`
-(bzw. das/die Schema-Modul(e)), ggf. neuer `backend/schemas`-Helper.
+**Betroffene Dateien:** `backend/routers/security.py` (Response-Schema + `response_model`).
 
 **Akzeptanz / Test:** Neuer Backend-Test: `GET /security/events` liefert
 `timestamp`, der auf `Z`/`+00:00` endet; ein bekannter UTC-Wert erscheint nach
@@ -71,25 +74,22 @@ Frontend-Konvertierung als korrekte CEST-Zeit (manuell/Preview gegengeprüft).
 
 ---
 
-## C — Diagnose-Panel: Zurück-Button
+## C — Diagnose-Panel: Zurück-Button — REKLASSIFIZIERT (kein eigener Task)
 
-**Problem:** Der Zurück-Button im Diagnose-Panel funktioniert nicht/sehr schlecht —
-obwohl er größer (vollflächig) ist als die anderen.
+**ERRATUM (bei der Plan-Erstellung korrigiert):** Ursprünglich als Code-Bug
+angenommen. Beim Nachlesen des exakten Codes zeigte sich: `draw_diagnose()`
+(`ui.py:310`) setzt `self.buttons = [Button(92, 188, 136, 46, "menu_2")]` — die
+Aktion `"menu_2"` **wird** in `handle_action()` behandelt (`→ SCREEN_MENU_2`).
+**Kein Code-Bug.** (Der `confirm_back`-Button aus `ui.py:315` gehört zu
+`draw_confirm`, nicht zum Diagnose-Panel.)
 
-**Ursache:** **Kein** Trefferflächen-Problem. `ui.py:315` setzt
-`self.buttons = [Button(0, 0, 320, 240, "confirm_back")]`, aber `handle_action()`
-(`ui.py:117`–`139`) hat **keinen** Zweig für `"confirm_back"` → der Tap wird
-ausgewertet, löst aber keine Aktion aus.
+**Tatsächliche Ursache:** Der Button sitzt bei `y = 188…234`, also ganz **unten am
+Bildschirmrand** (max 240). Beim beschriebenen Touch-Versatz („Boxen sitzen leicht
+unter den Buttons") landet ein Tap dort bei `y ≈ 234–240+` → am/über dem Rand →
+Fehltreffer. Damit ist dieser breite, aber randständige Button der am schlechtesten
+treffbare. → **Symptom der Touch-Fehlkalibrierung, wird von Punkt E behoben.**
 
-**Design:** Diagnose-Zurück-Button auf eine behandelte Aktion umstellen; Rücksprung
-nach `SCREEN_MENU_2` (dort wird Diagnose gestartet, `ui.py:321`). Vollflächiger
-Tap-to-back bleibt. Entweder eigenen Handler-Zweig ergänzen oder eine bestehende
-behandelte Aktion (z.B. `menu_2`) verwenden.
-
-**Betroffene Dateien:** `smart-bin/firmware/pico_touchpanel/ui.py`
-(+ Repo-Konsistenz `Quellcode/Client/ui.py`, falls vorhanden).
-
-**Akzeptanz:** Tippen auf das Diagnose-Panel führt zuverlässig zurück ins Menü.
+**Konsequenz:** Kein separater Task. Verifikation wandert in die Akzeptanz von E.
 
 ---
 
@@ -139,7 +139,10 @@ Einzelmessung ohne Mittelung (nicht Teil dieses Fixes — bewusst außen vor gel
 **Betroffene Dateien:** `Quellcode/Client/config.py` (Kalibrierkonstanten).
 
 **Akzeptanz:** Touch-Treffer decken sich mit den sichtbaren Buttons (kein
-„sitzt drunter"); alle Menü-/PIN-Buttons zuverlässig bedienbar.
+„sitzt drunter"); alle Menü-/PIN-Buttons zuverlässig bedienbar. **Inkl. Gegenprobe
+Punkt C:** der Diagnose-Zurück-Button (unterster Button, `y=188…234`) trifft nach
+der Kalibrierung zuverlässig. Falls er trotz sauberer Kalibrierung am Rand zickt →
+Nachtrag: Button höher/größer setzen (`ui.py` `draw_diagnose`).
 
 **Hinweis:** Erfordert USB + Operator am Panel. Fällt-back auf Offset-Korrektur/
 Mehrfachmessung nur, falls die reine Neukalibrierung das Problem nicht löst
