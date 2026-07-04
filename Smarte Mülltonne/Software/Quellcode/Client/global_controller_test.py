@@ -162,6 +162,19 @@ class GlobalController:
         # set_network_client gesetzt; None = rein lokal ueber Touchpanel.
         self.network_client = None
 
+        # --- Security: unbefugte Deckeloeffnung ---
+        # Deckel offen (Fuellstand kein Echo) UND scharf -> sofort Buzzer + Meldung.
+        # scharf = ausser Haus UND nicht durch Truck entschaerft. _disarm_by_truck
+        # kommt vom Backend via Bridge (ARM/DISARM).
+        self._disarm_by_truck = False
+        self._lid_alarm_active = False
+        self._last_lid_check_ms = time.ticks_ms()
+        self.lid_check_interval_ms = 500
+        self.security_alarm_pattern = [
+            (True, 150), (False, 90), (True, 150), (False, 90),
+            (True, 150), (False, 350),
+        ]
+
         # Anfahr-Rampe (exponentieller Anlauf): das Reisetempo ist self.base_speed,
         # bei jeder frischen Fahrt startet die Geschwindigkeit bei ramp_start_speed
         # und naehert sich exponentiell (Zeitkonstante ramp_tau_ms) dem Reisetempo.
@@ -564,6 +577,37 @@ class GlobalController:
                 self.party_buzzer_started = True
             self.buzzer.run()
 
+    def _security_lid_check(self):
+        """Querschnitt: Deckeloeffnung erkennen und ggf. Alarm ausloesen.
+        scharf = ausser Haus UND nicht durch Truck entschaerft."""
+        now = time.ticks_ms()
+        if time.ticks_diff(now, self._last_lid_check_ms) >= self.lid_check_interval_ms:
+            self._last_lid_check_ms = now
+            if self.fuellstand_sensor is not None:
+                self.fuellstand_sensor.run(force=True)
+                lid_open = self.fuellstand_sensor.is_deckel_offen()
+                armed = (
+                    self.state not in (self.STATE_AT_HOME, self.STATE_PARTY)
+                    and not self._disarm_by_truck
+                )
+                if lid_open and armed:
+                    if not self._lid_alarm_active:
+                        # Neue unbefugte Oeffnung -> Alarm + einmalige Meldung.
+                        self._lid_alarm_active = True
+                        print("SECURITY: unbefugte Deckeloeffnung!")
+                        self._bridge_send("REPORT:UNAUTHORIZED_OPEN")
+                        if self.buzzer is not None:
+                            self.buzzer.play(self.security_alarm_pattern, repeat=True)
+                elif self._lid_alarm_active:
+                    # Deckel zu ODER entschaerft -> Alarm beenden.
+                    self._lid_alarm_active = False
+                    if self.buzzer is not None:
+                        self.buzzer.stop()
+
+        # Alarm-Sound jeden Tick weitertreiben.
+        if self._lid_alarm_active and self.buzzer is not None:
+            self.buzzer.run()
+
     def set_network_client(self, client):
         """Verknuepft den TCP-Bridge-Client fuer Web-App-Steuerung/Status."""
         self.network_client = client
@@ -584,6 +628,14 @@ class GlobalController:
         print("Network-Command:", cmd)
 
         if cmd.startswith("ACK_RECEIVED"):
+            return
+
+        if cmd == "DISARM":
+            # Truck aktiv am Leeren -> Deckeloeffnung erlaubt.
+            self._disarm_by_truck = True
+            return
+        if cmd == "ARM":
+            self._disarm_by_truck = False
             return
 
         if cmd in ("CMD_GOTO_STREET", "GOTO_STREET", "goto_street", "goto_pickup"):
@@ -674,6 +726,9 @@ class GlobalController:
             self._logic_manual_return_home_request()
         elif self.state == self.STATE_PARTY:
             self._logic_party()
+
+        # Querschnitt: Deckel-Security in JEDEM Zustand pruefen.
+        self._security_lid_check()
 
     def _logic_at_home(self):
         if self.motors is not None:
