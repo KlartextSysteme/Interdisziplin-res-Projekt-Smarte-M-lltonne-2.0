@@ -1,13 +1,20 @@
 from datetime import datetime, timezone
+from math import hypot
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import truck_state
 from database import get_db
 from models.bin import Bin
 from models.event import SecurityEvent
 
 router = APIRouter()
+
+# Radius, innerhalb dessen der Truck als "aktiv am Leeren" gilt und die Tonne
+# entschaerft wird. Gleiche Wahrheit wie truck_simulator.ARRIVAL_THRESHOLD_M.
+DISARM_RADIUS_M = 10.0
 
 
 class BinUpdate(BaseModel):
@@ -229,4 +236,32 @@ def update_pico_telemetry(bin_id: int, payload: PicoTelemetry, db: Session = Dep
         "pico_state": payload.pico_state,
         "status": b.status,
         "fill_level": b.fill_level,
+    }
+
+
+def _truck_near_bin(b: Bin) -> tuple[bool, float | None]:
+    """True, wenn der Truck aktiv am Leeren ist (<= DISARM_RADIUS_M von der Tonne)."""
+    truck = truck_state.get()
+    tlat, tlng = truck.get("lat"), truck.get("lng")
+    blat = b.current_lat if b.current_lat is not None else b.lat
+    blng = b.current_lng if b.current_lng is not None else b.lng
+    if tlat is None or tlng is None or blat is None or blng is None:
+        return False, None
+    dist_m = hypot((tlat - blat) * 111_000, (tlng - blng) * 71_000)
+    return dist_m <= DISARM_RADIUS_M, dist_m
+
+
+@router.get("/{bin_id}/arm-state")
+def get_arm_state(bin_id: int, db: Session = Depends(get_db)):
+    """Security-Geofence: ist der Truck nah genug, um die Tonne zu entschaerfen
+    (Leerung)? Die Bridge pollt das und reicht ARM/DISARM an den Pico weiter.
+    Der Pico kombiniert es mit seinem eigenen 'zuhause'-Wissen."""
+    b = db.query(Bin).filter(Bin.id == bin_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Bin not found")
+    near, dist_m = _truck_near_bin(b)
+    return {
+        "bin_id": bin_id,
+        "disarmed": near,          # True = Truck am Leeren -> nicht scharf
+        "distance_m": round(dist_m, 1) if dist_m is not None else None,
     }
