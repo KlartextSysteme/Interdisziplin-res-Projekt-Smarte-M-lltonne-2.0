@@ -493,6 +493,11 @@ class GlobalController:
             self._bridge_send("REPORT:HYGIENE")
             return
 
+        if action == "eco":
+            if self.touchpanel is not None:
+                self.touchpanel.toggle_eco()
+            return
+
         if action == "shutdown":
             self.stop()
             return

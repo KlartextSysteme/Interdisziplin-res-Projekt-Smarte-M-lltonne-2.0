@@ -1,4 +1,4 @@
-from machine import Pin
+from machine import Pin, PWM
 from time import sleep_ms
 
 from config import PIN_BACKLIGHT
@@ -22,6 +22,7 @@ class Touchpanel:
         self.touch = None
         self.ui = None
         self.backlight = None
+        self.eco = False
         self.last_touch = False
 
     def init(self):
@@ -34,12 +35,36 @@ class Touchpanel:
         self.ui = TouchUi(self.display, action_handler=self._handle_action)
         self.ui.draw()
 
-    def set_backlight(self, enabled):
+    # Backlight ueber PWM (dimmbar): volle Helligkeit = DUTY_NORMAL, Eco = DUTY_ECO.
+    BACKLIGHT_FREQ = 1000
+    DUTY_NORMAL = 65535
+    DUTY_ECO = 26214       # ~40 % Helligkeit
+
+    def _ensure_backlight(self):
         if PIN_BACKLIGHT is None:
             return
         if self.backlight is None:
-            self.backlight = Pin(PIN_BACKLIGHT, Pin.OUT, value=1)
-        self.backlight.value(1 if enabled else 0)
+            self.backlight = PWM(Pin(PIN_BACKLIGHT))
+            self.backlight.freq(self.BACKLIGHT_FREQ)
+
+    def _target_duty(self):
+        return self.DUTY_ECO if self.eco else self.DUTY_NORMAL
+
+    def set_backlight(self, enabled):
+        # enabled=True -> aktuelle Helligkeit (normal/eco), False -> aus.
+        self._ensure_backlight()
+        if self.backlight is None:
+            return
+        self.backlight.duty_u16(self._target_duty() if enabled else 0)
+
+    def set_eco(self, enabled):
+        self.eco = bool(enabled)
+        self._ensure_backlight()
+        if self.backlight is not None:
+            self.backlight.duty_u16(self._target_duty())
+
+    def toggle_eco(self):
+        self.set_eco(not self.eco)
 
     def _handle_action(self, action):
         if self.action_handler:

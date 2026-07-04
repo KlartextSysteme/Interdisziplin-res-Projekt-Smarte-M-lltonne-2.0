@@ -26,8 +26,8 @@ TOUCH_SWAP_XY = True
 TOUCH_INVERT_X = True
 TOUCH_INVERT_Y = True
 
-# Optional display backlight pin. Set to the real BL pin when wired.
-PIN_BACKLIGHT = None
+# Display backlight pin (GPIO 15), per PWM dimmbar (Eco-Modus).
+PIN_BACKLIGHT = 15
 
 # Landscape UI target.
 WIDTH = 320
