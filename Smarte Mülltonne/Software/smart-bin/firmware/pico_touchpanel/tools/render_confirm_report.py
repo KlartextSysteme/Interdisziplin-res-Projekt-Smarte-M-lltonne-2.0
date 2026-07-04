@@ -19,11 +19,15 @@ sx = (W - sq) // 2
 sy = 50
 d.rounded_rectangle([sx, sy, sx + sq, sy + sq], radius=18, fill=YELLOW)
 
-# Dunkles Haekchen (BG-Farbe) im Quadrat, proportional zum 87er-Quadrat
-d.line(
-    [(sx + 22, sy + 46), (sx + 37, sy + 61), (sx + 65, sy + 28)],
-    fill=BG, width=8, joint="curve",
-)
+# Dunkles Haekchen (BG-Farbe) im Quadrat, proportional zum 87er-Quadrat.
+# joint="curve" rundet die Ecke; zusaetzlich runde Endkappen (Kreise) an den
+# beiden Haken-Enden, damit es zu den anderen Icons passt (keine flachen Enden).
+CHK = [(sx + 22, sy + 46), (sx + 37, sy + 61), (sx + 65, sy + 28)]
+CW = 8
+d.line(CHK, fill=BG, width=CW, joint="curve")
+_r = CW / 2
+for (cx, cy) in (CHK[0], CHK[-1]):
+    d.ellipse([cx - _r, cy - _r, cx + _r, cy + _r], fill=BG)
 
 # Text "Meldung gesendet", weiss, fett, zentriert darunter
 FONT_CANDIDATES = [
