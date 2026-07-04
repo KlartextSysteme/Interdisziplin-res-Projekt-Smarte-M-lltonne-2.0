@@ -7,7 +7,7 @@ from multiplexer import Multiplexer
 from PDcontroller import PDController
 from steppermotor import DualStepperMotorPWM
 from touchpanel import Touchpanel
-from ultraschallsensor import FuellstandSensor, HindernisSensoren
+from ultraschallsensor import FuellstandSensor, HindernisSensoren, UltraschallsensorMUX
 
 from tcp_bridge_client import TcpBridgeClient
 from config import (
@@ -19,20 +19,21 @@ from config import (
 )
 
 
-# Pins laut aktuellem Pico-Pinout
-MUX_S0_PIN = 2
-MUX_S1_PIN = 3
-MUX_S2_PIN = 4
-MUX_S3_PIN = 5
-MUX_SIGNAL_PIN = 28
+# Pins laut aktuellem Pico-Pinout (MUX-Steuerung: GP1-GP4 = S0-S3, GP5 = SIG)
+MUX_S0_PIN = 1
+MUX_S1_PIN = 2
+MUX_S2_PIN = 3
+MUX_S3_PIN = 4
+MUX_SIGNAL_PIN = 5
 
 US_TRIGGER_PIN = 6
 US_FRONT_CHANNEL = 5
 US_LEFT_CHANNEL = 7
 US_RIGHT_CHANNEL = 6
 
-# Testweise nutzt der Füllstand aktuell den vorderen US-Sensor.
+# Füllstand hat einen eigenen MUX-Kanal (C8), gemeinsamer Trigger mit den US-Sensoren.
 # Werte nach dem Test am realen Aufbau kalibrieren.
+FUELLSTAND_CHANNEL = 8
 FUELLSTAND_LEER_CM = 40
 FUELLSTAND_VOLL_CM = 5
 
@@ -79,8 +80,16 @@ def create_controller():
         timeout_us=8000,
     )
 
+    fuellstand_us = UltraschallsensorMUX(
+        multiplexer=mux,
+        trigger_pin=US_TRIGGER_PIN,
+        echo_channel=FUELLSTAND_CHANNEL,
+        timeout_us=8000,
+        name="US Fuellstand",
+    )
+
     fuellstand_sensor = FuellstandSensor(
-        ultrasonic=obstacle_sensors.front,
+        ultrasonic=fuellstand_us,
         leer_abstand_cm=FUELLSTAND_LEER_CM,
         voll_abstand_cm=FUELLSTAND_VOLL_CM,
     )

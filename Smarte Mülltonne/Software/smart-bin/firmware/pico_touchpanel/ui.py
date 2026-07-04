@@ -171,6 +171,8 @@ class TouchUi:
         elif action == "disconnect":
             self.connected = False
             asset = "confirm_disconnected"
+        elif action in ("report_damage", "report_hygiene"):
+            asset = "confirm_report"
         else:
             asset = "confirm_generic"
 

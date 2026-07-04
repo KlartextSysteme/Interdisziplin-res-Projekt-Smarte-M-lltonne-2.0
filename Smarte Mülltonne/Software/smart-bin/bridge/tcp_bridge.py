@@ -171,6 +171,15 @@ class PicoBridge:
             await writer.drain()
             return
 
+        if line.startswith("REPORT:"):
+            kind = line.split(":", 1)[1].strip().upper()
+            event_type = {"DAMAGE": "damage_report", "HYGIENE": "hygiene_report"}.get(kind)
+            if event_type is None:
+                LOGGER.warning("unknown report kind: %s", kind)
+                return
+            await self._post_report(event_type)
+            return
+
         LOGGER.debug("ignored pico line: %s", line)
 
     async def _post_telemetry(
@@ -188,6 +197,14 @@ class PicoBridge:
             json=payload,
         )
         resp.raise_for_status()
+
+    async def _post_report(self, event_type: str) -> None:
+        resp = await self.client.post(
+            f"{self.backend_url}/security/events",
+            json={"bin_id": self.state.bin_id, "event_type": event_type},
+        )
+        resp.raise_for_status()
+        LOGGER.info("report %s -> backend for bin %s", event_type, self.state.bin_id)
 
     async def _ack_backend(
         self,
