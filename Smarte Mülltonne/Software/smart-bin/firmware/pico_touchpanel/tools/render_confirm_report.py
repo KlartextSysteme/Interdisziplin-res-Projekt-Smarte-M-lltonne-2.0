@@ -13,16 +13,16 @@ WHITE = (255, 255, 255)
 img = Image.new("RGB", (W, H), BG)
 d = ImageDraw.Draw(img)
 
-# Gelbes abgerundetes Quadrat, zentriert (wie Referenz: ~96px, oben mittig)
-sq = 96
+# Gelbes abgerundetes Quadrat, zentriert (Referenz: 87x88 bei y=50)
+sq = 87
 sx = (W - sq) // 2
-sy = 44
-d.rounded_rectangle([sx, sy, sx + sq, sy + sq], radius=20, fill=YELLOW)
+sy = 50
+d.rounded_rectangle([sx, sy, sx + sq, sy + sq], radius=18, fill=YELLOW)
 
-# Dunkles Haekchen (BG-Farbe) im Quadrat
+# Dunkles Haekchen (BG-Farbe) im Quadrat, proportional zum 87er-Quadrat
 d.line(
-    [(sx + 26, sy + 50), (sx + 42, sy + 66), (sx + 72, sy + 32)],
-    fill=BG, width=11, joint="curve",
+    [(sx + 22, sy + 46), (sx + 37, sy + 61), (sx + 65, sy + 28)],
+    fill=BG, width=8, joint="curve",
 )
 
 # Text "Meldung gesendet", weiss, fett, zentriert darunter
@@ -44,14 +44,24 @@ def _load_font(size):
     return ImageFont.load_default()
 
 
-size = 30
+def _text_h(f):
+    bb = d.textbbox((0, 0), text, font=f)
+    return bb[3] - bb[1]
+
+
+TARGET_H = 17            # Texthoehe wie Referenz "Auswahl bestaetigt"
+TEXT_CENTER_Y = 178      # vertikale Text-Mitte wie Referenz
+size = 24
 font = _load_font(size)
-while d.textlength(text, font=font) > W - 40 and size > 12:
+while _text_h(font) > TARGET_H and size > 8:
     size -= 1
     font = _load_font(size)
 
-tw = d.textlength(text, font=font)
-d.text(((W - tw) // 2, 170), text, fill=WHITE, font=font)
+bb = d.textbbox((0, 0), text, font=font)
+tw, th = bb[2] - bb[0], bb[3] - bb[1]
+tx = (W - tw) // 2 - bb[0]
+ty = TEXT_CENTER_Y - th // 2 - bb[1]
+d.text((tx, ty), text, fill=WHITE, font=font)
 
 img.save("confirm_report.png")
-print("OK size", size)
+print("OK size", size, "text_h", th)
