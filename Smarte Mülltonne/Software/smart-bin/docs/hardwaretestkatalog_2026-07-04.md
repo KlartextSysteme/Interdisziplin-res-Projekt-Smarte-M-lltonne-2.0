@@ -4,9 +4,9 @@ Offene End-to-End-Tests am **physischen Pico**, die sich seit dem letzten
 Hardware-Lauf angesammelt haben. Alle Features sind codeseitig fertig, committet
 und `py_compile`-grün — sie brauchen nur noch die Verifikation an der echten Tonne.
 
-## Deploy (einmal vor den Tests)
+## Setup vor den Tests
 
-Modularer Client-Stack auf den Pico (`DEV=/dev/cu.usbmodem14301`):
+### A) Pico flashen (`DEV=/dev/cu.usbmodem14301`)
 
 ```bash
 cd "Smarte Mülltonne/Software"; DEV=/dev/cu.usbmodem14301
@@ -20,8 +20,28 @@ mpremote connect port:$DEV fs cp smart-bin/firmware/pico_touchpanel/assets/confi
 mpremote connect port:$DEV reset
 ```
 
-> Hinweis: Es gibt zwei `ui.py` (firmware = läuft auf dem Pico, + `Quellcode/Client/ui.py`
-> für Repo-Konsistenz). Auf den Pico kommt die **firmware**-Variante.
+Deckt ab: MUX-Pinout, Füllstand C8, Eco, Party, Meldungen, Deckel-Security.
+> Zwei `ui.py` (firmware = läuft auf dem Pico, + `Client/ui.py` = Repo-Konsistenz) —
+> auf den Pico kommt die **firmware**-Variante. **Nach dem `fs cp` nicht mehr `fs cat`
+> aufrufen** (stoppt die laufende Firmware → sonst nochmal `reset`).
+
+### B) Mac-Seite: Backend + Bridge neu starten (für T3 + T6 zwingend)
+
+Beide **neu starten**, damit die neuen Endpoints/Poller aktiv sind
+(Telemetry-`location_state`, `/arm-state`, Bridge-Arm-Poll, `UNAUTHORIZED_OPEN`):
+
+```bash
+# Backend (Port 8000)
+cd "Smarte Mülltonne/Software/smart-bin/backend" && .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+# Bridge (Port 50002 -> Backend), in eigenem Terminal:
+cd "Smarte Mülltonne/Software/smart-bin/bridge" && python tcp_bridge.py --backend http://127.0.0.1:8000 --bin-id 22
+```
+
+### C) Verbindung prüfen
+
+- Demo-Netz: Mac = `192.168.50.10`, WLAN `SmartBinDemo`, Bridge `:50002`, Backend `:8000`.
+- Nach Pico-Reset im Bridge-Log erwartet: `Pico connected` → `pico: Pico ist bereit` → `STATUS:STANDBY`.
+- Falls „alles leer" im Leitstand: Admin-Dashboard → Szenario **Schichtbeginn** setzen.
 
 ---
 
