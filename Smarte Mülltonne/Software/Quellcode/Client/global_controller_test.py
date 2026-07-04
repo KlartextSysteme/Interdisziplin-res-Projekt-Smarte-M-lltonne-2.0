@@ -178,7 +178,11 @@ class GlobalController:
         self.speed_curve = 60
 
         # --- Party-Modus (Easter-Egg via PIN "***") ---
-        self.party_duration_ms = 10000
+        # Step-basiert: N volle Umdrehungen (360deg = 2x turn_home_180_steps),
+        # damit die Tonne exakt in der Startausrichtung endet (Linie wieder da).
+        # Dauer wird beim Start aus Schrittzahl x Tempo berechnet.
+        self.party_full_rotations = 1
+        self.party_duration_ms = 10000   # Fallback, wird in set_state neu berechnet
         self.party_speed = 65
         self.party_buzzer_started = False
         # "Shave and a haircut, two bits" - als reiner Rhythmus auch bei festem
@@ -231,6 +235,12 @@ class GlobalController:
 
         if new_state == self.STATE_PARTY:
             self.party_buzzer_started = False
+            # Dauer = N volle Umdrehungen bei Party-Tempo -> endet exakt am Start.
+            if self.motors is not None:
+                rotation_steps = 2 * self.turn_home_180_steps * self.party_full_rotations
+                self.party_duration_ms = self.motors.steps_to_ms(
+                    rotation_steps, self.party_speed
+                )
 
         if new_state == self.STATE_OBSTACLE_WAIT:
             self._reset_obstacle_side_samples()
