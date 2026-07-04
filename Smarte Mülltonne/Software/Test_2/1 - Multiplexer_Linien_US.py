@@ -4,16 +4,16 @@ import utime
 
 # Multiplexer CD74HC4067
 # S0-S3 steuern den ausgewaehlten Kanal C0-C15.
-s0 = machine.Pin(2, machine.Pin.OUT)
-s1 = machine.Pin(3, machine.Pin.OUT)
-s2 = machine.Pin(4, machine.Pin.OUT)
-s3 = machine.Pin(5, machine.Pin.OUT)
+s0 = machine.Pin(1, machine.Pin.OUT)
+s1 = machine.Pin(2, machine.Pin.OUT)
+s2 = machine.Pin(3, machine.Pin.OUT)
+s3 = machine.Pin(4, machine.Pin.OUT)
 
 # Gemeinsamer Trigger fuer alle Ultraschallsensoren
 trigger = machine.Pin(6, machine.Pin.OUT)
 
 # SIG/Z/COM vom Multiplexer am Pico
-mux_signal = machine.Pin(28, machine.Pin.IN)
+mux_signal = machine.Pin(5, machine.Pin.IN)
 
 
 LINE_CHANNELS = [0, 1, 2, 3, 4]
