@@ -12,7 +12,7 @@ import ChatInterface from "./components/ChatInterface";
 import EnergyPanel from "./components/EnergyPanel";
 import SecurityPanel from "./components/SecurityPanel";
 import {
-  resolveAlerts,
+  resolveAlert,
   lockBin,
   planRoute,
   getCandidates,
@@ -113,8 +113,8 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleResolve(binId: number) {
-    await resolveAlerts(binId);
+  async function handleResolve(eventId: number) {
+    await resolveAlert(eventId);
   }
 
   async function handleLock(binId: number) {

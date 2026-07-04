@@ -120,6 +120,8 @@ export const unlockBin = (binId: number, token: string) =>
   post(`/security/${binId}/unlock`, undefined, { "X-Admin-Token": token });
 export const resolveAlerts = (binId: number) =>
   post(`/security/${binId}/resolve`);
+export const resolveAlert = (eventId: number) =>
+  post(`/security/events/${eventId}/resolve`);
 export const createProblemReport = (binId: number, reportType: "damage_report" | "hygiene_report") =>
   post(`/bins/${binId}/report`, { report_type: reportType, source: "webapp" });
 

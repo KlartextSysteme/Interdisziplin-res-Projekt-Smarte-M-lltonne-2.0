@@ -6,7 +6,7 @@ import type { SecurityEvent } from "@/types";
 
 interface Props {
   events: SecurityEvent[];
-  onResolve: (binId: number) => void;
+  onResolve: (eventId: number) => void;
   onLock: (binId: number) => void;
 }
 
@@ -75,7 +75,7 @@ export default function SecurityPanel({ events, onResolve, onLock }: Props) {
                 </button>
               )}
               <button
-                onClick={() => onResolve(e.bin_id)}
+                onClick={() => onResolve(e.id)}
                 className="flex h-8 items-center gap-1 rounded border border-white/10 bg-white/[0.055] px-2.5 text-xs font-semibold text-slate-200 transition hover:border-[#f2c94c]/40 hover:text-[#f2c94c]"
               >
                 <Check className="h-3 w-3" /> Quittieren
