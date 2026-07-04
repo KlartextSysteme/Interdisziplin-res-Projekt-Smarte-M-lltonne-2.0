@@ -39,13 +39,16 @@ FUELLSTAND_VOLL_CM = 5
 
 BUZZER_PIN = 0
 
-LEFT_DIR_PIN = 10
-LEFT_STEP_PIN = 11
-LEFT_ENABLE_PIN = 12
+# Motor-Pinsaetze L<->R getauscht: am realen Aufbau (2026-07-04, T1) fuhr die
+# alte Zuordnung 10/11/12=links, 13/8/9=rechts rueckwaerts + spiegelverkehrt.
+# Verifiziert per Referenz-Linienlauf (Position pendelt sauber um 0).
+LEFT_DIR_PIN = 13
+LEFT_STEP_PIN = 8
+LEFT_ENABLE_PIN = 9
 
-RIGHT_DIR_PIN = 13
-RIGHT_STEP_PIN = 8
-RIGHT_ENABLE_PIN = 9
+RIGHT_DIR_PIN = 10
+RIGHT_STEP_PIN = 11
+RIGHT_ENABLE_PIN = 12
 
 LEFT_FORWARD_DIR = 1
 RIGHT_FORWARD_DIR = 0
