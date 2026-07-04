@@ -71,9 +71,30 @@ Backlight an **GP15** per PWM. Voraussetzung: Backlight physisch an GP15 (via Tr
       **„Shave and a haircut"**-Rhythmus.
 - [ ] Nach ~10 s: Stop → zurück in den Leerlauf.
 
+## T6 — Unbefugte Deckelöffnung → Alarm
+
+Voraussetzung: **Bridge + Backend neu gestartet** (neuer Arm-State-Poll + Endpoint),
+Füllstand-Sensor auf C8 funktioniert (T2). Zusätzlich flashen: nichts Neues nötig
+(Pico-Logik steckt in `global_controller_test.py`, schon in der Deploy-Liste oben).
+
+- [ ] **Zuhause = Einwurf:** Tonne im Leerlauf (`AT_HOME`), Deckel öffnen (Füllstand
+      abdecken/kein Echo) → **kein** Alarm, keine Meldung.
+- [ ] **Scharf an der Straße:** `goto_street` (Web-App **oder** Touchpanel) → Tonne
+      wartet an der Abholpos. Web-App zeigt sie **unterwegs/an der Straße** (nicht mehr
+      „zuhause" — Telemetry-Fix). Deckel öffnen → **sofort Buzzer-Alarm** + Meldung
+      **„Unbefugtes Öffnen"** (Lock-Icon, rot) live im Security-Panel.
+- [ ] **Alarm nicht umgehbar:** Deckel offen lassen → Buzzer läuft weiter; erst beim
+      **Schließen** hört er auf.
+- [ ] **Entschärfen per Truck:** Sim-Truck an die Position von Tonne 22 fahren (≤10 m,
+      Admin/Route) → Bridge-Log `arm-state -> pico: DISARM`. Deckel öffnen → **kein**
+      Alarm (Leerung). Truck weg → `ARM` → wieder scharf.
+- [ ] Bridge-Log: `REPORT:UNAUTHORIZED_OPEN` → `POST /security/events` bei Alarm.
+- [ ] „Erledigen" im Leitstand entfernt die Meldung.
+
 ---
 
 ## Reihenfolge-Empfehlung
 
 **T1 zuerst** (MUX ist die Basis für alles Sensorische). Dann T2 (Füllstand),
-T3 (Meldungen, braucht Bridge/Backend), T4 (Eco), T5 (Party — Spaß zum Schluss).
+T3 (Meldungen, braucht Bridge/Backend), T4 (Eco), T5 (Party — Spaß zum Schluss),
+**T6 (Deckel-Security — braucht T2 + Bridge/Backend + optional Sim-Truck).**
