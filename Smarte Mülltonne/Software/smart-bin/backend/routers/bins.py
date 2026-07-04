@@ -102,6 +102,17 @@ PICO_STATE_TO_BIN_STATUS = {
     "MANUAL_RETURN_HOME_REQUEST": "idle",
 }
 
+# Pico-Zustand -> location_state. Damit eine (auch am Touchpanel ausgeloeste)
+# Fahrt die Web-App/den Backend-Zustand sofort konsistent ueberschreibt, statt
+# erst bei ARRIVED. LINE_FOLLOWING/ARRIVED bleiben absichtlich unberuehrt
+# (Richtung ergibt sich aus dem vorangehenden MANUAL_*_REQUEST bzw. ARRIVED-Target).
+PICO_STATE_TO_LOCATION = {
+    "MANUAL_GOTO_STREET_REQUEST": "moving_to_pickup",
+    "MANUAL_RETURN_HOME_REQUEST": "moving_home",
+    "WAIT_AT_STREET": "truck",
+    "STANDBY": "home",
+}
+
 
 @router.get("")
 def get_all_bins(db: Session = Depends(get_db)):
@@ -195,14 +206,16 @@ def update_pico_telemetry(bin_id: int, payload: PicoTelemetry, db: Session = Dep
         b.battery = max(0, min(100, payload.battery))
 
     location_state = _normalize_location_state(payload.location_state)
+    if not location_state and payload.target_destination:
+        location_state = _normalize_location_state(payload.target_destination)
+    if not location_state:
+        # Fallback: aus dem Pico-Zustand ableiten (Touchpanel-Fahrt konsistent).
+        location_state = PICO_STATE_TO_LOCATION.get(payload.pico_state)
+
     if location_state:
         b.location_state = location_state
         if location_state in {"home", "truck"}:
             _snap_to_location(b, location_state)
-    elif payload.target_destination:
-        b.location_state = _normalize_location_state(payload.target_destination) or b.location_state
-        if b.location_state in {"home", "truck"}:
-            _snap_to_location(b, b.location_state)
 
     if not b.locked:
         b.status = PICO_STATE_TO_BIN_STATUS.get(payload.pico_state, b.status)
