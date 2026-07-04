@@ -485,6 +485,14 @@ class GlobalController:
             self.request_return_home()
             return
 
+        if action == "report_damage":
+            self._bridge_send("REPORT:DAMAGE")
+            return
+
+        if action == "report_hygiene":
+            self._bridge_send("REPORT:HYGIENE")
+            return
+
         if action == "shutdown":
             self.stop()
             return
