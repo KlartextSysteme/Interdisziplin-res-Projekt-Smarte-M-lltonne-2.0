@@ -150,6 +150,12 @@ class TouchUi:
             if self.pin == MAINTENANCE_PIN:
                 self.menu_page = 1
                 self.go(SCREEN_MENU_1)
+            elif self.pin == "***":
+                # Easter-Egg: Party-Modus
+                self.pin = ""
+                self.go(SCREEN_STATUS)
+                if self.action_handler:
+                    self.action_handler("party")
             else:
                 self.pin = ""
                 self.draw_pin()

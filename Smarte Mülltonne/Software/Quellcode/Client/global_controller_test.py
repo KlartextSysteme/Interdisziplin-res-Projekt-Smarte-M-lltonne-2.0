@@ -22,6 +22,7 @@ class GlobalController:
     # Zustände für manuelle Anforderungen per Touchpanel
     STATE_MANUAL_GOTO_STREET_REQUEST = "MANUAL_GOTO_STREET_REQUEST"
     STATE_MANUAL_RETURN_HOME_REQUEST = "MANUAL_RETURN_HOME_REQUEST"
+    STATE_PARTY = "PARTY"   # Easter-Egg: dreht sich + Buzzer-Jingle
     #Zustände aus der Webapp
 
     # --- Unterzustände für AVOID_RIGHT ---
@@ -176,6 +177,19 @@ class GlobalController:
         # (Beim Tempo-Test nur EINE Variable aendern.)
         self.speed_curve = 60
 
+        # --- Party-Modus (Easter-Egg via PIN "***") ---
+        self.party_duration_ms = 10000
+        self.party_speed = 65
+        self.party_buzzer_started = False
+        self.party_pattern = [
+            (True, 120), (False, 90),
+            (True, 120), (False, 90),
+            (True, 120), (False, 260),
+            (True, 300), (False, 120),
+            (True, 120), (False, 90),
+            (True, 450), (False, 220),
+        ]
+
     def set_state(self, new_state):
         if self.state == new_state:
             return
@@ -211,6 +225,9 @@ class GlobalController:
 
         if new_state == self.STATE_LINE_LOST:
             self.line_lost_alarm_started = False
+
+        if new_state == self.STATE_PARTY:
+            self.party_buzzer_started = False
 
         if new_state == self.STATE_OBSTACLE_WAIT:
             self._reset_obstacle_side_samples()
@@ -498,9 +515,41 @@ class GlobalController:
                 self.touchpanel.toggle_eco()
             return
 
+        if action == "party":
+            self.request_party()
+            return
+
         if action == "shutdown":
             self.stop()
             return
+
+    def request_party(self):
+        # Easter-Egg: nur aus dem Leerlauf starten (braucht Platz zum Drehen).
+        if self.state == self.STATE_AT_HOME:
+            print("PARTY MODE! 🎉")
+            self.set_state(self.STATE_PARTY)
+
+    def _logic_party(self):
+        elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
+
+        if elapsed >= self.party_duration_ms:
+            if self.motors is not None:
+                self.motors.stop()
+            if self.buzzer is not None:
+                self.buzzer.stop()
+            self.set_state(self.STATE_AT_HOME)
+            return
+
+        # Zuegig auf der Stelle drehen ...
+        if self.motors is not None:
+            self.motors.turn_right(self.party_speed)
+
+        # ... und den Buzzer-Jingle in Dauerschleife spielen.
+        if self.buzzer is not None:
+            if not self.party_buzzer_started:
+                self.buzzer.play(self.party_pattern, repeat=True)
+                self.party_buzzer_started = True
+            self.buzzer.run()
 
     def set_network_client(self, client):
         """Verknuepft den TCP-Bridge-Client fuer Web-App-Steuerung/Status."""
@@ -551,7 +600,7 @@ class GlobalController:
         """Liefert den periodischen STATUS-String fuer die Bridge. Auf die
         von Backend/Web-App bekannten Werte der Inline-Firmware gemappt."""
         s = self.state
-        if s == self.STATE_AT_HOME:
+        if s in (self.STATE_AT_HOME, self.STATE_PARTY):
             return "STANDBY"
         if s == self.STATE_OBSTACLE_WAIT:
             return "OBSTACLE"
@@ -610,6 +659,8 @@ class GlobalController:
             self._logic_manual_goto_street_request()
         elif self.state == self.STATE_MANUAL_RETURN_HOME_REQUEST:
             self._logic_manual_return_home_request()
+        elif self.state == self.STATE_PARTY:
+            self._logic_party()
 
     def _logic_at_home(self):
         if self.motors is not None:
