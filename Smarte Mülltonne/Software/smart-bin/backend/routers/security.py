@@ -72,3 +72,13 @@ def resolve_events(bin_id: int, db: Session = Depends(get_db)):
     ).update({"resolved": True})
     db.commit()
     return {"bin_id": bin_id, "resolved": True}
+
+
+@router.post("/events/{event_id}/resolve")
+def resolve_event(event_id: int, db: Session = Depends(get_db)):
+    event = db.query(SecurityEvent).filter(SecurityEvent.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    event.resolved = True
+    db.commit()
+    return {"event_id": event_id, "resolved": True}
