@@ -42,3 +42,12 @@ def test_resolve_single_event_leaves_others():
 def test_resolve_unknown_event_returns_404():
     r = client.post("/security/events/99999999/resolve")
     assert r.status_code == 404
+
+
+def test_alert_timestamp_is_utc_z():
+    created = client.post("/security/events", json={"bin_id": 22, "event_type": "hygiene_report"}).json()
+    payload = _build_live_payload()
+    alert = next(a for a in payload["alerts"] if a["id"] == created["id"])
+    assert alert["timestamp"].endswith("Z")
+    assert "T" in alert["timestamp"]          # ISO-8601, kein Space-Separator
+    client.post(f"/security/events/{created['id']}/resolve")  # cleanup
