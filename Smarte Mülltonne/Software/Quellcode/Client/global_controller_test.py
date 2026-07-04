@@ -181,13 +181,16 @@ class GlobalController:
         self.party_duration_ms = 10000
         self.party_speed = 65
         self.party_buzzer_started = False
+        # "Shave and a haircut, two bits" - als reiner Rhythmus auch bei festem
+        # Ton sofort erkennbar (aktiver Buzzer kann keine Tonhoehen).
         self.party_pattern = [
-            (True, 120), (False, 90),
-            (True, 120), (False, 90),
-            (True, 120), (False, 260),
-            (True, 300), (False, 120),
-            (True, 120), (False, 90),
-            (True, 450), (False, 220),
+            (True, 200), (False, 110),   # Shave
+            (True, 110), (False, 70),    # and
+            (True, 110), (False, 110),   # a
+            (True, 200), (False, 110),   # hair
+            (True, 240), (False, 380),   # cut  (+ Pause)
+            (True, 200), (False, 130),   # two
+            (True, 260), (False, 500),   # bits (+ Pause vor Wiederholung)
         ]
 
     def set_state(self, new_state):
