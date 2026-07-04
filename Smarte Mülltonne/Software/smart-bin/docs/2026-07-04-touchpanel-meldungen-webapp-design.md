@@ -36,6 +36,12 @@ Vertical Slice über: Touchpanel-Firmware → TCP-Bridge → Backend → Fronten
   alle ~0,35 s an das Frontend.
 - **Frontend:** `AlertBanner.tsx` + `SecurityPanel.tsx` zeigen die WS-`alerts`;
   `resolveAlerts(binId)` → `POST /security/{bin_id}/resolve`.
+- **Frontend kennt die Meldungstypen bereits:** `lib/labels.ts` hat
+  `securityEventLabel`/`eventTone` für `damage_report` („Beschädigung gemeldet")
+  und `hygiene_report` („Hygieneproblem gemeldet", beide amber). `SecurityPanel.tsx`
+  rendert dafür schon eigene Icons: `Wrench` (damage_report) und `Sparkles`
+  (hygiene_report). → **Das Frontend braucht keine Änderung, sofern der event_type
+  exakt `damage_report`/`hygiene_report` heißt.**
 
 ## 3. Design & Datenfluss
 
@@ -47,7 +53,7 @@ Touchpanel  SCHADEN/HYGIENE
        └─ show_confirm("confirm_report")   [NEU: Asset "Meldung gesendet"]
    ↓ (TCP-Bridge-Socket)
 Bridge._handle_pico_line: "REPORT:<kind>"   [NEU: Parsing]
-   → POST {backend}/security/events {bin_id: 22, event_type: "damage"|"hygiene"}
+   → POST {backend}/security/events {bin_id: 22, event_type: "damage_report"|"hygiene_report"}
    ↓
 Backend.create_event → SecurityEvent(event_type, resolved=False)   [wiederverwendet]
    ↓
@@ -77,23 +83,24 @@ Frontend AlertBanner/SecurityPanel: Meldung mit eigenem Icon       [NEU: Icon/La
    `report_damage` → `self._bridge_send("REPORT:DAMAGE")`,
    `report_hygiene` → `self._bridge_send("REPORT:HYGIENE")`.
 4. **`smart-bin/bridge/tcp_bridge.py`** — in `_handle_pico_line`: Zweig
-   `line.startswith("REPORT:")` → kind = Rest (DAMAGE|HYGIENE) → mappe auf
-   `event_type` `"damage"`/`"hygiene"` → `POST {backend}/security/events
-   {bin_id: self.state.bin_id, event_type}`. Fehler tolerieren (loggen, kein Crash).
+   `line.startswith("REPORT:")` → kind = Rest (`DAMAGE`|`HYGIENE`) → mappe auf
+   `event_type` **`"damage_report"`/`"hygiene_report"`** (exakt die vom Frontend
+   erwarteten Keys) → `POST {backend}/security/events {bin_id: self.state.bin_id,
+   event_type}`. Fehler tolerieren (loggen, kein Crash).
 5. **`smart-bin/backend/routers/security.py`** — unverändert nutzbar (`event_type`
    frei). Optional (nicht zwingend): das `# TODO`-WS-Push implementieren für sofortige
    Anzeige; ohne das deckt der ~0,35-s-Broadcast es ab.
-6. **`smart-bin/frontend/app/dashboard/components/AlertBanner.tsx` +
-   `SecurityPanel.tsx`** — Icon-/Label-Mapping für `event_type`:
-   - `"hygiene"` → Icon `Wind` (lucide), Label „Hygiene/Geruch"
-   - `"damage"` → Icon `Hammer` (lucide), Label „Beschädigung"
-   - Bestehende (`tamper`/`theft_attempt`/`unauthorized_open`) unverändert.
-   - Erledigen-Button (`resolveAlerts`) wird wiederverwendet.
+6. **Frontend — keine Änderung nötig.** `damage_report`/`hygiene_report` sind in
+   `lib/labels.ts` (Label + amber-Ton) und `SecurityPanel.tsx` (Icons `Wrench`/
+   `Sparkles`) bereits umgesetzt; Erledigen-Button (`resolveAlerts`) existiert.
+   *Optionaler Polish (nicht im Slice):* `AlertBanner.tsx` nutzt ein generisches
+   `AlertTriangle`-Icon — dort könnte man später auch das typ-spezifische Icon zeigen.
 
 ## 5. Datenmodell
 
-Wiederverwendung von `SecurityEvent`. Keine Migration. `event_type` erhält zwei
-neue erlaubte Werte: `"hygiene"`, `"damage"`. (String-Feld, kein Enum-Zwang.)
+Wiederverwendung von `SecurityEvent`. Keine Migration. `event_type` nutzt zwei
+Werte, die das Frontend **bereits kennt**: `"damage_report"`, `"hygiene_report"`.
+(String-Feld, kein Enum-Zwang.)
 
 ## 6. Fehlerbehandlung & Grenzen (YAGNI)
 
@@ -127,4 +134,5 @@ neue erlaubte Werte: `"hygiene"`, `"damage"`. (String-Feld, kein Enum-Zwang.)
 - Modellierung: **A** — bestehenden Alert-Kanal (`SecurityEvent`) wiederverwenden.
 - Lifecycle: **B** — Anzeigen **und** Erledigen.
 - Panel-Bestätigung: **ja**, neues Asset „Meldung gesendet" im Confirm-Stil.
-- Icons: Hygiene = `Wind`, Beschädigung = `Hammer` (lucide) — leicht austauschbar.
+- Icons: **bereits im Frontend vorhanden** — Beschädigung = `Wrench`,
+  Hygiene = `Sparkles` (SecurityPanel). Keine neuen Icons nötig.
