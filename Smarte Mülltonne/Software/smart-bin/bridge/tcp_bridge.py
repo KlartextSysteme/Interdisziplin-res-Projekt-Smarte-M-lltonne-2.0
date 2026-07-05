@@ -52,6 +52,7 @@ class BridgeState:
     connected: bool = False
     inflight_by_pico_cmd: dict[str, int] = field(default_factory=dict)
     sent_command_ids: set[int] = field(default_factory=set)
+    last_disarmed: bool | None = None   # zuletzt an den Pico gesendeter Geofence-Zustand
 
 
 class PicoBridge:
@@ -102,7 +103,26 @@ class PicoBridge:
                     await self._send_backend_command_to_pico(command, writer)
             except Exception:
                 LOGGER.exception("command polling failed")
+            try:
+                await self._sync_arm_state(writer)
+            except Exception:
+                LOGGER.exception("arm-state polling failed")
             await asyncio.sleep(self.poll_interval_s)
+
+    async def _sync_arm_state(self, writer: asyncio.StreamWriter) -> None:
+        """Geofence-Zustand vom Backend pollen und ARM/DISARM an den Pico
+        weiterreichen, nur bei Aenderung. DISARM = Truck am Leeren (<=10m)."""
+        resp = await self.client.get(
+            f"{self.backend_url}/bins/{self.state.bin_id}/arm-state"
+        )
+        resp.raise_for_status()
+        disarmed = bool(resp.json().get("disarmed"))
+        if disarmed != self.state.last_disarmed:
+            self.state.last_disarmed = disarmed
+            cmd = "DISARM" if disarmed else "ARM"
+            writer.write((cmd + "\n").encode())
+            await writer.drain()
+            LOGGER.info("arm-state -> pico: %s (bin %s)", cmd, self.state.bin_id)
 
     async def _get_pending_command(self) -> dict[str, Any] | None:
         resp = await self.client.get(
@@ -173,7 +193,11 @@ class PicoBridge:
 
         if line.startswith("REPORT:"):
             kind = line.split(":", 1)[1].strip().upper()
-            event_type = {"DAMAGE": "damage_report", "HYGIENE": "hygiene_report"}.get(kind)
+            event_type = {
+                "DAMAGE": "damage_report",
+                "HYGIENE": "hygiene_report",
+                "UNAUTHORIZED_OPEN": "unauthorized_open",
+            }.get(kind)
             if event_type is None:
                 LOGGER.warning("unknown report kind: %s", kind)
                 return

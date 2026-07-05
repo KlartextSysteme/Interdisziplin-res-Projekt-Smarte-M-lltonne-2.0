@@ -39,7 +39,9 @@ export default function SecurityPanel({ events, onResolve, onLock }: Props) {
           ? Wrench
           : e.event_type === "hygiene_report"
             ? Sparkles
-            : AlertTriangle;
+            : e.event_type === "unauthorized_open"
+              ? Lock
+              : AlertTriangle;
 
         return (
           <div

@@ -1,13 +1,20 @@
 from datetime import datetime, timezone
+from math import hypot
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+import truck_state
 from database import get_db
 from models.bin import Bin
 from models.event import SecurityEvent
 
 router = APIRouter()
+
+# Radius, innerhalb dessen der Truck als "aktiv am Leeren" gilt und die Tonne
+# entschaerft wird. Gleiche Wahrheit wie truck_simulator.ARRIVAL_THRESHOLD_M.
+DISARM_RADIUS_M = 10.0
 
 
 class BinUpdate(BaseModel):
@@ -100,6 +107,17 @@ PICO_STATE_TO_BIN_STATUS = {
     "USER_PAUSED": "idle",
     "MANUAL_GOTO_STREET_REQUEST": "idle",
     "MANUAL_RETURN_HOME_REQUEST": "idle",
+}
+
+# Pico-Zustand -> location_state. Damit eine (auch am Touchpanel ausgeloeste)
+# Fahrt die Web-App/den Backend-Zustand sofort konsistent ueberschreibt, statt
+# erst bei ARRIVED. LINE_FOLLOWING/ARRIVED bleiben absichtlich unberuehrt
+# (Richtung ergibt sich aus dem vorangehenden MANUAL_*_REQUEST bzw. ARRIVED-Target).
+PICO_STATE_TO_LOCATION = {
+    "MANUAL_GOTO_STREET_REQUEST": "moving_to_pickup",
+    "MANUAL_RETURN_HOME_REQUEST": "moving_home",
+    "WAIT_AT_STREET": "truck",
+    "STANDBY": "home",
 }
 
 
@@ -195,14 +213,16 @@ def update_pico_telemetry(bin_id: int, payload: PicoTelemetry, db: Session = Dep
         b.battery = max(0, min(100, payload.battery))
 
     location_state = _normalize_location_state(payload.location_state)
+    if not location_state and payload.target_destination:
+        location_state = _normalize_location_state(payload.target_destination)
+    if not location_state:
+        # Fallback: aus dem Pico-Zustand ableiten (Touchpanel-Fahrt konsistent).
+        location_state = PICO_STATE_TO_LOCATION.get(payload.pico_state)
+
     if location_state:
         b.location_state = location_state
         if location_state in {"home", "truck"}:
             _snap_to_location(b, location_state)
-    elif payload.target_destination:
-        b.location_state = _normalize_location_state(payload.target_destination) or b.location_state
-        if b.location_state in {"home", "truck"}:
-            _snap_to_location(b, b.location_state)
 
     if not b.locked:
         b.status = PICO_STATE_TO_BIN_STATUS.get(payload.pico_state, b.status)
@@ -216,4 +236,32 @@ def update_pico_telemetry(bin_id: int, payload: PicoTelemetry, db: Session = Dep
         "pico_state": payload.pico_state,
         "status": b.status,
         "fill_level": b.fill_level,
+    }
+
+
+def _truck_near_bin(b: Bin) -> tuple[bool, float | None]:
+    """True, wenn der Truck aktiv am Leeren ist (<= DISARM_RADIUS_M von der Tonne)."""
+    truck = truck_state.get()
+    tlat, tlng = truck.get("lat"), truck.get("lng")
+    blat = b.current_lat if b.current_lat is not None else b.lat
+    blng = b.current_lng if b.current_lng is not None else b.lng
+    if tlat is None or tlng is None or blat is None or blng is None:
+        return False, None
+    dist_m = hypot((tlat - blat) * 111_000, (tlng - blng) * 71_000)
+    return dist_m <= DISARM_RADIUS_M, dist_m
+
+
+@router.get("/{bin_id}/arm-state")
+def get_arm_state(bin_id: int, db: Session = Depends(get_db)):
+    """Security-Geofence: ist der Truck nah genug, um die Tonne zu entschaerfen
+    (Leerung)? Die Bridge pollt das und reicht ARM/DISARM an den Pico weiter.
+    Der Pico kombiniert es mit seinem eigenen 'zuhause'-Wissen."""
+    b = db.query(Bin).filter(Bin.id == bin_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Bin not found")
+    near, dist_m = _truck_near_bin(b)
+    return {
+        "bin_id": bin_id,
+        "disarmed": near,          # True = Truck am Leeren -> nicht scharf
+        "distance_m": round(dist_m, 1) if dist_m is not None else None,
     }

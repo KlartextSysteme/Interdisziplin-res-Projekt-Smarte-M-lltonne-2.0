@@ -22,6 +22,7 @@ class GlobalController:
     # Zustände für manuelle Anforderungen per Touchpanel
     STATE_MANUAL_GOTO_STREET_REQUEST = "MANUAL_GOTO_STREET_REQUEST"
     STATE_MANUAL_RETURN_HOME_REQUEST = "MANUAL_RETURN_HOME_REQUEST"
+    STATE_PARTY = "PARTY"   # Easter-Egg: dreht sich + Buzzer-Jingle
     #Zustände aus der Webapp
 
     # --- Unterzustände für AVOID_RIGHT ---
@@ -161,6 +162,19 @@ class GlobalController:
         # set_network_client gesetzt; None = rein lokal ueber Touchpanel.
         self.network_client = None
 
+        # --- Security: unbefugte Deckeloeffnung ---
+        # Deckel offen (Fuellstand kein Echo) UND scharf -> sofort Buzzer + Meldung.
+        # scharf = ausser Haus UND nicht durch Truck entschaerft. _disarm_by_truck
+        # kommt vom Backend via Bridge (ARM/DISARM).
+        self._disarm_by_truck = False
+        self._lid_alarm_active = False
+        self._last_lid_check_ms = time.ticks_ms()
+        self.lid_check_interval_ms = 500
+        self.security_alarm_pattern = [
+            (True, 150), (False, 90), (True, 150), (False, 90),
+            (True, 150), (False, 350),
+        ]
+
         # Anfahr-Rampe (exponentieller Anlauf): das Reisetempo ist self.base_speed,
         # bei jeder frischen Fahrt startet die Geschwindigkeit bei ramp_start_speed
         # und naehert sich exponentiell (Zeitkonstante ramp_tau_ms) dem Reisetempo.
@@ -175,6 +189,26 @@ class GlobalController:
         # Adaption neutralisiert: speed_curve == base_speed -> konstantes Tempo.
         # (Beim Tempo-Test nur EINE Variable aendern.)
         self.speed_curve = 60
+
+        # --- Party-Modus (Easter-Egg via PIN "***") ---
+        # Step-basiert: N volle Umdrehungen (360deg = 2x turn_home_180_steps),
+        # damit die Tonne exakt in der Startausrichtung endet (Linie wieder da).
+        # Dauer wird beim Start aus Schrittzahl x Tempo berechnet.
+        self.party_full_rotations = 1
+        self.party_duration_ms = 10000   # Fallback, wird in set_state neu berechnet
+        self.party_speed = 65
+        self.party_buzzer_started = False
+        # "Shave and a haircut, two bits" - als reiner Rhythmus auch bei festem
+        # Ton sofort erkennbar (aktiver Buzzer kann keine Tonhoehen).
+        self.party_pattern = [
+            (True, 200), (False, 110),   # Shave
+            (True, 110), (False, 70),    # and
+            (True, 110), (False, 110),   # a
+            (True, 200), (False, 110),   # hair
+            (True, 240), (False, 380),   # cut  (+ Pause)
+            (True, 200), (False, 130),   # two
+            (True, 260), (False, 500),   # bits (+ Pause vor Wiederholung)
+        ]
 
     def set_state(self, new_state):
         if self.state == new_state:
@@ -211,6 +245,15 @@ class GlobalController:
 
         if new_state == self.STATE_LINE_LOST:
             self.line_lost_alarm_started = False
+
+        if new_state == self.STATE_PARTY:
+            self.party_buzzer_started = False
+            # Dauer = N volle Umdrehungen bei Party-Tempo -> endet exakt am Start.
+            if self.motors is not None:
+                rotation_steps = 2 * self.turn_home_180_steps * self.party_full_rotations
+                self.party_duration_ms = self.motors.steps_to_ms(
+                    rotation_steps, self.party_speed
+                )
 
         if new_state == self.STATE_OBSTACLE_WAIT:
             self._reset_obstacle_side_samples()
@@ -498,9 +541,72 @@ class GlobalController:
                 self.touchpanel.toggle_eco()
             return
 
+        if action == "party":
+            self.request_party()
+            return
+
         if action == "shutdown":
             self.stop()
             return
+
+    def request_party(self):
+        # Easter-Egg: nur aus dem Leerlauf starten (braucht Platz zum Drehen).
+        if self.state == self.STATE_AT_HOME:
+            print("PARTY MODE! 🎉")
+            self.set_state(self.STATE_PARTY)
+
+    def _logic_party(self):
+        elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
+
+        if elapsed >= self.party_duration_ms:
+            if self.motors is not None:
+                self.motors.stop()
+            if self.buzzer is not None:
+                self.buzzer.stop()
+            self.set_state(self.STATE_AT_HOME)
+            return
+
+        # Zuegig auf der Stelle drehen ...
+        if self.motors is not None:
+            self.motors.turn_right(self.party_speed)
+
+        # ... und den Buzzer-Jingle in Dauerschleife spielen.
+        if self.buzzer is not None:
+            if not self.party_buzzer_started:
+                self.buzzer.play(self.party_pattern, repeat=True)
+                self.party_buzzer_started = True
+            self.buzzer.run()
+
+    def _security_lid_check(self):
+        """Querschnitt: Deckeloeffnung erkennen und ggf. Alarm ausloesen.
+        scharf = ausser Haus UND nicht durch Truck entschaerft."""
+        now = time.ticks_ms()
+        if time.ticks_diff(now, self._last_lid_check_ms) >= self.lid_check_interval_ms:
+            self._last_lid_check_ms = now
+            if self.fuellstand_sensor is not None:
+                self.fuellstand_sensor.run(force=True)
+                lid_open = self.fuellstand_sensor.is_deckel_offen()
+                armed = (
+                    self.state not in (self.STATE_AT_HOME, self.STATE_PARTY)
+                    and not self._disarm_by_truck
+                )
+                if lid_open and armed:
+                    if not self._lid_alarm_active:
+                        # Neue unbefugte Oeffnung -> Alarm + einmalige Meldung.
+                        self._lid_alarm_active = True
+                        print("SECURITY: unbefugte Deckeloeffnung!")
+                        self._bridge_send("REPORT:UNAUTHORIZED_OPEN")
+                        if self.buzzer is not None:
+                            self.buzzer.play(self.security_alarm_pattern, repeat=True)
+                elif self._lid_alarm_active:
+                    # Deckel zu ODER entschaerft -> Alarm beenden.
+                    self._lid_alarm_active = False
+                    if self.buzzer is not None:
+                        self.buzzer.stop()
+
+        # Alarm-Sound jeden Tick weitertreiben.
+        if self._lid_alarm_active and self.buzzer is not None:
+            self.buzzer.run()
 
     def set_network_client(self, client):
         """Verknuepft den TCP-Bridge-Client fuer Web-App-Steuerung/Status."""
@@ -522,6 +628,14 @@ class GlobalController:
         print("Network-Command:", cmd)
 
         if cmd.startswith("ACK_RECEIVED"):
+            return
+
+        if cmd == "DISARM":
+            # Truck aktiv am Leeren -> Deckeloeffnung erlaubt.
+            self._disarm_by_truck = True
+            return
+        if cmd == "ARM":
+            self._disarm_by_truck = False
             return
 
         if cmd in ("CMD_GOTO_STREET", "GOTO_STREET", "goto_street", "goto_pickup"):
@@ -551,7 +665,7 @@ class GlobalController:
         """Liefert den periodischen STATUS-String fuer die Bridge. Auf die
         von Backend/Web-App bekannten Werte der Inline-Firmware gemappt."""
         s = self.state
-        if s == self.STATE_AT_HOME:
+        if s in (self.STATE_AT_HOME, self.STATE_PARTY):
             return "STANDBY"
         if s == self.STATE_OBSTACLE_WAIT:
             return "OBSTACLE"
@@ -610,6 +724,11 @@ class GlobalController:
             self._logic_manual_goto_street_request()
         elif self.state == self.STATE_MANUAL_RETURN_HOME_REQUEST:
             self._logic_manual_return_home_request()
+        elif self.state == self.STATE_PARTY:
+            self._logic_party()
+
+        # Querschnitt: Deckel-Security in JEDEM Zustand pruefen.
+        self._security_lid_check()
 
     def _logic_at_home(self):
         if self.motors is not None:
