@@ -154,6 +154,14 @@ class GlobalController:
         self._last_battery_percent = None
         self._last_battery_voltage = None
 
+        # FILL an die Bridge drosseln: _read_fuellstand_for_status() laeuft im
+        # engen Status-Takt und wuerde sonst dutzende FILL/s ins TCP schieben
+        # (flutet Bridge/Netz). Nur bei relevanter Aenderung oder Heartbeat senden.
+        self._last_fill_sent = None
+        self._last_fill_sent_ms = 0
+        self._fill_send_delta = 2
+        self._fill_send_interval_ms = 3000
+
         # Touchpanel-Tick waehrend der Fahrt drosseln, damit der SPI-Touch-Read
         # die PD-Regelung nicht jeden Zyklus ausbremst (enges Regel-Raster).
         self.last_touch_tick_ms = time.ticks_ms()
@@ -339,6 +347,21 @@ class GlobalController:
             + " | Deckel offen: "
             + str(self.fuellstand_sensor.is_deckel_offen())
         )
+
+        # Fuellstand an die Bridge -> Backend (bin.fill_level) -> Web-App/Routenplanung.
+        # Gedrosselt: nur bei >= _fill_send_delta % Aenderung oder als Heartbeat
+        # alle _fill_send_interval_ms, sonst flutet der enge Status-Takt das TCP.
+        if fill_level is not None:
+            now = time.ticks_ms()
+            changed = (
+                self._last_fill_sent is None
+                or abs(fill_level - self._last_fill_sent) >= self._fill_send_delta
+            )
+            heartbeat = time.ticks_diff(now, self._last_fill_sent_ms) >= self._fill_send_interval_ms
+            if changed or heartbeat:
+                self._bridge_send("FILL:" + str(fill_level))
+                self._last_fill_sent = fill_level
+                self._last_fill_sent_ms = now
 
         return fill_level
 

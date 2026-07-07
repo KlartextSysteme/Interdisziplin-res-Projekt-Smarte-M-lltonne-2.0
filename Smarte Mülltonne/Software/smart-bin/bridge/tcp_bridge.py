@@ -72,6 +72,7 @@ class BridgeState:
     sent_command_ids: set[int] = field(default_factory=set)
     last_disarmed: bool | None = None   # zuletzt an den Pico gesendeter Geofence-Zustand
     last_battery: int | None = None     # zuletzt vom Pico gemeldeter Akkustand %
+    last_fill: int | None = None        # zuletzt vom Pico gemeldeter Fuellstand %
 
 
 class PicoBridge:
@@ -215,6 +216,14 @@ class PicoBridge:
                 pass
             return
 
+        if line.startswith("FILL:"):
+            # Fuellstand cachen; naechster STATUS-Post traegt ihn mit -> bin.fill_level.
+            try:
+                self.state.last_fill = max(0, min(100, int(line.split(":", 1)[1].strip())))
+            except ValueError:
+                pass
+            return
+
         if line.startswith("ARRIVED:"):
             place = line.split(":", 1)[1].strip()
             state = "WAIT_AT_STREET" if place == "STREET" else "STANDBY"
@@ -262,6 +271,8 @@ class PicoBridge:
             payload["target_destination"] = target_destination
         if self.state.last_battery is not None:
             payload["battery"] = self.state.last_battery
+        if self.state.last_fill is not None:
+            payload["fill_level"] = self.state.last_fill
 
         resp = await self.client.post(
             f"{self.backend_url}/bins/{self.state.bin_id}/telemetry",

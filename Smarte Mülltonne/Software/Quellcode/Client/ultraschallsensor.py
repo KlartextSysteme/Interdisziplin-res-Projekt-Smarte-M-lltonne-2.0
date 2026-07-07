@@ -223,6 +223,8 @@ class FuellstandSensor:
         voll_abstand_cm=5.0,
         deckel_offen_margin_cm=5.0,
         no_echo_for_deckel_offen=3,
+        median_window=21,
+        fill_percentile=0.2,
     ):
         self.us = ultrasonic
         self.leer_abstand_cm = float(leer_abstand_cm)
@@ -235,6 +237,19 @@ class FuellstandSensor:
 
         self._no_echo_count = 0
         self.no_echo_for_deckel_offen = int(no_echo_for_deckel_offen)
+
+        # Nah-gewichtetes Perzentil-Filter gegen Ausreisser. Der US verfehlt
+        # weiches/schraeges Muellgut oft -> der Ping laeuft am Muell vorbei zum
+        # Boden -> Fern-Echo -> faelschlich 0 %. Physik: Muellgut kann die
+        # Distanz nur VERKUERZEN, nie verlaengern. Ein Fern-Wert bei gefuellter
+        # Tonne ist also immer ein Fehlschuss. Darum nicht der Median, sondern
+        # ein niedriges Perzentil (naechste konsistente Oberflaeche): Fern-
+        # Fehlschuesse (oberes Ende) fallen raus, ein einzelner Nah-Ausreisser
+        # (unterstes Ende) auch. Ist die Tonne wirklich leer, sind ALLE Werte
+        # fern -> Perzentil bleibt fern -> 0 %.
+        self._median_window = int(median_window)
+        self._fill_percentile = float(fill_percentile)
+        self._dist_window = []
 
     def run(self, force=False):
         """
@@ -252,25 +267,34 @@ class FuellstandSensor:
             if self._no_echo_count >= self.no_echo_for_deckel_offen:
                 self.deckel_offen = True
                 self.fuellstand_prozent = None
+                self._dist_window = []
             return
 
-        self.last_distance_cm = distance
-
-        if distance >= self.leer_abstand_cm:
-            self.deckel_offen = False
-            self.fuellstand_prozent = 0
-            self._no_echo_count = 0
-            return
-
+        self.last_distance_cm = distance  # Rohwert (Debug/Diagnose)
         self._no_echo_count = 0
         self.deckel_offen = False
 
-        if distance <= self.voll_abstand_cm:
+        # Rohdistanz in den Ring schieben und das nah-gewichtete Perzentil als
+        # robusten Arbeitswert nehmen (kleiner Index = kuerzere Distanz = naeher).
+        self._dist_window.append(distance)
+        if len(self._dist_window) > self._median_window:
+            self._dist_window.pop(0)
+        ordered = sorted(self._dist_window)
+        idx = int(len(ordered) * self._fill_percentile)
+        if idx >= len(ordered):
+            idx = len(ordered) - 1
+        filtered = ordered[idx]
+
+        if filtered >= self.leer_abstand_cm:
+            self.fuellstand_prozent = 0
+            return
+
+        if filtered <= self.voll_abstand_cm:
             self.fuellstand_prozent = 100
             return
 
         span = max(0.001, self.leer_abstand_cm - self.voll_abstand_cm)
-        ratio = (self.leer_abstand_cm - distance) / span
+        ratio = (self.leer_abstand_cm - filtered) / span
         ratio = max(0.0, min(1.0, ratio))
         self.fuellstand_prozent = int(round(ratio * 100))
 

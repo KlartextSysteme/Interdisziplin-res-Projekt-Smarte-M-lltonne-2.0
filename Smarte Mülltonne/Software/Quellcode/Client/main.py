@@ -35,7 +35,9 @@ US_RIGHT_CHANNEL = 6
 # Füllstand hat einen eigenen MUX-Kanal (C8), gemeinsamer Trigger mit den US-Sensoren.
 # Werte nach dem Test am realen Aufbau kalibrieren.
 FUELLSTAND_CHANNEL = 8
-FUELLSTAND_LEER_CM = 40
+# Kalibriert am realen Aufbau (2026-07): leere Tonne misst ~33.6-35.2 cm (Sensor
+# -> Boden). LEER_CM knapp unter die minimale Leer-Distanz -> leer = 0 %.
+FUELLSTAND_LEER_CM = 33
 FUELLSTAND_VOLL_CM = 5
 
 BUZZER_PIN = 0
@@ -110,7 +112,7 @@ def create_controller():
         kp=32,
         kd=2,
         target_position=0,
-        max_correction=60,
+        max_correction=80,
     )
 
     motors = DualStepperMotorPWM(
@@ -146,7 +148,7 @@ def create_controller():
         fuellstand_sensor=fuellstand_sensor,
         akkustand_sensor=akkustand,
         touchpanel=None,
-        base_speed=60,
+        base_speed=80,
         min_speed=0,
         max_speed=95,
     )
