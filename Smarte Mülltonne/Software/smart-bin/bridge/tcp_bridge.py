@@ -17,8 +17,10 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import os
 import signal
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -30,6 +32,22 @@ DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 50002
 DEFAULT_BACKEND = "http://localhost:8000"
 DEFAULT_POLL_INTERVAL_S = 1.0
+
+# Akku-Messwerte werden hier mitgeschrieben (CSV), damit sie sich spaeter auslesen
+# lassen. Pfad ueber env BATTERY_LOG ueberschreibbar.
+BATTERY_LOG = os.environ.get("BATTERY_LOG", "/tmp/battery_log.csv")
+
+
+def _log_battery(bin_id: int, pct: int) -> None:
+    """timestamp_utc,bin_id,battery_percent an die CSV anhaengen (fehlertolerant)."""
+    try:
+        new = not os.path.exists(BATTERY_LOG) or os.path.getsize(BATTERY_LOG) == 0
+        with open(BATTERY_LOG, "a") as f:
+            if new:
+                f.write("timestamp_utc,bin_id,battery_percent\n")
+            f.write(f"{datetime.now(timezone.utc).isoformat()},{bin_id},{pct}\n")
+    except OSError as exc:
+        LOGGER.warning("battery log write failed: %s", exc)
 
 BACKEND_TO_PICO_COMMAND = {
     "goto_street": "CMD_GOTO_STREET",
@@ -53,6 +71,7 @@ class BridgeState:
     inflight_by_pico_cmd: dict[str, int] = field(default_factory=dict)
     sent_command_ids: set[int] = field(default_factory=set)
     last_disarmed: bool | None = None   # zuletzt an den Pico gesendeter Geofence-Zustand
+    last_battery: int | None = None     # zuletzt vom Pico gemeldeter Akkustand %
 
 
 class PicoBridge:
@@ -187,6 +206,15 @@ class PicoBridge:
             await self._post_telemetry(state)
             return
 
+        if line.startswith("BATTERY:"):
+            # Cachen (naechster STATUS-Post traegt den Wert mit) + in CSV aufzeichnen.
+            try:
+                self.state.last_battery = max(0, min(100, int(line.split(":", 1)[1].strip())))
+                _log_battery(self.state.bin_id, self.state.last_battery)
+            except ValueError:
+                pass
+            return
+
         if line.startswith("ARRIVED:"):
             place = line.split(":", 1)[1].strip()
             state = "WAIT_AT_STREET" if place == "STREET" else "STANDBY"
@@ -232,6 +260,8 @@ class PicoBridge:
         payload: dict[str, Any] = {"pico_state": pico_state}
         if target_destination:
             payload["target_destination"] = target_destination
+        if self.state.last_battery is not None:
+            payload["battery"] = self.state.last_battery
 
         resp = await self.client.post(
             f"{self.backend_url}/bins/{self.state.bin_id}/telemetry",

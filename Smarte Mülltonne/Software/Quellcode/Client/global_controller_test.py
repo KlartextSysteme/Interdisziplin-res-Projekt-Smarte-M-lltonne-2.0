@@ -145,10 +145,10 @@ class GlobalController:
         self.last_debug_ms = time.ticks_ms()
         self.debug_interval_ms = 250
 
-        # Akku nur im Ruhezustand messen: erst nachdem die Motoren laenger aus
-        # waren, damit nicht der Spannungseinbruch unter Last angezeigt wird.
-        self.battery_idle_delay_ms = 10 * 60 * 1000
-        self.battery_read_interval_ms = 60 * 1000
+        # Akku nur im Ruhezustand messen (nicht den Spannungseinbruch unter Last
+        # anzeigen). Werte fuer Live-Anzeige/Demo verkuerzt: 5 s Settle, dann alle 5 s.
+        self.battery_idle_delay_ms = 5 * 1000
+        self.battery_read_interval_ms = 5 * 1000
         self._last_motor_active_ms = time.ticks_ms()
         self._last_battery_read_ms = 0
         self._last_battery_percent = None
@@ -389,6 +389,9 @@ class GlobalController:
             + str(self._last_battery_percent)
             + "%"
         )
+
+        # Akkustand an die Bridge -> Backend (bin.battery) -> Leitstand.
+        self._bridge_send("BATTERY:" + str(self._last_battery_percent))
 
         return self._last_battery_percent
 
