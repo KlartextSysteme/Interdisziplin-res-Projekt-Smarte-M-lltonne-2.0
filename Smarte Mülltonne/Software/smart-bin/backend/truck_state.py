@@ -14,6 +14,20 @@ _state: dict = {
 }
 
 
+# Dispatch-Gate: der Truck-Simulator faehrt NUR, wenn dispatched == True.
+# Wird per "Route starten" gesetzt und per "Route stoppen" geloescht.
+_dispatched = {"on": False}
+
+
+def is_dispatched() -> bool:
+    return bool(_dispatched["on"])
+
+
+def set_dispatched(value: bool) -> bool:
+    _dispatched["on"] = bool(value)
+    return _dispatched["on"]
+
+
 def get() -> dict:
     return dict(_state)
 
@@ -25,3 +39,11 @@ def update(**fields) -> dict:
     _state["load_percent"] = int(round((load / capacity) * 100)) if capacity > 0 else 0
     _state["updated_at"] = datetime.now(timezone.utc).isoformat()
     return dict(_state)
+
+
+def despawn() -> dict:
+    """Truck von der Karte nehmen (lat/lng None) und Fortschritt zuruecksetzen."""
+    return update(
+        lat=None, lng=None, action="idle",
+        current_bin_id=None, route_progress=None,
+    )

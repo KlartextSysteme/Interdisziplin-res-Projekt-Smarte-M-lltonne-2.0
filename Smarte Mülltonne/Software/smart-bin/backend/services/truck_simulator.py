@@ -659,6 +659,12 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
                 await asyncio.sleep(0.5)
                 continue
 
+            # "Route stoppen" mitten in der Fahrt -> Fahrt abbrechen; der Haupt-Loop
+            # despawnt den Truck dann.
+            if not truck_state.is_dispatched():
+                logger.info("truck simulator route %s gestoppt -> despawn", route_id)
+                return pos, load_units
+
             # Wurde währenddessen ein anderer Kandidat aktiviert? Dann diese Fahrt
             # abbrechen — der Haupt-Loop übernimmt die neue aktive Route.
             if not db.query(Route.active).filter(Route.id == route_id).scalar():
@@ -792,10 +798,18 @@ async def _maybe_plan_next_trip(prev_route_id: int):
 async def run_truck_simulator():
     pos = _depot()
     load_units = 0.0
-    _post_position(pos, "idle", None, load_units)
-    logger.info("truck simulator started at depot")
+    truck_state.despawn()  # startet despawnt (nicht auf der Karte) bis "Route starten"
+    logger.info("truck simulator started (idle, not dispatched)")
 
     while True:
+        # Dispatch-Gate: ohne "Route starten" bleibt der Truck despawnt und faehrt nicht.
+        if not truck_state.is_dispatched():
+            truck_state.despawn()
+            pos = _depot()
+            load_units = 0.0
+            await asyncio.sleep(1)
+            continue
+
         db = SessionLocal()
         try:
             route = _latest_active_route(db)
@@ -804,6 +818,7 @@ async def run_truck_simulator():
             db.close()
 
         if route_id is None:
+            # gestartet, aber (noch) keine aktive Route -> am Depot gespawnt, wartet
             _post_position(pos, "idle", None, load_units)
             await asyncio.sleep(3)
             continue
