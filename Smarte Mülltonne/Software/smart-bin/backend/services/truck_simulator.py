@@ -30,8 +30,13 @@ BIN_MAX_WAIT_S = 18.0
 HARDWARE_BIN_ID = 22
 PHYSICAL_DRIVE_S = 98.0
 HARDWARE_READY_BUFFER_S = 30.0
+# Nach dem Einsammeln faehrt die reale Tonne selbsttaetig heim -> aber erst nach
+# dieser Verzoegerung, damit sie nicht losfaehrt, waehrend sie noch entleert wird.
+HARDWARE_RETURN_DELAY_S = 20.0
 # Timer-Tasks fuer den realen goto_street (analog _bin_move_tasks, cancel-on-reschedule).
 _hw_dispatch_tasks: dict[int, "asyncio.Task"] = {}
+# Timer-Tasks fuer die reale Heimfahrt (getrennt vom goto_street-Task).
+_hw_return_tasks: dict[int, "asyncio.Task"] = {}
 # Gemeinsame Wahrheit mit der Routenplanung (config), damit geplante und
 # gefahrene Route bei Kapazität/Schwelle nicht auseinanderlaufen.
 COLLECT_FILL_THRESHOLD = settings.collect_fill_threshold
@@ -403,6 +408,44 @@ async def _fire_real_goto_street(bin_id: int, delay_s: float, truck_eta_s: float
             "real bin %s: goto_street ABGESETZT (Hinfahrt ~%.0fs + Puffer %.0fs)",
             bin_id, PHYSICAL_DRIVE_S, HARDWARE_READY_BUFFER_S,
         )
+    finally:
+        db.close()
+
+
+def _schedule_real_return_home(bin_id: int, delay_s: float) -> "asyncio.Task":
+    old = _hw_return_tasks.get(bin_id)
+    if old and not old.done():
+        old.cancel()
+    task = asyncio.create_task(_fire_real_return_home(bin_id, delay_s))
+    _hw_return_tasks[bin_id] = task
+
+    def _cleanup(done_task: "asyncio.Task", bid: int = bin_id):
+        if _hw_return_tasks.get(bid) is done_task:
+            _hw_return_tasks.pop(bid, None)
+
+    task.add_done_callback(_cleanup)
+    logger.info("real bin %s: goto_home geplant in %.1fs (nach Entleerung)", bin_id, delay_s)
+    return task
+
+
+async def _fire_real_return_home(bin_id: int, delay_s: float):
+    # Wanduhr-Delay -> die Tonne faehrt erst los, wenn das Entleeren durch ist.
+    if delay_s > 0:
+        await asyncio.sleep(delay_s)
+
+    from routers.commands import enqueue  # deferred: vermeidet Import-Zyklus
+
+    db = SessionLocal()
+    try:
+        b = db.query(Bin).filter(Bin.id == bin_id).first()
+        if not b:
+            return
+        # Nur feuern, wenn die Tonne nicht ohnehin schon zuhause ist.
+        if (b.location_state or "home") == "home":
+            logger.info("real bin %s bereits zuhause -> kein goto_home", bin_id)
+            return
+        enqueue(db, bin_id, "return_home")
+        logger.info("real bin %s: goto_home ABGESETZT (Rueckfahrt ~%.0fs)", bin_id, PHYSICAL_DRIVE_S)
     finally:
         db.close()
 
@@ -806,7 +849,12 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
                 collected_units = _empty_bin(db, hit_bin)
                 load_units = min(TRUCK_CAPACITY_UNITS, load_units + collected_units)
                 visited.add(hit_bin)
-                _schedule_bin_move(hit_bin, "home", delay_s=2.0)
+                if hit_bin == HARDWARE_BIN_ID:
+                    # Reale Tonne: kein Sim-Marker heim, sondern echtes goto_home
+                    # nach kurzer Verzoegerung (Telemetrie fuehrt den Status nach).
+                    _schedule_real_return_home(hit_bin, HARDWARE_RETURN_DELAY_S)
+                else:
+                    _schedule_bin_move(hit_bin, "home", delay_s=2.0)
                 _post_position(pos, "en_route", None, load_units, progress)
             else:
                 # Rückfahrt = nichts mehr zu sammeln (alle erreichbaren/passenden
