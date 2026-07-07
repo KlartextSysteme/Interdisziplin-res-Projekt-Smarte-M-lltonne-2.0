@@ -28,6 +28,19 @@ DIAG_PANEL_BG = color565(66, 65, 66)
 DIAG_VALUE_RIGHT_X = 289
 DIAG_FILL_Y = 88
 DIAG_OBST_Y = 63
+DIAG_AKKU_Y = 113  # Akku-Zeile (unter Fuellstand), am Geraet feinjustieren
+
+# Dynamisches Akku-Icon oben rechts (Rahmen + Gehaeuse + Balken via fill_rect).
+# Koordinaten am realen Display feinjustieren.
+BATT_X = 285
+BATT_Y = 8
+BATT_W = 27
+BATT_H = 14
+BATT_BARS = 4
+BATT_FRAME = color565(224, 224, 224)   # Rahmen + Plus-Pol
+BATT_CASE = color565(38, 40, 44)       # Gehaeuse-Innenfuellung (leerer Balken)
+BATT_OK = color565(120, 210, 130)      # Balken gruen
+BATT_LOW = color565(224, 96, 72)       # Balken rot bei <= 20 %
 # Zeichen -> (Asset-Name, Breite px), Breiten aus tools/render_diag_digits.py
 DIAG_GLYPHS = {
     "0": ("dv_0", 10), "1": ("dv_1", 10), "2": ("dv_2", 10), "3": ("dv_3", 10),
@@ -76,10 +89,12 @@ class TouchUi:
         self.fill_level = 54
         self.line_ok = True
         self.obstacle_cm = None
+        self.battery_level = None
         self.light_mode = False
         # Zuletzt gezeichnete Diagnose-Werte (fuer partielles Live-Refresh).
         self._diag_last_fill = None
         self._diag_last_obstacle = None
+        self._diag_last_battery = None
 
     def set_status(
         self,
@@ -89,6 +104,7 @@ class TouchUi:
         locked=None,
         line_ok=None,
         obstacle_cm=_UNSET,
+        battery_level=None,
         status_kind=None,
         light_mode=None,
         **_unused
@@ -105,6 +121,8 @@ class TouchUi:
             self.line_ok = bool(line_ok)
         if obstacle_cm is not _UNSET:
             self.obstacle_cm = obstacle_cm
+        if battery_level is not None:
+            self.battery_level = max(0, min(100, int(battery_level)))
         if status_kind is not None:
             self.status_kind = status_kind
         if light_mode is not None:
@@ -129,7 +147,8 @@ class TouchUi:
 
         if self.screen == SCREEN_DIAGNOSE:
             if (self.fill_level != self._diag_last_fill
-                    or self.obstacle_cm != self._diag_last_obstacle):
+                    or self.obstacle_cm != self._diag_last_obstacle
+                    or self.battery_level != self._diag_last_battery):
                 self._draw_diag_values()
 
     def handle_touch(self, x, y):
@@ -283,6 +302,26 @@ class TouchUi:
         self.draw_theme_toggle()
         if show_fill:
             self.draw_fill_overlay()
+        self.draw_battery_icon()
+
+    def _battery_bars(self):
+        if self.battery_level is None:
+            return 0
+        # 0..BATT_BARS Balken; 25/50/75/100 % -> 1/2/3/4 (mit Rundung)
+        return max(0, min(BATT_BARS, int((self.battery_level + 12) // 25)))
+
+    def draw_battery_icon(self):
+        # Selbstgezeichnetes Icon deckt ein evtl. gebackenes Symbol; Balken dynamisch.
+        self.d.fill_rect(BATT_X, BATT_Y, BATT_W, BATT_H, BATT_FRAME)
+        self.d.fill_rect(BATT_X + 2, BATT_Y + 2, BATT_W - 4, BATT_H - 4, BATT_CASE)
+        self.d.fill_rect(BATT_X + BATT_W, BATT_Y + 4, 3, BATT_H - 8, BATT_FRAME)
+        bars = self._battery_bars()
+        color = BATT_LOW if (self.battery_level is not None and self.battery_level <= 20) else BATT_OK
+        inner_x = BATT_X + 3
+        seg = (BATT_W - 6) // BATT_BARS
+        for i in range(BATT_BARS):
+            if i < bars:
+                self.d.fill_rect(inner_x + i * seg + 1, BATT_Y + 4, seg - 2, BATT_H - 8, color)
 
     def draw_theme_toggle(self):
         asset = "theme_to_dark" if self.light_mode else "theme_to_light"
@@ -347,6 +386,11 @@ class TouchUi:
             return "-"
         return str(int(self.obstacle_cm)) + " CM"
 
+    def _diag_akku_text(self):
+        if self.battery_level is None:
+            return "-"
+        return str(self.battery_level) + "%"
+
     def _draw_diag_value(self, text, right_x, top_y):
         # Slot leeren (rechts vom Label, x>=200) und Wert rechtsbuendig blitten.
         self.d.fill_rect(200, top_y - 1, right_x - 200 + 1, 12, DIAG_PANEL_BG)
@@ -366,8 +410,10 @@ class TouchUi:
     def _draw_diag_values(self):
         self._draw_diag_value(self._diag_obstacle_text(), DIAG_VALUE_RIGHT_X, DIAG_OBST_Y)
         self._draw_diag_value(self._diag_fill_text(), DIAG_VALUE_RIGHT_X, DIAG_FILL_Y)
+        self._draw_diag_value(self._diag_akku_text(), DIAG_VALUE_RIGHT_X, DIAG_AKKU_Y)
         self._diag_last_fill = self.fill_level
         self._diag_last_obstacle = self.obstacle_cm
+        self._diag_last_battery = self.battery_level
 
     def draw_diagnose(self):
         self.buttons = [Button(92, 188, 136, 46, "menu_2")]
