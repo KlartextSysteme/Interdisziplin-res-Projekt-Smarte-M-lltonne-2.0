@@ -739,17 +739,27 @@ class GlobalController:
 
         fill_level = self._read_fuellstand_for_status()
 
+        # Hindernis nur unterhalb der Stopp-Schwelle (stop_cm) anzeigen;
+        # alles darueber (oder kein Echo) = kein Hindernis -> None -> "-".
+        obstacle_cm = None
+        if self.obstacle_sensors is not None:
+            front_cm = self.obstacle_sensors.run_front(force=True)
+            if front_cm is not None and front_cm < self.obstacle_sensors.stop_cm:
+                obstacle_cm = front_cm
+
         if self.touchpanel is not None:
             if fill_level is None:
                 self.touchpanel.set_status(
                     status_kind="full_home",
                     location="home",
+                    obstacle_cm=obstacle_cm,
                 )
             else:
                 self.touchpanel.set_status(
                     status_kind="full_home",
                     location="home",
                     fill_level=fill_level,
+                    obstacle_cm=obstacle_cm,
                 )
 
         self._debug_state("warte")
