@@ -30,17 +30,28 @@ DIAG_FILL_Y = 88
 DIAG_OBST_Y = 63
 DIAG_AKKU_Y = 113  # Akku-Zeile (unter Fuellstand), am Geraet feinjustieren
 
-# Dynamisches Akku-Icon oben rechts (Rahmen + Gehaeuse + Balken via fill_rect).
-# Koordinaten am realen Display feinjustieren.
-BATT_X = 285
-BATT_Y = 8
-BATT_W = 27
-BATT_H = 14
+# Dynamisches Akku-Icon oben rechts, deckungsgleich mit dem gebackenen Status-Icon
+# (Outline-Batterie @ 290,9, ~17x10). Gelb/Balken = normal, rot leer = schwach,
+# gruen + Stecker = laedt. Koordinaten am Display feinjustieren.
+BATT_X = 290
+BATT_Y = 9
+BATT_BODY_W = 14   # Korpus ohne Plus-Pol
+BATT_H = 10
 BATT_BARS = 4
-BATT_FRAME = color565(224, 224, 224)   # Rahmen + Plus-Pol
-BATT_CASE = color565(38, 40, 44)       # Gehaeuse-Innenfuellung (leerer Balken)
-BATT_OK = color565(120, 210, 130)      # Balken gruen
-BATT_LOW = color565(224, 96, 72)       # Balken rot bei <= 20 %
+BATT_LOW_PCT = 15
+BATT_BG = color565(66, 65, 66)         # Top-Bar-Hintergrund (deckt gebackenes Icon)
+BATT_YELLOW = color565(255, 198, 32)   # normal (wie Design)
+BATT_RED = color565(224, 72, 56)       # leer/schwach
+BATT_GREEN = color565(120, 200, 90)    # laedt
+
+# Datum-Overlay in der globalen Leiste (deckt das gebackene Datum, Asset date_current.rle).
+DATE_X = 11
+DATE_Y = 6
+# Adress-Overlay unten (deckt das gebackene 'Westfalenweg 8', Asset addr_current.rle).
+ADDR_X = 106
+ADDR_Y = 214
+# Fuellstand-Overlay nur bei Aenderung >= X %-Punkte neu zeichnen (gegen Sensor-Jitter).
+FILL_REDRAW_STEP = 3
 # Zeichen -> (Asset-Name, Breite px), Breiten aus tools/render_diag_digits.py
 DIAG_GLYPHS = {
     "0": ("dv_0", 10), "1": ("dv_1", 10), "2": ("dv_2", 10), "3": ("dv_3", 10),
@@ -90,11 +101,16 @@ class TouchUi:
         self.line_ok = True
         self.obstacle_cm = None
         self.battery_level = None
+        self.charging = False
         self.light_mode = False
         # Zuletzt gezeichnete Diagnose-Werte (fuer partielles Live-Refresh).
         self._diag_last_fill = None
         self._diag_last_obstacle = None
         self._diag_last_battery = None
+        # Status-Screen partielles Refresh
+        self._last_status_asset = None
+        self._status_last_fill = None
+        self._status_last_battery = None
 
     def set_status(
         self,
@@ -105,6 +121,7 @@ class TouchUi:
         line_ok=None,
         obstacle_cm=_UNSET,
         battery_level=None,
+        charging=None,
         status_kind=None,
         light_mode=None,
         **_unused
@@ -123,15 +140,30 @@ class TouchUi:
             self.obstacle_cm = obstacle_cm
         if battery_level is not None:
             self.battery_level = max(0, min(100, int(battery_level)))
+        if charging is not None:
+            self.charging = bool(charging)
         if status_kind is not None:
             self.status_kind = status_kind
         if light_mode is not None:
             self.light_mode = bool(light_mode)
 
-        # Diagnose wird nicht voll neu gemalt (Flackern); tick() macht das
-        # partielle Refresh der beiden Wert-Slots.
+        # Status-Screen: Basisbild NICHT bei jedem Update neu blitten (das liess das
+        # gebackene Datum/Akku aufblitzen). Voll nur bei Asset-/Screen-Wechsel; sonst
+        # nur die geaenderten dynamischen Teile -> kein Flackern, Overlays bleiben.
         if self.screen == SCREEN_STATUS:
-            self.draw()
+            asset, show_fill = self._status_asset()
+            if asset != self._last_status_asset:
+                self.draw()
+            else:
+                if show_fill and (
+                    self._status_last_fill is None
+                    or abs(self.fill_level - self._status_last_fill) >= FILL_REDRAW_STEP
+                ):
+                    self.draw_fill_overlay()
+                    self._status_last_fill = self.fill_level
+                if (self.battery_level, self.charging) != self._status_last_battery:
+                    self.draw_battery_icon()
+                    self._status_last_battery = (self.battery_level, self.charging)
 
     def go(self, screen):
         self.screen = screen
@@ -271,11 +303,7 @@ class TouchUi:
         elif self.screen == SCREEN_CONFIRM:
             self.draw_confirm()
 
-    def draw_status(self):
-        self.buttons = [
-            Button(256, 176, 64, 64, "pin"),
-            Button(0, 176, 64, 64, "toggle_theme"),
-        ]
+    def _status_asset(self):
         asset = "status_full_home_clean"
         if self.status_kind == "obstacle":
             asset = "status_obstacle"
@@ -298,30 +326,61 @@ class TouchUi:
         show_fill = asset in ("status_full_home_clean", "status_full_truck_clean")
         if self.light_mode:
             asset += "_light"
+        return asset, show_fill
+
+    def draw_status(self):
+        self.buttons = [
+            Button(256, 176, 64, 64, "pin"),
+            Button(0, 176, 64, 64, "toggle_theme"),
+        ]
+        asset, show_fill = self._status_asset()
         self.r.draw(asset)
+        self.r.draw_at("date_current", DATE_X, DATE_Y)
+        if show_fill:
+            self.r.draw_at("addr_current", ADDR_X, ADDR_Y)
         self.draw_theme_toggle()
         if show_fill:
             self.draw_fill_overlay()
         self.draw_battery_icon()
+        # Fuer partielles Refresh in set_status (kein Vollbild-Reblit -> kein Flackern).
+        self._last_status_asset = asset
+        self._status_last_fill = self.fill_level
+        self._status_last_battery = (self.battery_level, self.charging)
 
     def _battery_bars(self):
         if self.battery_level is None:
-            return 0
-        # 0..BATT_BARS Balken; 25/50/75/100 % -> 1/2/3/4 (mit Rundung)
-        return max(0, min(BATT_BARS, int((self.battery_level + 12) // 25)))
+            return 1
+        # 1..BATT_BARS Balken; 25/50/75/100 % -> 1/2/3/4
+        return max(1, min(BATT_BARS, int((self.battery_level + 12) // 25)))
 
     def draw_battery_icon(self):
-        # Selbstgezeichnetes Icon deckt ein evtl. gebackenes Symbol; Balken dynamisch.
-        self.d.fill_rect(BATT_X, BATT_Y, BATT_W, BATT_H, BATT_FRAME)
-        self.d.fill_rect(BATT_X + 2, BATT_Y + 2, BATT_W - 4, BATT_H - 4, BATT_CASE)
-        self.d.fill_rect(BATT_X + BATT_W, BATT_Y + 4, 3, BATT_H - 8, BATT_FRAME)
-        bars = self._battery_bars()
-        color = BATT_LOW if (self.battery_level is not None and self.battery_level <= 20) else BATT_OK
-        inner_x = BATT_X + 3
-        seg = (BATT_W - 6) // BATT_BARS
-        for i in range(BATT_BARS):
-            if i < bars:
-                self.d.fill_rect(inner_x + i * seg + 1, BATT_Y + 4, seg - 2, BATT_H - 8, color)
+        # Outline-Batterie wie im Status-Design; deckt das gebackene Icon.
+        x, y, bw, bh = BATT_X, BATT_Y, BATT_BODY_W, BATT_H
+        self.d.fill_rect(x - 2, y - 1, bw + 7, bh + 2, BATT_BG)
+
+        if self.charging:
+            col = BATT_GREEN
+        elif self.battery_level is not None and self.battery_level <= BATT_LOW_PCT:
+            col = BATT_RED
+        else:
+            col = BATT_YELLOW
+
+        # Korpus-Umriss (2px) + Plus-Pol rechts
+        self.d.fill_rect(x, y, bw, 2, col)
+        self.d.fill_rect(x, y + bh - 2, bw, 2, col)
+        self.d.fill_rect(x, y, 2, bh, col)
+        self.d.fill_rect(x + bw - 2, y, 2, bh, col)
+        self.d.fill_rect(x + bw, y + 3, 2, bh - 6, col)
+
+        ix, iy, ih = x + 3, y + 2, bh - 4
+        if self.charging:
+            # kleiner Blitz als Lade-Symbol (Zickzack)
+            self.d.fill_rect(ix + 4, iy, 2, 3, col)
+            self.d.fill_rect(ix + 2, iy + 2, 3, 2, col)
+            self.d.fill_rect(ix + 1, iy + 3, 2, 3, col)
+        elif col is not BATT_RED:
+            for i in range(self._battery_bars()):
+                self.d.fill_rect(ix + i * 2, iy, 1, ih, col)
 
     def draw_theme_toggle(self):
         asset = "theme_to_dark" if self.light_mode else "theme_to_light"
