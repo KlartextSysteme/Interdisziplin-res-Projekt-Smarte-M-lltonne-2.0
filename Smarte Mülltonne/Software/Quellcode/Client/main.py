@@ -2,6 +2,7 @@ from time import sleep_ms, ticks_ms, ticks_diff
 
 from buzzer import Buzzer
 from global_controller_test import GlobalController
+from akkustandsueberwachung import Akkustandsueberwachung
 from liniensensor import Liniensensor
 from multiplexer import Multiplexer
 from PDcontroller import PDController
@@ -38,6 +39,12 @@ FUELLSTAND_LEER_CM = 40
 FUELLSTAND_VOLL_CM = 5
 
 BUZZER_PIN = 0
+
+BATTERY_ADC_PIN = 27
+BATTERY_R1_OHM = 100000
+BATTERY_R2_OHM = 33000
+BATTERY_MIN_VOLTAGE = 7.827
+BATTERY_MAX_VOLTAGE = 10.072
 
 LEFT_DIR_PIN = 10
 LEFT_STEP_PIN = 11
@@ -117,6 +124,13 @@ def create_controller():
     )
 
     buzzer = Buzzer(BUZZER_PIN, active_high=True)
+    akkustand = Akkustandsueberwachung(
+        adc_pin=BATTERY_ADC_PIN,
+        r1_ohm=BATTERY_R1_OHM,
+        r2_ohm=BATTERY_R2_OHM,
+        min_voltage=BATTERY_MIN_VOLTAGE,
+        max_voltage=BATTERY_MAX_VOLTAGE,
+    )
 
     controller = GlobalController(
         line_sensor=line_sensor,
@@ -125,6 +139,7 @@ def create_controller():
         motors=motors,
         buzzer=buzzer,
         fuellstand_sensor=fuellstand_sensor,
+        akkustand_sensor=akkustand,
         touchpanel=None,
         base_speed=60,
         min_speed=0,
