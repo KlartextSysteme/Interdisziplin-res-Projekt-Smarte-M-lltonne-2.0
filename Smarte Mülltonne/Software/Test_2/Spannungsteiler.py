@@ -54,3 +54,7 @@ while True:
 #ADC-Rohwert: 38569
 #Spannung an GP27: 1.942 V
 #Batteriespannung: 7.827 V
+
+# ADC-Rohwert: 49628
+# Spannung an GP27: 2.499 V
+# Batteriespannung: 10.072 V

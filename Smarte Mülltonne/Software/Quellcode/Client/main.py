@@ -2,6 +2,7 @@ from time import sleep_ms, ticks_ms, ticks_diff
 
 from buzzer import Buzzer
 from global_controller_test import GlobalController
+from akkustandsueberwachung import Akkustandsueberwachung
 from liniensensor import Liniensensor
 from multiplexer import Multiplexer
 from PDcontroller import PDController
@@ -39,9 +40,17 @@ FUELLSTAND_VOLL_CM = 5
 
 BUZZER_PIN = 0
 
+BATTERY_ADC_PIN = 27
+BATTERY_R1_OHM = 100000
+BATTERY_R2_OHM = 33000
+BATTERY_MIN_VOLTAGE = 7.827
+BATTERY_MAX_VOLTAGE = 10.072
+
 # Motor-Pinsaetze L<->R getauscht: am realen Aufbau (2026-07-04, T1) fuhr die
 # alte Zuordnung 10/11/12=links, 13/8/9=rechts rueckwaerts + spiegelverkehrt.
 # Verifiziert per Referenz-Linienlauf (Position pendelt sauber um 0).
+# MERGE-HINWEIS: origin/main "finale Belegung" hatte den Swap NICHT (LEFT=10/11/12).
+# Hier bewusst unser T1-verifiziertes 13/8/9 belassen -> Verdrahtung gegenpruefen!
 LEFT_DIR_PIN = 13
 LEFT_STEP_PIN = 8
 LEFT_ENABLE_PIN = 9
@@ -120,6 +129,13 @@ def create_controller():
     )
 
     buzzer = Buzzer(BUZZER_PIN, active_high=True)
+    akkustand = Akkustandsueberwachung(
+        adc_pin=BATTERY_ADC_PIN,
+        r1_ohm=BATTERY_R1_OHM,
+        r2_ohm=BATTERY_R2_OHM,
+        min_voltage=BATTERY_MIN_VOLTAGE,
+        max_voltage=BATTERY_MAX_VOLTAGE,
+    )
 
     controller = GlobalController(
         line_sensor=line_sensor,
@@ -128,6 +144,7 @@ def create_controller():
         motors=motors,
         buzzer=buzzer,
         fuellstand_sensor=fuellstand_sensor,
+        akkustand_sensor=akkustand,
         touchpanel=None,
         base_speed=60,
         min_speed=0,
