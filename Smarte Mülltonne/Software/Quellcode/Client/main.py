@@ -112,7 +112,7 @@ def create_controller():
         right_step_pin=RIGHT_STEP_PIN,
         right_enable_pin=RIGHT_ENABLE_PIN,
         min_freq=2000,
-        max_freq=4500,
+        max_freq=7000,
         left_forward_dir=LEFT_FORWARD_DIR,
         right_forward_dir=RIGHT_FORWARD_DIR,
         enable_active_value=1,
