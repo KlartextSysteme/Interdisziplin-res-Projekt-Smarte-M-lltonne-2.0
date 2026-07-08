@@ -80,28 +80,48 @@ Das Projekt wurde durchgängig mit **KI-Agenten** entwickelt — und zwar
 | **1 — Flottenmanagement-App (V1)** | **Codex** | WebApp/Leitstand: FastAPI-Backend, Datenmodell, Next.js-Dashboard, Müllwagen-Simulation, Command-Queue |
 | **2 — Hardware-Integration** | **Claude Code** | Anbindung der realen Tonne: TCP-Bridge, Telemetrie, Touchpanel, Sicherheits-/Fahrlogik |
 
-### 3.1 Wireframes → initialer Prompt → UI
+### 3.1 Agentische Arbeitsweisen (eingesetzte Skills)
 
-Startpunkt der Web-App waren **Wireframes** (liegen im Repo, u. a.
-`Briefing_Fulya_Wireframes.md` und die Excalidraw-Diagramme unter `docs/`). Diese
-Wireframes wurden als **initialer Prompt** an den Agenten gegeben, der daraus die
-UI entwickelte. Die Designvorgaben (dunkler operativer Leitstand, gelber Akzent,
+Die Umsetzung folgte nicht dem Muster „ein Prompt = fertige App", sondern einem
+Set bewusster **Arbeitsweisen im Umgang mit den KI-Agenten**. Diese Skills sind
+der eigentliche methodische Kern des Projekts:
+
+**Brainstorming (Konzept vor Code).** Vor dem Bauen eines Features wurde das
+Problem gemeinsam mit dem Agenten exploriert — Zielbild, Optionen, Trade-offs —
+und erst daraus eine Spezifikation/ein Plan abgeleitet. Erst danach wurde Code
+erzeugt. So entstanden abgestimmte Anforderungen statt vorschnellem Code.
+
+**Multi-Agent-Prompting.** Aufgaben wurden auf **spezialisierte Agenten**
+verteilt, je nach Stärke des Werkzeugs: **Codex** für die Flottenmanagement-WebApp
+(Phase 1), **Claude Code** für die Hardware-Integration (Phase 2). Innerhalb einer
+Phase wurden abgegrenzte Teilaufgaben zusätzlich an **Sub-Agenten** delegiert
+(subagent-getriebene Umsetzung), um klar umrissene Arbeitspakete parallel/fokussiert
+abzuarbeiten.
+
+**Wireframes → initialer Prompt → UI.** Startpunkt der Web-App waren **Wireframes**
+(liegen im Repo, u. a. `Briefing_Fulya_Wireframes.md` und die Excalidraw-Diagramme
+unter `docs/`). Sie wurden als **initialer Prompt** an den Agenten gegeben, der
+daraus die UI entwickelte. Die Designvorgaben (dunkler Leitstand, gelber Akzent,
 Karte zentral, Flotte links, Status/Meldungen rechts) sind in
-`docs/claude_prompt_webapp_pico_integration_scope.md` dokumentiert.
+`docs/claude_prompt_webapp_pico_integration_scope.md` festgehalten.
 
-### 3.2 Vertical Slicing
+**Vertical Slicing.** Gebaut wurde in **vertikalen Durchstichen**: statt Schicht
+für Schicht wurde **eine Funktion komplett durch alle Ebenen** umgesetzt —
+**Datenbank → Backend → Frontend** — als in sich lauffähiges Arbeitspaket. Nach
+jedem Slice steht ein demonstrierbares, durchgängiges Feature — ideal für die
+agentische Iteration und für Zwischenstände vor dem Prof. Der Ansatz ist im Repo
+namentlich verankert: `docs/api_contract.md` beschreibt den **„ersten Vertical
+Slice"** der Hardware-Anbindung.
 
-Gearbeitet wurde in **vertikalen Durchstichen (Vertical Slicing)**: statt Schicht
-für Schicht wurde **eine Funktion komplett durch alle Ebenen** gebaut —
-**Datenbank → Backend → Frontend** — als in sich lauffähiges Arbeitspaket. Der
-Ansatz ist im Repo sogar namentlich verankert: `docs/api_contract.md` beschreibt
-den **„ersten Vertical Slice"** der Hardware-Anbindung.
+**Iteration & Testing.** Kern der agentischen Arbeit war der **Zyklus aus Bauen →
+Testen → Nachschärfen**. Features wurden am realen Aufbau geprüft (siehe
+`docs/hardwaretestkatalog_2026-07-04.md`), gefundene Fehler flossen als nächster
+Prompt zurück in den Agenten, der gezielt nachbesserte — teils über mehrere Runden
+pro Feature (z. B. Motor-Pin-Korrektur, Kalibrierung und Stabilisierung des
+Füllstandsensors). So näherte man sich iterativ dem funktionierenden Ergebnis, statt
+auf einen „großen Wurf" zu setzen.
 
-**Vorteil:** Nach jedem Slice gibt es ein demonstrierbares, durchgängiges Feature
-— ideal für iteratives Arbeiten mit einem Agenten und für Zwischenstände vor dem
-Prof.
-
-### 3.3 Bridge & Command-Queue als Adapter an die bestehende Logik ✅
+### 3.2 Bridge & Command-Queue als Adapter an die bestehende Logik ✅
 
 Die zweite Phase durfte die in Phase 1 gebaute WebApp **nicht neu erfinden**.
 Stattdessen wurde die Hardware **an die bestehende Backend-Logik angepasst** —
@@ -175,7 +195,8 @@ Kernentscheidungen:
   Consumer** (Konnektivität, Effizienz, Umwelt/Service).
 - **Funktionen:** folgen zwingend aus „Routenplanung nach Füllstand" →
   Telemetrie · Routenlogik · Dispatch/Visualisierung.
-- **Methode:** **agentisches KI-Coding, Multi-Agent** (Codex → Claude Code),
-  **Wireframes → Prompt → UI**, **Vertical Slicing**, **Bridge/Command-Queue als
-  Adapter** an bestehende Logik.
+- **Methode:** **agentisches KI-Coding** mit bewussten Skills — **Brainstorming**,
+  **Multi-Agent-Prompting** (Codex → Claude Code, + Sub-Agenten),
+  **Wireframes → Prompt → UI**, **Vertical Slicing**, **Iteration & Testing**;
+  Ergebnis u. a. **Bridge/Command-Queue als Adapter** an die bestehende Logik.
 - **Architektur:** Pico ↔ Bridge ↔ Backend ↔ Dashboard.
