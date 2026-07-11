@@ -81,6 +81,13 @@ class PicoBridge:
         self.state = BridgeState(bin_id=bin_id)
         self.poll_interval_s = poll_interval_s
         self.client = httpx.AsyncClient(timeout=5.0)
+        # Nur EINE aktive Pico-Verbindung zulassen. Der Pico reconnectet bei
+        # WLAN-Hickups am Nano-Router, ohne dass die alte TCP-Verbindung sofort
+        # als tot erkannt wird -> mehrere handle_client/Poll-Tasks parallel, die
+        # sich sent_command_ids teilen und Kommandos in halb-offene Sockets
+        # schreiben -> Pico bekommt sie nie, kein ACK, Queue blockiert.
+        self._active_writer: "asyncio.StreamWriter | None" = None
+        self._active_poll_task: "asyncio.Task | None" = None
 
     async def close(self) -> None:
         await self.client.aclose()
@@ -92,11 +99,25 @@ class PicoBridge:
     ) -> None:
         peer = writer.get_extra_info("peername")
         LOGGER.info("Pico connected from %s", peer)
+
+        # Alte (ggf. halb-offene) Verbindung hart schliessen -> deren readline
+        # bricht ab, deren Poll-Task wird gecancelt. So bleibt genau eine aktive
+        # Verbindung; Kommandos gehen nur noch an den aktuellen Socket.
+        old_writer, old_task = self._active_writer, self._active_poll_task
+        if old_task is not None:
+            old_task.cancel()
+        if old_writer is not None and old_writer is not writer:
+            with contextlib.suppress(Exception):
+                old_writer.close()
+            LOGGER.info("closed previous Pico connection (superseded by %s)", peer)
+
         self.state.connected = True
         self.state.inflight_by_pico_cmd.clear()
         self.state.sent_command_ids.clear()
 
         poll_task = asyncio.create_task(self._poll_commands(writer))
+        self._active_writer = writer
+        self._active_poll_task = poll_task
         try:
             while not reader.at_eof():
                 try:
@@ -116,6 +137,9 @@ class PicoBridge:
             with contextlib.suppress(asyncio.CancelledError):
                 await poll_task
             self.state.connected = False
+            if self._active_writer is writer:
+                self._active_writer = None
+                self._active_poll_task = None
             writer.close()
             with contextlib.suppress(Exception):
                 await writer.wait_closed()
