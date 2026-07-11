@@ -103,7 +103,7 @@ class GlobalController:
 
         # müssen noch angepasst werden
         self.avoid_turn_90_steps = 22000
-        self.turn_home_180_steps = 44000
+        self.turn_home_180_steps = 47000
 
         self.avoid_turn_90_ms = 0
         self.turn_home_180_ms = 0
@@ -857,6 +857,22 @@ class GlobalController:
         self._debug_state("warte")
             
 
+    def _confirm_front_obstacle(self, samples=3, needed=2):
+        """Entprellt die Front-Hinderniserkennung: erst ein ueber mehrere
+        Messungen bestaetigtes Hindernis loest den Stopp aus. Einzelne
+        Spurious-Kurzechos (Vibration/Boden-/Chassis-Reflexion/MUX-Crosstalk)
+        werden verworfen -> keine Fehl-Stopps mitten in der Fahrt. Ein echtes
+        Hindernis wird trotzdem in wenigen 10 ms bestaetigt und stoppt."""
+        if self.obstacle_sensors is None:
+            return False
+        hits = 0
+        for _ in range(samples):
+            d = self.obstacle_sensors.run_front(force=True)
+            if d is not None and d <= self.obstacle_sensors.stop_cm:
+                hits += 1
+            time.sleep_ms(5)
+        return hits >= needed
+
     def _logic_line_following(self):
         if self.line_sensor is None or self.pd_controller is None or self.motors is None:
             if self.motors:
@@ -866,7 +882,11 @@ class GlobalController:
         if self.obstacle_sensors is not None:
             self.obstacle_sensors.run_front()
 
-            if self.obstacle_sensors.front_obstacle_detected():
+            # Entprellt: erst stoppen, wenn das Hindernis ueber mehrere
+            # Messungen bestaetigt ist (verhindert Fehl-Stopps durch einzelne
+            # spurious Kurzechos im Fahrbetrieb). Erst-Check nutzt die gecachte
+            # Messung -> kein Zusatzaufwand, solange die Bahn frei ist.
+            if self.obstacle_sensors.front_obstacle_detected() and self._confirm_front_obstacle():
                 self.motors.stop()
                 self.set_state(self.STATE_OBSTACLE_WAIT)
                 return

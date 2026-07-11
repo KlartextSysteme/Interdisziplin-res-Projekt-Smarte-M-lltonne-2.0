@@ -48,21 +48,23 @@ BATTERY_R2_OHM = 33000
 BATTERY_MIN_VOLTAGE = 7.827
 BATTERY_MAX_VOLTAGE = 10.072
 
-# Motor-Pinsaetze L<->R getauscht: am realen Aufbau (2026-07-04, T1) fuhr die
-# alte Zuordnung 10/11/12=links, 13/8/9=rechts rueckwaerts + spiegelverkehrt.
-# Verifiziert per Referenz-Linienlauf (Position pendelt sauber um 0).
-# MERGE-HINWEIS: origin/main "finale Belegung" hatte den Swap NICHT (LEFT=10/11/12).
-# Hier bewusst unser T1-verifiziertes 13/8/9 belassen -> Verdrahtung gegenpruefen!
-LEFT_DIR_PIN = 13
-LEFT_STEP_PIN = 8
-LEFT_ENABLE_PIN = 9
+# Motor-Pinbelegung nach dem Verpol-Blast + Treibertausch (2026-07-11) neu
+# verkabelt und am realen Aufbau per Einzelmotor-Test empirisch verifiziert:
+#   LINKS  an 10/11/12  (vorwaerts = DIR 0)
+#   RECHTS an 13/8/9    (vorwaerts = DIR 1)
+# Ersetzt die fruehere T1-Belegung (13/8/9=links), die zur alten Verkabelung
+# vor dem Blast passte. Bei erneutem Umverdrahten: Richtungen wieder per
+# Einzelmotor-Test pruefen (rechte Spulen waren nach dem Tausch falsch gepaart).
+LEFT_DIR_PIN = 10
+LEFT_STEP_PIN = 11
+LEFT_ENABLE_PIN = 12
 
-RIGHT_DIR_PIN = 10
-RIGHT_STEP_PIN = 11
-RIGHT_ENABLE_PIN = 12
+RIGHT_DIR_PIN = 13
+RIGHT_STEP_PIN = 8
+RIGHT_ENABLE_PIN = 9
 
-LEFT_FORWARD_DIR = 1
-RIGHT_FORWARD_DIR = 0
+LEFT_FORWARD_DIR = 0
+RIGHT_FORWARD_DIR = 1
 
 
 def create_controller():
