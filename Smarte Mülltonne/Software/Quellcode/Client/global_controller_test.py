@@ -91,6 +91,13 @@ class GlobalController:
         self.obstacle_stop_cm = 15
         self.avoid_side = None
 
+        # Nicht-blockierende Entprellung der Front-Hinderniserkennung: Hindernis
+        # muss durchgehend >= _front_obstacle_confirm_ms anliegen, sonst wird ein
+        # einzelnes spurious Kurzecho verworfen. KEINE Forced-Messungen im
+        # Regeltakt (die wuerden die PD-Regelung ausbremsen -> langsam/ruckelig).
+        self._front_obstacle_since_ms = None
+        self._front_obstacle_confirm_ms = 250
+
         self.avoid_speed = 35
         self.avoid_turn_speed = 35
 
@@ -207,7 +214,7 @@ class GlobalController:
         # in der schaerfsten Kurve wird bis auf speed_curve heruntergedrosselt.
         # Adaption neutralisiert: speed_curve == base_speed -> konstantes Tempo.
         # (Beim Tempo-Test nur EINE Variable aendern.)
-        self.speed_curve = 60
+        self.speed_curve = 25
 
         # --- Party-Modus (Easter-Egg via PIN "***") ---
         # Step-basiert: N volle Umdrehungen (360deg = 2x turn_home_180_steps),
@@ -857,22 +864,6 @@ class GlobalController:
         self._debug_state("warte")
             
 
-    def _confirm_front_obstacle(self, samples=3, needed=2):
-        """Entprellt die Front-Hinderniserkennung: erst ein ueber mehrere
-        Messungen bestaetigtes Hindernis loest den Stopp aus. Einzelne
-        Spurious-Kurzechos (Vibration/Boden-/Chassis-Reflexion/MUX-Crosstalk)
-        werden verworfen -> keine Fehl-Stopps mitten in der Fahrt. Ein echtes
-        Hindernis wird trotzdem in wenigen 10 ms bestaetigt und stoppt."""
-        if self.obstacle_sensors is None:
-            return False
-        hits = 0
-        for _ in range(samples):
-            d = self.obstacle_sensors.run_front(force=True)
-            if d is not None and d <= self.obstacle_sensors.stop_cm:
-                hits += 1
-            time.sleep_ms(5)
-        return hits >= needed
-
     def _logic_line_following(self):
         if self.line_sensor is None or self.pd_controller is None or self.motors is None:
             if self.motors:
@@ -882,14 +873,22 @@ class GlobalController:
         if self.obstacle_sensors is not None:
             self.obstacle_sensors.run_front()
 
-            # Entprellt: erst stoppen, wenn das Hindernis ueber mehrere
-            # Messungen bestaetigt ist (verhindert Fehl-Stopps durch einzelne
-            # spurious Kurzechos im Fahrbetrieb). Erst-Check nutzt die gecachte
-            # Messung -> kein Zusatzaufwand, solange die Bahn frei ist.
-            if self.obstacle_sensors.front_obstacle_detected() and self._confirm_front_obstacle():
-                self.motors.stop()
-                self.set_state(self.STATE_OBSTACLE_WAIT)
-                return
+            # Nicht-blockierend entprellt: stoppen erst, wenn das Hindernis
+            # durchgehend >= _front_obstacle_confirm_ms anliegt. Einzelne
+            # spurious Kurzechos (nur bis zur naechsten Messung gecacht) erreichen
+            # die Schwelle nie -> keine Fehl-Stopps, aber auch kein Blockieren des
+            # Regeltakts (keine Forced-Messungen).
+            if self.obstacle_sensors.front_obstacle_detected():
+                now = time.ticks_ms()
+                if self._front_obstacle_since_ms is None:
+                    self._front_obstacle_since_ms = now
+                elif time.ticks_diff(now, self._front_obstacle_since_ms) >= self._front_obstacle_confirm_ms:
+                    self.motors.stop()
+                    self.set_state(self.STATE_OBSTACLE_WAIT)
+                    self._front_obstacle_since_ms = None
+                    return
+            else:
+                self._front_obstacle_since_ms = None
 
         position = self.line_sensor.get_position()
 
@@ -1698,7 +1697,7 @@ class GlobalController:
                 self.set_state(self.STATE_AT_HOME)
             return
 
-        self.motors.turn_right(self.avoid_turn_speed)
+        self.motors.turn_left(self.avoid_turn_speed)
 
         self._debug_state(
             "180-Grad-Drehung zuhause Elapsed ms: "
@@ -1725,7 +1724,7 @@ class GlobalController:
 
         elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
 
-        self.motors.turn_right(self.avoid_turn_speed)
+        self.motors.turn_left(self.avoid_turn_speed)
 
         self._debug_state(
             "180-Grad-Drehung an der Strasse Elapsed ms: "
