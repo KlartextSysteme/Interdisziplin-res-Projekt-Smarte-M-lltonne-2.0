@@ -1,7 +1,7 @@
 import time
 
 from config import MAINTENANCE_PIN
-from display import color565
+from display import BLACK, WHITE, color565
 from wireframe import WireframeRenderer
 
 
@@ -54,6 +54,7 @@ class TouchUi:
         self.connected = True
         self.locked = False
         self.fill_level = 54
+        self.battery_level = None
         self.line_ok = True
         self.obstacle_cm = None
         self.light_mode = False
@@ -68,6 +69,7 @@ class TouchUi:
         obstacle_cm=None,
         status_kind=None,
         light_mode=None,
+        battery_level=None,
         **_unused
     ):
         if fill_level is not None:
@@ -86,6 +88,8 @@ class TouchUi:
             self.status_kind = status_kind
         if light_mode is not None:
             self.light_mode = bool(light_mode)
+        if battery_level is not None:
+            self.battery_level = max(0, min(100, int(battery_level)))
 
         if self.screen in (SCREEN_STATUS, SCREEN_DIAGNOSE):
             self.draw()
@@ -240,6 +244,7 @@ class TouchUi:
             asset += "_light"
         self.r.draw(asset)
         self.draw_theme_toggle()
+        self.draw_battery_overlay()
         if show_fill:
             self.draw_fill_overlay()
 
@@ -257,6 +262,19 @@ class TouchUi:
         self.d.fill_rect(151, 101, 28, 21, BIN_LABEL)
 
         self.r.draw_at_keyed("fill_" + str(self.fill_level), 131, 141, BIN_BODY)
+
+    def draw_battery_overlay(self):
+        if self.battery_level is None:
+            return
+
+        text = "AKKU " + str(self.battery_level) + "%"
+        width = self.d.text_width(text, scale=1)
+        x = 312 - width
+        y = 8
+        bg = WHITE if self.light_mode else BLACK
+        fg = BLACK if self.light_mode else WHITE
+        self.d.fill_rect(x - 4, y - 3, width + 8, 12, bg)
+        self.d.text(text, x, y, fg, scale=1)
 
     def draw_pin(self):
         self.buttons = []

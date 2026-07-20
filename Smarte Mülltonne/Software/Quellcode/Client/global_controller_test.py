@@ -59,6 +59,7 @@ class GlobalController:
         motors=None,
         buzzer=None,
         fuellstand_sensor=None,
+        akkustand_sensor=None,
         touchpanel=None,
         base_speed=45,
         min_speed=0,
@@ -70,6 +71,7 @@ class GlobalController:
         self.motors = motors
         self.buzzer = buzzer
         self.fuellstand_sensor = fuellstand_sensor
+        self.akkustand_sensor = akkustand_sensor
         self.touchpanel = touchpanel
 
         self.base_speed = base_speed
@@ -142,6 +144,15 @@ class GlobalController:
         # -------- zum Testen --------
         self.last_debug_ms = time.ticks_ms()
         self.debug_interval_ms = 250
+
+        # Akku nur im Ruhezustand messen: erst nachdem die Motoren laenger aus
+        # waren, damit nicht der Spannungseinbruch unter Last angezeigt wird.
+        self.battery_idle_delay_ms = 10 * 60 * 1000
+        self.battery_read_interval_ms = 60 * 1000
+        self._last_motor_active_ms = time.ticks_ms()
+        self._last_battery_read_ms = 0
+        self._last_battery_percent = None
+        self._last_battery_voltage = None
 
         # Touchpanel-Tick waehrend der Fahrt drosseln, damit der SPI-Touch-Read
         # die PD-Regelung nicht jeden Zyklus ausbremst (enges Regel-Raster).
@@ -330,6 +341,56 @@ class GlobalController:
         )
 
         return fill_level
+
+    def _is_motor_activity_state(self):
+        return self.state in (
+            self.STATE_LINE_FOLLOWING,
+            self.STATE_LINE_LOST,
+            self.STATE_TURN_AT_HOME,
+            self.STATE_TURN_AT_STREET,
+            self.STATE_AVOID_RIGHT,
+            self.STATE_AVOID_LEFT,
+            self.STATE_AVOID_NOT_POSSIBLE,
+            self.STATE_PARTY,
+        )
+
+    def _update_motor_activity_time(self):
+        if self._is_motor_activity_state():
+            self._last_motor_active_ms = time.ticks_ms()
+
+    def _read_battery_for_status(self):
+        if self.akkustand_sensor is None:
+            return None
+
+        now = time.ticks_ms()
+        if time.ticks_diff(now, self._last_motor_active_ms) < self.battery_idle_delay_ms:
+            return self._last_battery_percent
+
+        if (
+            self._last_battery_percent is not None
+            and time.ticks_diff(now, self._last_battery_read_ms) < self.battery_read_interval_ms
+        ):
+            return self._last_battery_percent
+
+        try:
+            status = self.akkustand_sensor.read_status()
+        except Exception as exc:
+            print("Akkumessung fehlgeschlagen:", exc)
+            return self._last_battery_percent
+
+        self._last_battery_read_ms = now
+        self._last_battery_percent = status["battery_percent"]
+        self._last_battery_voltage = status["battery_voltage"]
+
+        self._debug_print(
+            "Akku-Test | Spannung: "
+            + str(round(self._last_battery_voltage, 3))
+            + " V | Akkustand: "
+            + str(self._last_battery_percent)
+            + "%"
+        )
+
+        return self._last_battery_percent
 
     def _motor_debug_text(self):
         if self.motors is None:
@@ -682,6 +743,8 @@ class GlobalController:
         return s
 
     def run(self):
+        self._update_motor_activity_time()
+
         if self.touchpanel is not None:
             # Waehrend der Fahrt den Touch-Read drosseln (er blockiert sonst die
             # Regelung); im Leerlauf jeden Zyklus, damit das Menue flott bleibt.
@@ -738,18 +801,21 @@ class GlobalController:
             self.buzzer.stop()
 
         fill_level = self._read_fuellstand_for_status()
+        battery_level = self._read_battery_for_status()
 
         if self.touchpanel is not None:
             if fill_level is None:
                 self.touchpanel.set_status(
                     status_kind="full_home",
                     location="home",
+                    battery_level=battery_level,
                 )
             else:
                 self.touchpanel.set_status(
                     status_kind="full_home",
                     location="home",
                     fill_level=fill_level,
+                    battery_level=battery_level,
                 )
 
         self._debug_state("warte")
