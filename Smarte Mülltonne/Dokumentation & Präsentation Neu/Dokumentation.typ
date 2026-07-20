@@ -139,7 +139,7 @@
     columns: (1fr, 1fr),
     align(left)[
       #text(size: 9pt, fill: luma(125))[*Projektgruppe*] \
-      #text(size: 10.5pt)[Jan-Lukas · Theresa Pelz · Alaeddine Baghyour · Fulya · Jonas Wiesner]
+      #text(size: 10.5pt)[Jan-Lukas · Theresa Pelz · Alaeddine Baghyour · Samiy Fulya Bulut · Jonas Wiesner]
     ],
     align(right)[
       #text(size: 9pt, fill: luma(125))[*Stand der Dokumentation*] \
@@ -778,6 +778,372 @@ Die vorgesehene Integrationsstrategie ist inkrementell:
 3. Commands werden über Polling und ACKs eingebunden.
 4. Fahrzustände und Position beziehungsweise Zustandsübergänge werden in die Live-Daten aufgenommen.
 5. Danach wird getestet, ob der Agent operative Aktionen zuverlässig auslösen darf.
+
+
+#pagebreak()
+
+= Nutzerinteraktion und Touchpanel
+
+== Rolle des Touchpanels im Gesamtsystem
+
+Das Touchpanel bildet die lokale Benutzerschnittstelle der Smarten Mülltonne 2.0. Während die Flottenmanagement-Web-App für die zentrale Überwachung und Steuerung mehrerer Mülltonnen vorgesehen ist, ermöglicht das Touchpanel die direkte Interaktion mit einer einzelnen Mülltonne am jeweiligen Standort. Beide Bedienebenen ergänzen sich und verbinden die Nutzerinnen und Nutzer mit der lokalen Hardwaresteuerung und dem digitalen Managementsystem.
+
+Über das Touchpanel können zentrale Betriebsfunktionen ausgelöst und aktuelle Systemzustände eingesehen werden. Dazu gehören das Starten und Stoppen der autonomen Fahrt sowie die Funktion "Nach Hause", mit der die Mülltonne zu ihrem definierten Standplatz zurückkehrt.
+
+Der Startbildschirm zeigt außerdem Datum und Uhrzeit, den aktuellen Akkustand, den Füllstand, die zugeordnete Adresse und den Verbindungsstatus. Erkannte Hindernisse, technische Fehler und Sicherheitsereignisse werden ebenfalls lokal dargestellt. Relevante Zustände werden gleichzeitig an die Flottenmanagement-Web-App übertragen. Dadurch bleiben lokale Bedienung und zentrale Überwachung miteinander verbunden.
+
+#figure(
+  table(
+    columns: (1.45fr, 2.3fr, 2.3fr),
+    [*Bereich*], [*Darstellung und Bedienung am Touchpanel*], [*Verbindung zur Web-App*],
+
+    [Fahrsteuerung],
+    [Starten und Stoppen der autonomen Fahrt sowie Rückkehr über die Funktion "Nach Hause".],
+    [Der aktuelle Fahr- und Betriebszustand wird zentral sichtbar.],
+
+    [Allgemeine Informationen],
+    [Anzeige von Datum, Uhrzeit und zugeordneter Adresse der Mülltonne.],
+    [Die Adresse ermöglicht die eindeutige Zuordnung innerhalb der Flottenübersicht.],
+
+    [Akku und Füllstand],
+    [Darstellung des Akkustands und des gemessenen Füllstands als Prozentwerte.],
+    [Die Werte können für Monitoring und Abholplanung verwendet werden.],
+
+    [Verbindungsstatus],
+    [Ein Statussymbol zeigt die Verbindung zum digitalen Managementsystem an.],
+    [Die Erreichbarkeit der Mülltonne kann zentral kontrolliert werden.],
+
+    [Fehler und Sicherheit],
+    [Hindernisse, technische Fehler und sicherheitsrelevante Zustände werden lokal angezeigt.],
+    [Die Ereignisse werden zusätzlich in der Web-App dargestellt.],
+  ),
+  caption: [Funktionen des Touchpanels und ihre Verbindung zum Flottenmanagement],
+)
+
+ Für das Bedienkonzept ist entscheidend, dass die lokale Benutzeroberfläche mit der Hardwaresteuerung verbunden ist und relevante Systemzustände mit der Web-App synchronisiert werden.
+
+#decision[
+  *Systementscheidung:* Das Touchpanel und die Flottenmanagement-Web-App wurden als zwei sich ergänzende Bedienebenen konzipiert. Das Touchpanel ermöglicht die direkte lokale Interaktion mit einer einzelnen Mülltonne. Die Web-App übernimmt dagegen die zentrale Überwachung und Steuerung des gesamten Systems.
+]
+
+== Zielgruppen und Nutzungskontext
+
+Das Touchpanel richtet sich grundsätzlich an Bewohnerinnen und Bewohner aller Altersgruppen, die eine Smarte Mülltonne im privaten oder gemeinschaftlichen Wohnumfeld nutzen. Die Benutzeroberfläche wurde deshalb nicht für eine eng abgegrenzte technische Nutzergruppe, sondern als allgemein verständliche und möglichst barrierearme Schnittstelle konzipiert.
+
+Ein besonderer Fokus liegt auf älteren Menschen und Personen mit eingeschränkter Mobilität. Für diese Nutzergruppen kann das manuelle Bewegen einer gefüllten Mülltonne bis zur Straße eine erhebliche körperliche Belastung darstellen. Durch die lokale Fahrsteuerung und die ergänzende Fernsteuerung soll die Mülltonne ohne großen körperlichen Aufwand zur Abholposition bewegt und nach der Leerung wieder zu ihrem Standplatz zurückgerufen werden können.
+
+Die Interaktion mit dem Touchpanel findet überwiegend im Außenbereich und häufig innerhalb eines kurzen Zeitfensters statt. Typische Nutzungssituationen sind das Einwerfen von Abfall, das Kontrollieren von Füllstand und Akkustand, das Starten der Fahrt zur Abholposition, die Rückkehr nach der Leerung sowie die Reaktion auf Hindernisse, Fehler- oder Sicherheitsmeldungen.
+
+Da das Display bei unterschiedlichen Lichtverhältnissen erkennbar bleiben muss, wurde für die Nutzung bei Tageslicht ein eigener Tagmodus berücksichtigt. Dieser unterstützt eine kontrastreiche Darstellung der zentralen Informationen und Bedienelemente. Ergänzend ermöglicht die Web-App eine ortsunabhängige Kontrolle des Systems, wenn eine direkte Bedienung an der Mülltonne nicht möglich oder nicht sinnvoll ist.
+
+#figure(
+  table(
+    columns: (1.55fr, 2.15fr, 2.35fr),
+    [*Nutzergruppe*], [*Typischer Nutzungskontext*], [*Zentrales Bedürfnis*],
+
+    [Bewohnerinnen und Bewohner],
+    [Direkte Nutzung der Mülltonne im privaten oder gemeinschaftlichen Wohnumfeld.],
+    [Einfache Bedienung und schneller Zugriff auf die wichtigsten Funktionen.],
+
+    [Ältere Menschen],
+    [Bereitstellung und Rückholung der Mülltonne ohne hohe körperliche Belastung.],
+    [Verständliche Navigation, gut erkennbare Zustände und wenige Bedienschritte.],
+
+    [Personen mit eingeschränkter Mobilität],
+    [Lokale oder ortsunabhängige Steuerung der Mülltonne.],
+    [Reduzierung manueller Wege und körperlicher Anstrengung.],
+
+    [Service- und Entsorgungspersonal],
+    [Kontrolle von Betriebszuständen, Fehlern oder Sicherheitsmeldungen direkt vor Ort.],
+    [Schneller Überblick über den Zustand der einzelnen Mülltonne.],
+  ),
+  caption: [Zielgruppen und Nutzungskontexte des Touchpanels],
+)
+
+#infobox[
+  *Zielgruppenentscheidung:* Das Touchpanel wurde als allgemein verständliche Schnittstelle für Bewohnerinnen und Bewohner konzipiert. Die besonderen Bedürfnisse älterer Menschen und Personen mit eingeschränkter Mobilität werden dabei als Maßstab für eine möglichst barrierearme Bedienung verwendet, ohne andere Nutzergruppen auszuschließen.
+]
+
+== Anforderungen an die lokale Bedienung
+
+Aus den Zielgruppen und den typischen Nutzungssituationen wurden konkrete Anforderungen an die lokale Bedienung abgeleitet. Das Touchpanel muss auf einem kleinen Display schnell erfassbar sein, direkte Rückmeldungen geben und gleichzeitig vor unbeabsichtigten oder unberechtigten Eingriffen schützen. Da die Bedienung häufig im Außenbereich und nur für kurze Zeit erfolgt, müssen die wichtigsten Informationen ohne eine lange Navigation sichtbar sein.
+
+Statusinformationen wie Akkustand, Füllstand, Standort, Uhrzeit und Verbindungsstatus werden bereits auf dem Startbildschirm dargestellt. Dadurch können Nutzerinnen und Nutzer den Zustand der Mülltonne kontrollieren, ohne sich zunächst anmelden oder durch mehrere Menüs navigieren zu müssen. Steuerungsfunktionen mit direkter Auswirkung auf das System werden dagegen über eine PIN-Eingabe geschützt.
+
+#figure(
+  table(
+    columns: (1.55fr, 2.25fr, 2.25fr),
+    [*Anforderung*], [*Begründung*], [*Umsetzung im Bedienkonzept*],
+
+    [Schnelle Erfassbarkeit],
+    [Die Interaktion erfolgt häufig nur für wenige Sekunden.],
+    [Zentrale Zustände werden direkt auf dem Startbildschirm angezeigt.],
+
+    [Gute Sichtbarkeit],
+    [Das Display wird im Außenbereich und bei unterschiedlichen Lichtverhältnissen verwendet.],
+    [Kontrastreiche Gelb-Grau-Gestaltung sowie ein für Tageslicht vorgesehener Tagmodus.],
+
+    [Einfache Navigation],
+    [Auch Personen ohne technische Vorkenntnisse müssen die Funktionen verstehen können.],
+    [Reduzierte Menüstruktur, Swipe- beziehungsweise Pfeilnavigation und ein deutlich sichtbarer Zurück-Button.],
+
+    [Eindeutige Rückmeldung],
+    [Nutzerinnen und Nutzer müssen erkennen, ob eine Aktion erfolgreich ausgelöst wurde.],
+    [Separate Bestätigungsanzeigen wie "Auswahl bestätigt", "Meldung gesendet" oder "Verbindung hergestellt".],
+
+    [Verständliche Fehlerkommunikation],
+    [Hindernisse oder technische Fehler dürfen nicht ausschließlich über einen Farbwechsel kommuniziert werden.],
+    [Kombination aus Farbe, Symbol und Text für Zustände wie "Hindernis erkannt" oder "Linie verloren".],
+
+    [Zugriffsschutz],
+    [Fahr-, Sicherheits- oder Systemfunktionen dürfen nicht unbeabsichtigt oder durch unbefugte Personen ausgelöst werden.],
+    [Statusinformationen bleiben direkt sichtbar; geschützte Bedienfunktionen werden erst nach der PIN-Eingabe freigegeben.],
+
+    [Multimodales Feedback],
+    [Kritische Situationen müssen auch dann wahrnehmbar sein, wenn der Bildschirm nicht dauerhaft betrachtet wird.],
+    [Visuelle Statusanzeigen werden bei kritischen Ereignissen durch akustisches Feedback über den Buzzer ergänzt.],
+  ),
+  caption: [Anforderungen an die lokale Bedienung und ihre Umsetzung im Touchpanel],
+)
+
+Die Farbcodierung unterstützt die schnelle Orientierung, ist jedoch nicht der einzige Informationsträger. Gelb kennzeichnet aktive Elemente, ausgewählte Funktionen oder wichtige Hinweise. Rot wird für Fehler- und Gefahrenzustände verwendet, während Grün einen regulären beziehungsweise verbundenen Zustand signalisiert. Symbole und kurze Textmeldungen ergänzen die Farben, damit die Bedeutung auch ohne vorherige Einweisung verständlich bleibt.
+
+#decision[
+  *Interaktionsentscheidung:* Allgemeine Statusinformationen sollen unmittelbar zugänglich sein. Funktionen mit Auswirkungen auf Fahrt, Sicherheit oder Systemzustand werden dagegen durch PIN-Eingabe, eindeutige Auswahl und anschließende Bestätigung abgesichert.
+]
+
+== Iterativer Designprozess
+
+Die Benutzeroberfläche des Touchpanels entstand nicht in einem einzelnen Entwurf, sondern wurde in mehreren aufeinander aufbauenden Gestaltungsphasen entwickelt. Ausgangspunkt waren die zuvor definierten Use Cases und Nutzungsszenarien. Darauf aufbauend wurden erste Skizzen, Wireframes, Wireflows und User Flows erstellt, um die benötigten Funktionen, möglichen Navigationswege und Rückmeldungen des Systems sichtbar zu machen.
+
+Im Verlauf des Projekts wurden unterschiedliche horizontale, vertikale und visuelle Interface-Ansätze entwickelt. Die Entwürfe wurden innerhalb des Teams besprochen und anhand der Anforderungen an Verständlichkeit, Sichtbarkeit, Zugriffsschutz und Anzahl der notwendigen Bedienschritte bewertet. Zusätzlich flossen Rückmeldungen des Hardwareteams zu Displaygröße und technischen Einschränkungen sowie Feedback aus der Projektbetreuung in die Weiterentwicklung ein.
+
+Die einzelnen Entwürfe dienten daher nicht nur als visuelle Varianten. Mit ihnen wurde geprüft, wie viele Funktionen auf dem begrenzten Display sinnvoll dargestellt werden können und wie Nutzerinnen und Nutzer zwischen Statusanzeige, Fahrsteuerung, Wartung, Sicherheitsfunktionen und Fehlermeldungen navigieren.
+
+#figure(
+  image("touchpanel_entwurfsuebersicht.png", width: 100%),
+  caption: [Übersicht der untersuchten Wireframes, Navigationsvarianten und Funktionsabläufe],
+)
+
+=== Erste Entwurfsphase: Horizontale und vertikale Navigationsvarianten
+
+In der ersten Entwurfsphase wurde eine bewusst reduzierte, skizzenhafte Benutzeroberfläche entwickelt. Einzelne Funktionen wie Füllstands- und Akkuanzeige, PIN-Eingabe, Deckelsteuerung, Fahrt zur Abholposition, Rückkehr zum Standplatz, Problemmeldung und Wartung wurden zunächst auf getrennte Screens verteilt.
+
+Für die Navigation wurden unterschiedliche Varianten untersucht. In der horizontalen Variante wechselten die Nutzerinnen und Nutzer über Pfeile beziehungsweise eine lineare Abfolge zwischen den einzelnen Funktionsseiten. Dieser Ansatz stellte jeweils nur wenige Inhalte gleichzeitig dar und ermöglichte dadurch große Symbole, gut erkennbare Schaltflächen und eindeutige Bestätigungsanzeigen.
+
+Parallel dazu wurden vertikale und kompaktere Varianten entwickelt. Dabei wurden Statusinformationen und Funktionsbereiche stärker auf einer Oberfläche gebündelt. Seitlich oder untereinander angeordnete Symbole ermöglichten einen direkteren Wechsel zwischen Deckelsteuerung, Problemmeldung und Wartungsfunktionen.
+
+#figure(
+  align(
+    center,
+    image("touchpanel_vertikal.png", width: 48%),
+  ),
+  caption: [Untersuchte vertikale und kompakte Navigationsvarianten],
+)
+
+#figure(
+  table(
+    columns: (1.45fr, 2.35fr, 2.25fr),
+    [*Variante*], [*Vorteil*], [*Erkannte Schwäche*],
+
+    [Horizontale Navigation],
+    [Große Bedienelemente und klare Konzentration auf jeweils eine Funktion.],
+    [Viele einzelne Screens und entsprechend lange Navigationswege.],
+
+    [Vertikale beziehungsweise kompakte Navigation],
+    [Mehrere Funktionsbereiche können auf einer Oberfläche erreicht werden.],
+    [Die kleine Displayfläche wird schneller überladen und einzelne Symbole werden kleiner.],
+  ),
+  caption: [Vergleich der ersten horizontalen und vertikalen Navigationsvarianten],
+)
+
+Obwohl die ersten Entwürfe visuell einfach und grundsätzlich verständlich waren, entstand durch die große Anzahl einzelner Screens ein umfangreicher User Flow. Häufig benötigte Funktionen waren teilweise erst nach mehreren Navigationsschritten erreichbar. Gleichzeitig zeigte die kompakte vertikale Variante, dass zu viele Funktionen auf einer kleinen Fläche die Übersichtlichkeit und Treffergenauigkeit der Bedienelemente reduzieren.
+
+Die erste Entwurfsphase machte damit den zentralen Zielkonflikt sichtbar: Eine starke Aufteilung erzeugt zu viele Screens, während eine zu starke Verdichtung das kleine Display überlädt. Diese Erkenntnis bildete die Grundlage für die folgenden Designiterationen.
+
+=== Zweite Entwurfsphase: Pixelästhetik und kompakte Navigation
+
+In der zweiten Entwurfsphase wurde eine pixelorientierte Benutzeroberfläche entwickelt. Ausgangspunkt war die Überlegung, dass eine reduzierte Pixelästhetik grundsätzlich gut zu einem kleinen Display und einer begrenzten Bildschirmauflösung passen kann. Gleichzeitig sollte bewusst eine spielerische und nostalgische Gestaltungsrichtung erprobt werden, um zu untersuchen, ob sich die technische Mülltonne dadurch zugänglicher und emotionaler darstellen lässt.
+
+Im Gegensatz zu den umfangreichen linearen Screen-Flows der ersten Entwurfsphase wurde hier erstmals eine kompaktere menübasierte Navigation eingesetzt. Der zentrale Systemzustand wurde gemeinsam mit der Mülltonne auf einer Hauptansicht dargestellt. Direkt erreichbare Symbole für Startseite, Fahrsteuerung und Einstellungen reduzierten die Anzahl der benötigten Navigationsschritte.
+
+Die größeren Icons und die deutlich voneinander unterscheidbaren Statusfarben funktionierten auf dem kleinen Bildschirm besonders gut. Zustände wie "Bereit" und "Akku niedrig" konnten durch die Kombination aus Farbe, Text, Batterieanzeige und veränderter Darstellung der Mülltonne schnell unterschieden werden. Auch die dauerhaft sichtbare Akkuanzeige erwies sich als sinnvoll.
+
+#figure(
+  align(
+    center,
+    image("touchpanel_pixel.jpeg", width: 50%),
+  ),
+  caption: [Pixelorientierter Entwurf mit kompakter Navigation und farbcodierten Systemzuständen],
+)
+
+Trotz dieser Vorteile wurde die Pixelästhetik nicht als finale Gestaltungsrichtung übernommen. Die Oberfläche wirkte im Verhältnis zum technischen und kommunalen Anwendungskontext teilweise zu spielerisch. Gleichzeitig entstand ein deutlicher visueller Unterschied zur modern gestalteten Flottenmanagement-Web-App. Für das Gesamtsystem war jedoch eine zusammenhängende Designsprache zwischen lokaler Bedienoberfläche und zentraler Web-Anwendung sinnvoller.
+
+Die zweite Entwurfsphase wurde deshalb nicht verworfen, ohne ihre Erkenntnisse weiterzuverwenden. Die reduzierte Menüstruktur, die größeren Icons, die kompakte Akkuanzeige und die eindeutige farbliche Unterscheidung von Systemzuständen wurden als positive Elemente erkannt und in die Entwicklung der finalen Benutzeroberfläche übertragen.
+
+#infobox[
+  *Übernommene Erkenntnisse:* Die Pixelästhetik wurde nicht fortgeführt, die kompaktere Navigation, größeren Symbole, permanente Akkuanzeige und klare Statusfarben beeinflussten jedoch direkt den finalen Entwurf.
+]
+
+=== Finaler Entwurf: Modulare Funktionsnavigation
+
+Der finale Entwurf entstand als Synthese der vorangegangenen Gestaltungsphasen und der dazu erhaltenen Rückmeldungen. Funktionierende Elemente der früheren Varianten wurden übernommen und weiterentwickelt. Gleichzeitig sollten die erkannten Probleme, insbesondere lange Navigationswege und eine Überladung der kleinen Displayfläche, vermieden werden.
+
+Die Entwürfe, Wireframes und Wireflows wurden im UX/UI-Arbeitspaket mit Figma entwickelt und schrittweise zu einem gemeinsamen Bedienkonzept zusammengeführt. Dadurch konnten unterschiedliche Bildschirmaufteilungen, Navigationsvarianten und Systemzustände bereits vor der technischen Umsetzung visuell überprüft und miteinander verglichen werden.
+
+Für die visuelle Weiterentwicklung wurde eine neue digitale Darstellung der Smarten Mülltonne gestaltet. Diese ersetzte die zuvor verwendete skizzenhafte beziehungsweise pixelorientierte Darstellung und bildete die Grundlage für eine modernere Benutzeroberfläche, die gestalterisch besser mit der Flottenmanagement-Web-App harmoniert.
+
+Auf dieser visuellen Grundlage wurden die Navigationsstruktur, die Wireflows und der dazugehörige User Flow weiterentwickelt. Die einzelnen Funktionen wurden in logisch zusammengehörige Module gegliedert. Allgemeine Statusinformationen bleiben unmittelbar sichtbar, während Fahr-, Sicherheits-, Verbindungs-, Energie- und Diagnosefunktionen über geschützte Bedienbereiche erreichbar sind.
+
+Anschließend wurde der Entwurf innerhalb des UX/UI- und Softwareteams hinsichtlich seiner technischen Umsetzbarkeit auf dem vorhandenen Touchdisplay sowie seiner Verbindung zur Hardware- und Web-App-Struktur überprüft. Bewertet wurden insbesondere die Anzahl der notwendigen Navigationsschritte, die Größe der Bedienelemente, die Sichtbarkeit wichtiger Systemzustände und die technische Realisierbarkeit der vorgesehenen Funktionen. Auf Grundlage dieser gemeinsamen Prüfung wurde die modulare Funktionsnavigation als finaler Entwurf ausgewählt.
+
+
+#figure(
+  table(
+    columns: (1.45fr, 2.25fr, 2.25fr),
+    [*Ausgangspunkt*], [*Gewonnene Erkenntnis*], [*Übernahme in den finalen Entwurf*],
+
+    [Erste Wireframes],
+    [Große Symbole und eindeutige Bestätigungen erleichtern die Bedienung.],
+    [Große Funktionskarten, klare Beschriftungen und separate Bestätigungsanzeigen.],
+
+    [Horizontale und vertikale Varianten],
+    [Zu viele einzelne Screens verlängern den Bedienweg; eine zu starke Verdichtung überlädt das Display.],
+    [Gliederung der Funktionen in logisch zusammengehörige, modular erreichbare Bereiche.],
+
+    [Pixelorientierter Entwurf],
+    [Kompakte Navigation, permanente Akkuanzeige und deutliche Statusfarben funktionieren auf dem kleinen Display gut.],
+    [Übernahme der kompakten Statusdarstellung, größeren Symbole und farblichen Zustandsunterscheidung.],
+
+    [Feedback und technische Prüfung],
+    [Die Oberfläche muss mit Displaygröße, Hardwarefunktionen und Web-App-Struktur vereinbar sein.],
+    [Modernisierte Designsprache und gemeinsam überprüfter User Flow.],
+  ),
+  caption: [Übertragung der Erkenntnisse aus den Entwurfsphasen in das finale Bedienkonzept],
+)
+
+Der finale Entwurf folgt einer modularen Funktionsnavigation. Der Startbildschirm bietet einen direkten Überblick über Füllstand, Akkustand, zugeordnete Adresse, Verbindungsstatus und aktuelle Systemmeldungen. Diese Informationen können ohne vorherige PIN-Eingabe eingesehen werden.
+
+Nach der PIN-Eingabe erhalten die Nutzerinnen und Nutzer Zugriff auf die vorgesehenen Funktionsmodule. Dazu gehören unter anderem Fahrsteuerung, Deckelsteuerung, Sicherheit, Verbindung, Problemmeldung, Energieverwaltung und Diagnose. Aktionen mit Auswirkungen auf Fahrt, Sicherheit oder Systemzustand werden durch eindeutige Bestätigungsanzeigen abgeschlossen.
+
+#figure(
+  image("touchpanel_final_wireflow.png", width: 30%),
+  caption: [In Figma entwickelter finaler Wireflow der modularen Funktionsnavigation],
+)
+
+#decision[
+  *Finale Designentscheidung:* Die modulare Funktionsnavigation wurde ausgewählt, weil sie die Verständlichkeit der ersten Wireframes, die kompakte Statusdarstellung des Pixelentwurfs und eine moderne, zur Web-App passende Designsprache miteinander verbindet. Die endgültige Entscheidung erfolgte nach gemeinsamer Prüfung der Nutzerführung und technischen Umsetzbarkeit.
+]
+
+== Informationsarchitektur und User Flow
+
+Die Informationsarchitektur des finalen Touchpanel-Entwurfs trennt frei zugängliche Statusinformationen von geschützten Bedienfunktionen. Dadurch können Nutzerinnen und Nutzer den aktuellen Zustand der Mülltonne schnell kontrollieren, ohne sich zunächst durch mehrere Menüs bewegen oder eine PIN eingeben zu müssen.
+
+Die Bedienstruktur ist in vier Ebenen gegliedert: Start- und Statusbereich, Zugriffsschutz, modulare Funktionsnavigation sowie Rückmeldung und Bestätigung. Diese Gliederung reduziert die Anzahl gleichzeitig sichtbarer Inhalte und sorgt dafür, dass jede Ansicht eine klar erkennbare Aufgabe besitzt.
+
+#figure(
+  table(
+    columns: (1.25fr, 1.8fr, 2.85fr),
+    [*Ebene*], [*Funktion*], [*Inhalt*],
+
+    [1],
+    [Start und Status],
+    [Anzeige des aktuellen Systemzustands, Füllstands, Akkustands, Standorts und Verbindungsstatus.],
+
+    [2],
+    [Zugriffsschutz],
+    [PIN-Eingabe vor dem Zugriff auf geschützte Steuerungs- und Systemfunktionen.],
+
+    [3],
+    [Funktionsnavigation],
+    [Navigation zwischen den logisch gruppierten Bedienmodulen über Swipe-Gesten beziehungsweise Pfeile.],
+
+    [4],
+    [Rückmeldung],
+    [Bestätigung erfolgreicher Aktionen sowie Darstellung von Fehler-, Warn- und Sicherheitszuständen.],
+  ),
+  caption: [Ebenen der Informationsarchitektur des Touchpanels],
+)
+
+Der reguläre User Flow beginnt auf dem Start- beziehungsweise Statusscreen. Dort werden die wichtigsten Informationen ohne vorherige Anmeldung dargestellt. Über den Zugang zu den Bedienfunktionen gelangt die Nutzerin oder der Nutzer zur PIN-Eingabe. Erst nach erfolgreicher Eingabe werden die geschützten Funktionsmodule freigegeben.
+
+Innerhalb der Funktionsnavigation können die einzelnen Module über eine Swipe-Geste oder durch das Anklicken eines Pfeils gewechselt werden. Jedes Modul bündelt inhaltlich zusammengehörige Aktionen. Ein deutlich sichtbarer "Zurück"-Button ermöglicht die Rückkehr zur vorherigen Ansicht und verhindert, dass die Nutzerinnen und Nutzer innerhalb der Navigationsstruktur die Orientierung verlieren.
+
+Nach der Auswahl einer Aktion zeigt das System eine separate Bestätigungsansicht. Rückmeldungen wie "Auswahl bestätigt", "Meldung gesendet", "Tonne entsperrt" oder "Verbindung hergestellt" machen sichtbar, dass die Eingabe erkannt und verarbeitet wurde. Anschließend kann über die Navigation zum vorherigen Funktionsbereich oder zum Startscreen zurückgekehrt werden.
+
+Der typische Interaktionsablauf lässt sich damit in sechs Schritte gliedern:
+
+1. Aktuellen Status auf dem Startscreen erfassen.
+2. Geschützten Bedienbereich auswählen.
+3. Zugriff über die PIN-Eingabe freigeben.
+4. Zum gewünschten Funktionsmodul navigieren.
+5. Aktion auswählen und Systemrückmeldung abwarten.
+6. Zur vorherigen Ansicht oder zum Startscreen zurückkehren.
+
+#figure(
+  align(
+    center,
+    image("touchpanel_final_navigation.png", width: 68%),
+  ),
+  caption: [Zentraler User Flow vom Startscreen über die PIN-Eingabe bis zur modularen Funktionsnavigation],
+)
+
+Fehler- und Sicherheitsmeldungen bilden einen parallelen System-Flow. Zustände wie "Hindernis erkannt", "Linie verloren" oder "Hilfe benötigt" können unabhängig vom aktuell geöffneten Funktionsmodul eingeblendet werden. Dadurch haben sicherheitsrelevante Informationen Vorrang vor der normalen Navigation und werden unmittelbar sichtbar.
+
+#infobox[
+  *Kernprinzip des User Flows:* Statusinformationen bleiben direkt zugänglich. Systemverändernde Aktionen werden durch PIN-Eingabe geschützt, innerhalb klar getrennter Funktionsmodule ausgeführt und anschließend durch eine eindeutige Rückmeldung bestätigt.
+]
+
+== Technische Umsetzung und interne Evaluation
+
+Nach der Auswahl des finalen Bedienkonzepts wurde die in Figma entwickelte Struktur für den funktionalen Prototyp aufbereitet und mit der lokalen Hardwaresteuerung sowie der Flottenmanagement-Web-App verbunden. Im Mittelpunkt der technischen Umsetzung standen die für den Demonstrationsbetrieb zentralen Funktionen.
+
+Dazu gehörten die Anzeige von Füllstand, Akkustand und Systemzustand, das Starten und Stoppen der Fahrt, die Bewegung zur Abholposition, die Rückkehr über die Funktion "Nach Hause" sowie die Darstellung von Fehler- und Sicherheitsmeldungen. Relevante Zustände wurden zusätzlich mit der Web-App synchronisiert, sodass lokale Bedienung und zentrale Überwachung gemeinsam geprüft werden konnten.
+
+Nicht alle im vollständigen Figma-Wireflow vorgesehenen Module wurden mit derselben technischen Tiefe umgesetzt. Bereiche wie Energieverwaltung, Diagnose, Verbindungsoptionen und erweiterte Problemmeldungen wurden im Bedienkonzept vollständig berücksichtigt, ihre konkrete Funktionalität blieb jedoch teilweise vom Entwicklungsstand der angeschlossenen Hardware- und Softwarekomponenten abhängig.
+
+#figure(
+  table(
+    columns: (1.55fr, 2.15fr, 2.35fr),
+    [*Prüfbereich*], [*Technischer Stand*], [*Ergebnis der internen Bewertung*],
+
+    [Statusanzeige],
+    [Darstellung von Füllstand, Akkustand, Verbindung und aktuellen Systemzuständen.],
+    [Die wichtigsten Informationen konnten ohne tiefe Navigation unmittelbar erfasst werden.],
+
+    [Fahrsteuerung],
+    [Start, Stopp, Fahrt zur Abholposition und Rückkehr zum Standplatz.],
+    [Die zentralen Bewegungsfunktionen ließen sich über die lokale Bedienoberfläche auslösen.],
+
+    [Fehler und Sicherheit],
+    [Lokale Darstellung von Hindernissen, Linienverlust und sicherheitsrelevanten Zuständen.],
+    [Die Kombination aus Symbol, Farbe, Text und akustischer Rückmeldung erleichterte die Zuordnung des Zustands.],
+
+    [Web-App-Synchronisation],
+    [Übertragung relevanter Status- und Betriebsdaten an das zentrale Managementsystem.],
+    [Lokale Anzeige und zentrale Überwachung konnten als zusammenhängendes System betrachtet werden.],
+
+    [Erweiterte Module],
+    [Energie, Diagnose, Verbindung und Problemmeldung wurden im Wireflow vorgesehen.],
+    [Der Funktionsumfang war teilweise vom technischen Integrationsstand der jeweiligen Systemkomponente abhängig.],
+  ),
+  caption: [Technischer Stand und interne Bewertung der Touchpanel-Funktionen],
+)
+
+Die interne Evaluation erfolgte während der schrittweisen Integration und der Tests am realen Gesamtsystem. Dabei wurde insbesondere geprüft, ob die vorgesehenen Zustände verständlich dargestellt werden, die zentralen Bedienwege nachvollziehbar bleiben und die Rückmeldungen nach einer Aktion eindeutig sind.
+
+Als positiv erwiesen sich die Trennung zwischen unmittelbar sichtbaren Statusinformationen und geschützten Bedienfunktionen sowie die separaten Bestätigungsanzeigen. Gleichzeitig bestätigte die Umsetzung, dass die begrenzte Displayfläche eine konsequente Priorisierung der Inhalte erfordert. Nicht jede technisch mögliche Information sollte dauerhaft angezeigt werden.
+
+Eine standardisierte Usability-Studie mit externen Testpersonen war nicht Bestandteil der internen Evaluation. Für eine weitere Entwicklung sollten insbesondere Tests mit älteren Menschen und Personen mit eingeschränkter Mobilität durchgeführt werden. Zusätzlich sind längere Tests bei unterschiedlichen Licht- und Wetterbedingungen sowie die systematische Prüfung von Fehlersituationen sinnvoll.
+
+#infobox[
+  *Bewertung:* Das Touchpanel konnte als funktionsfähige lokale Schnittstelle in das Gesamtsystem eingebunden werden. Die zentralen Bedien- und Statusfunktionen waren für den Demonstrationsbetrieb verfügbar. Für eine produktnahe Weiterentwicklung sind jedoch externe Usability-Tests, Langzeittests im Außenbereich und eine vollständige technische Integration aller vorgesehenen Module erforderlich.
+]
+
+
+
+
+
 
 = Projektorganisation
 
