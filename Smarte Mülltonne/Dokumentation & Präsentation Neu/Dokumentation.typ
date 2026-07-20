@@ -1141,8 +1141,66 @@ Eine standardisierte Usability-Studie mit externen Testpersonen war nicht Bestan
 ]
 
 
+#pagebreak()
+
+= Präsentations- und Medienkonzept
+
+== Kontinuierliche Video-Dokumentation
+
+Der Projektverlauf wurde von Beginn an kontinuierlich durch Videoaufnahmen dokumentiert. In nahezu jeder Projektwoche entstanden mit Smartphones sowohl kurze Einzelaufnahmen als auch längere Videos. Dabei wurde nicht nur die technische Entwicklung des Prototyps festgehalten. Auch Arbeits-, Abstimmungs- und Planungsprozesse innerhalb des Teams wurden dokumentiert, um die Entstehung des Gesamtsystems möglichst vollständig nachvollziehbar zu machen.
+
+Die Aufnahmen zeigen verschiedene Phasen des Projekts, darunter den mechanischen und elektronischen Aufbau, die Verkabelung, die Integration einzelner Komponenten sowie Fahr- und Funktionstests. Darüber hinaus wurden die Entwicklung des Touchpanels, die Flottenmanagement-Web-App und das Zusammenspiel der verschiedenen Systembereiche aufgezeichnet. Neben erfolgreichen Tests wurden auch Fehlversuche, technische Probleme und die daraus entstandenen Verbesserungen bewusst festgehalten.
+
+Die kontinuierliche Dokumentation erfüllte mehrere Zwecke. Sie ermöglichte dem Team, frühere Arbeitsschritte erneut zu betrachten, Entscheidungen nachzuvollziehen und die Entwicklung des Prototyps über den gesamten Projektzeitraum zu vergleichen. Gleichzeitig dienten die Aufnahmen als Nachweis der praktischen Projektarbeit und der Funktionsfähigkeit des Systems. Aus dem entstandenen Videomaterial konnten später geeignete Sequenzen für die Projektpräsentation und die abschließenden Videos ausgewählt werden. Darüber hinaus bildeten die Aufnahmen eine visuelle Absicherung für den Fall, dass einzelne Funktionen während einer Live-Demonstration nicht zuverlässig vorgeführt werden konnten.
+
+== Videoschnitt und dramaturgische Aufbereitung
+
+Aus dem während des Projekts entstandenen umfangreichen Videomaterial wurden mehrere Videos mit unterschiedlichen inhaltlichen Schwerpunkten erstellt. Der Videoschnitt und die gestalterische Aufbereitung erfolgten mit Microsoft Clipchamp. Dabei wurden sowohl kurze Einzelaufnahmen als auch längere Aufzeichnungen gesichtet, ausgewählt und zu zusammenhängenden Darstellungen verarbeitet.
+
+Für die Auswahl der Aufnahmen waren insbesondere die Bildqualität, die Verständlichkeit der dargestellten Abläufe und die Sichtbarkeit der tatsächlich funktionierenden Systemkomponenten entscheidend. Unklare, wiederholte oder für den jeweiligen Verwendungszweck nicht relevante Sequenzen wurden gekürzt oder entfernt. Im ausführlichen Projektvideo wurden hingegen auch Fehlversuche und technische Probleme bewusst beibehalten, da sie den Entwicklungsprozess und die daraus entstandenen Verbesserungen nachvollziehbar machen.
+
+Die ausgewählten Sequenzen wurden durch Schnitte, Beschleunigungen, Übergänge, Musik, Überschriften und ergänzende Texte aufbereitet. Zusätzlich wurden das Logo der Hochschule sowie die Namen der Projektbeteiligten integriert. Die Länge, Reihenfolge und inhaltliche Gewichtung der Videos wurden innerhalb des Teams abgestimmt und anhand gemeinsamer Rückmeldungen schrittweise angepasst.
+
+#figure(
+  table(
+    columns: (1.45fr, 2.25fr, 2.45fr),
+    [*Videoformat*], [*Dramaturgischer Schwerpunkt*], [*Verwendungszweck*],
+
+    [Kurztrailer],
+    [Kompakte und aufmerksamkeitsstarke Zusammenfassung des Projekts.],
+    [Kurze Vorstellung des Projekts zu Beginn der Präsentation.],
+
+    [Teamvorstellung],
+    [Vorstellung der Projektgruppe und ihrer gemeinsamen Arbeit.],
+    [Einordnung des Teams und Herstellung eines persönlichen Projektbezugs.],
+
+    [Systemdemonstration],
+    [Gezielte Darstellung der technischen Funktionen und des Zusammenspiels der Systembereiche.],
+    [Nachweis der Funktionsfähigkeit und visuelle Absicherung bei möglichen Problemen während der Live-Demonstration.],
+
+    [Ausführliches Projektvideo],
+    [Chronologische Darstellung der Projektphasen einschließlich Fehlversuchen, Anpassungen und Verbesserungen.],
+    [Umfassender Überblick über den Entwicklungsprozess sowie Wiedergabe im Hintergrund nach der Präsentation.],
+  ),
+  caption: [Aufbereitung und Einsatz der erstellten Videoformate],
+)
+
+#infobox[
+  *KI-gestützte Videoproduktion:* Ergänzend zum dokumentarischen Videomaterial wurden mithilfe generativer KI und gezielt formulierter Prompts zwei kurze Werbevideos erstellt. Diese dienten dazu, die Projektidee kompakt, kreativ und aufmerksamkeitsstark zu vermitteln.
+]
 
 
+== Einsatz in Abschlusspräsentation und Ausstellung
+
+Für die Abschlusspräsentation wurde in Canva eine umfangreiche Präsentation mit rund 90 Folien entwickelt. Zunächst entstand eine inhaltliche Grundstruktur, die anschließend zu einer multimedialen Präsentation weiterentwickelt wurde. Texte, Bilder, Videos und technische Darstellungen wurden so miteinander kombiniert, dass die einzelnen Entwicklungsbereiche nicht nur erklärt, sondern auch anhand realer Projektaufnahmen veranschaulicht werden konnten.
+
+Die Gestaltung orientierte sich an der visuellen Sprache des Touchpanels und der Flottenmanagement-Web-App. Dunkle Flächen, gelbe Akzente, einheitliche Symbole und Darstellungen der Smarten Mülltonne sorgten für ein zusammenhängendes Erscheinungsbild. Die Inhalte der unterschiedlichen Fachbereiche wurden gemeinsam an diese Gestaltungsstruktur angepasst, sodass Hardware, Software, Touchpanel, Web-App und Medien nicht wie voneinander getrennte Teilprojekte wirkten, sondern als Bestandteile eines gemeinsamen Gesamtsystems präsentiert wurden.
+
+Bereits der Wartebildschirm enthielt eine kurze KI-gestützte Animation. Für den eigentlichen Einstieg wurde die Smarte Mülltonne anhand des realen Prototyps in Blender als dreidimensionales Modell nachgebildet. Dieses Modell wurde anschließend in Unreal Engine in einer filmischen Szene inszeniert. Dabei erscheint die Mülltonne aus der Dunkelheit, bevor der Projekttitel eingeblendet wird. Direkt im Anschluss folgte das Video zur Vorstellung des Projektteams.
+
+Während der weiteren Präsentation wurden in nahezu allen Themenbereichen passende Videoausschnitte eingesetzt. Die während des Projekts aufgenommenen Szenen ergänzten die jeweiligen Erläuterungen und machten Aufbau, Entwicklung, Tests und Systemfunktionen unmittelbar sichtbar. Dadurch konnten auch komplexe technische Inhalte anschaulicher und näher an der tatsächlichen Projektarbeit vermittelt werden.
+
+Den Abschluss bildete das ausführliche Projektvideo. Es zeigte den gesamten Entwicklungsprozess einschließlich Planungsphasen, technischer Arbeiten, erfolgreicher Tests, aufgetretener Fehler und daraus entstandener Verbesserungen. Nach dem Ende der eigentlichen Präsentation konnte dieses Video im Ausstellungsbereich weiter im Hintergrund abgespielt werden. Besucherinnen und Besucher erhielten dadurch die Möglichkeit, den Projektverlauf und zusätzliche Details auch unabhängig vom mündlichen Vortrag nachzuvollziehen.
 
 
 = Projektorganisation
