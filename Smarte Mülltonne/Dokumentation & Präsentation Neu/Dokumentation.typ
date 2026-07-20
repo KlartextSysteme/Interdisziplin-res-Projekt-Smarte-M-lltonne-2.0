@@ -135,17 +135,24 @@
     Studiengang Digitale Technologien
   ]
   #v(4.2cm)
-  #grid(
-    columns: (1fr, 1fr),
-    align(left)[
-      #text(size: 9pt, fill: luma(125))[*Projektgruppe*] \
-      #text(size: 10.5pt)[Jan-Lukas · Theresa Pelz · Alaeddine Baghyour · Samiy Fulya Bulut · Jonas Wiesner]
-    ],
-    align(right)[
-      #text(size: 9pt, fill: luma(125))[*Stand der Dokumentation*] \
-      #text(size: 10.5pt)[03. Mai 2026]
+
+#grid(
+  columns: (2.3fr, 1fr),
+  column-gutter: 1cm,
+
+  align(left)[
+    #text(size: 9pt, fill: luma(125))[*Projektgruppe*] \
+    #text(size: 10.5pt)[
+      Jan-Lukas · Theresa Pelz · Alaeddine Baghyour \
+      Samiye Fulya Bulut · Jonas Wiesner
     ]
-  )
+  ],
+
+  align(right)[
+    #text(size: 9pt, fill: luma(125))[*Stand der Dokumentation*] \
+    #text(size: 10.5pt)[20. Juli 2026]
+  ]
+)
 ]
 
 #pagebreak()
