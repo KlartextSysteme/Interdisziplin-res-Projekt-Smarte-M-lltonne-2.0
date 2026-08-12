@@ -143,14 +143,14 @@
   align(left)[
     #text(size: 9pt, fill: luma(125))[*Projektgruppe*] \
     #text(size: 10.5pt)[
-      Jan-Lukas · Theresa Pelz · Alaeddine Baghyour \
+      Jan-Lukas Bellenhaus · Theresa Pelz · Alaeddine Baghyour \
       Samiye Fulya Bulut · Jonas Wiesner
     ]
   ],
 
   align(right)[
     #text(size: 9pt, fill: luma(125))[*Stand der Dokumentation*] \
-    #text(size: 10.5pt)[20. Juli 2026]
+    #text(size: 10.5pt)[12. August 2026]
   ]
 )
 ]
@@ -217,33 +217,126 @@ Der wichtigste konzeptionelle Schritt war nicht nur der Wechsel von einer isolie
 
 == Sprint 0: Orientierung und Sichtung
 
-Sprint 0 war zunächst als Setup- und Alignment-Phase vom 14. April 2026 bis 19. April 2026 geplant. In dieser Phase standen die Sichtung der Vorarbeiten, die Rollenklärung, die Projektvision, die Tool-Auswahl und die Definition erster Use Cases im Vordergrund.
+Sprint 0 diente als Setup- und Alignment-Phase vom 14. April 2026 bis 19. April 2026. In dieser Phase standen die Sichtung der Vorarbeiten des ersten Teils des interdisziplinären Projektes, die Rollenklärung, die Projektvision, die Tool-Auswahl und die Definition erster Use Cases im Vordergrund.
 
 #figure(
   table(
     columns: (1.2fr, 2.2fr, 2.4fr),
     [*Zeitraum*], [*Schwerpunkt*], [*Ergebnis*],
-    [14.04.–19.04.2026], [Setup & Alignment], [Projektvision konkretisieren, Rollen und Schwerpunkte klären, Projektplan anlegen.],
+    [14.04.–19.04.2026], [Setup & Alignment], [Projektvision konkretisieren, Rollen und Schwerpunkte klären, Tools festlegen, Festlegung der Koordination der Gruppe, Wählen der Schwerpunkte, Projektplan anlegen.],
     [14.04.–19.04.2026], [Research], [Vorarbeiten aus dem Wintersemester 2025/26 sichten und Übergabe bewerten.],
     [15.04.–19.04.2026], [Use Cases], [Grundfunktionen wie Navigation, Füllstand, Status, Serververwaltung, Sicherheit und Aufladen sammeln.],
   ),
   caption: [Sprint 0 nach Notion-Zeitplanung],
 )
 
-== Sprint 1: Anforderungen, Architektur und Planung
+An diesem Sprint waren alle Teammitglieder beteiligt, da es sich um eine projektweite Initialisierungsphase handelte. Die Koordination des Teams war in vier Teilbereiche gegliedert: Hardware/Mechanik, Software/System, App/UX-UI sowie Konzept/Produktstrategie, wobei sich die Teams wie folgt aufteilten: 
+- Hardware/Mechanik: Jan-Lukas Bellenhaus, Theresa Pelz, Alaeddine Baghyour
+- Software/System: Jan-Lukas Bellenhaus, Jonas Wiesner, Theresa Pelz, Alaeddine Baghyour
+- App/UX-UI: Fulya Bulut, Jonas Wiesner
+- Konzept/Produktstrategie: Fulya Bulut, Jonas Wiesner
 
-Sprint 1 war vom 20. April 2026 bis 10. Mai 2026 geplant. Da diese Dokumentation den Stand vom 03. Mai 2026 abbildet, liegen einige Sprint-1-Arbeiten bereits als Konzept oder Prototyp vor, während andere laut Notion-Board noch in Bearbeitung oder offen sind.
-
-Der Sprint hatte vier parallele Arbeitsrichtungen:
+Dabei haben die Teams folgende Aufgaben für die Duchführung des Projektes geplant: 
 
 - Hardware und Mechanik: Antrieb, neue Räder, Kettenführung, Sensorik, Fahrwerk, Elektrik, Sicherheitskomponenten.
 - Software und System: Fahrlogik, sichere Zustände, Motorsteuerung, Datenübergabe an App.
 - App und UX/UI: Flottenmanagement-App, Layout, Karte, Visualisierung und Interaktionskonzept.
 - Konzept und Produktstrategie: Vision, Use Cases, Storyline und Priorisierung.
 
-== Weitere geplante Projektphasen
+== Sprint 1: Anforderungen, Architektur und Planung
 
-Die anschließende Planung sieht Sprint 2 vom 11. Mai 2026 bis 15. Mai 2026 mit Hardwareintegration, App-Pico-Verbindung, Touchpanel, ersten Fahrtests, Antriebsverbesserungen und Umsetzung des Flottenmanagement-Prototyps vor. Sprint 3 ist für den 06. Juni 2026 bis 10. Juni 2026 vorgesehen und fokussiert Erweiterungen wie Diebstahlschutz, kontinuierliche Navigationsverbesserung, UX-Verbesserungen, Hardwaretests und Fehleranalyse. Sprint 4 umfasst Ende Juni und Juli 2026 Finalisierung, Präsentation, Medien und technische Dokumentation.
+Sprint 1 war vom 20. April 2026 bis 10. Mai 2026 geplant. Hier wurden basierend auf den Überlegungen des Projektfokuses erste Themen und Aufgabenpakete definiert. 
+
+Der Sprint wurde in drei Hauptbereiche geteilt. Dazu gehörte die Vorbereitung mit der Finalisierung der Vision und dem Assessment der Hardware, der Bereich Hardware bei dem der Antrieb der Smarten Mülltonne 1.0 analysiert wurde und die Energieversorgung weitergedacht wurde und zuletzt das UX-Konzept, bei der die Planung für die Softwarearchitektur der Flottenmanagement-App im Fokus stand. 
+
+Diese Aufgaben konnten auf alle beteiligten Teams am Projekt aufgeteilt werden.
+
+In der Umsetzung wurden viele der geplanten Aufgaben bearbeitet, jedoch teilweise mit deutlich höherem Zeitaufwand und verschobenen Fertigstellungsdaten. Dies liegt besonders daran, dass das Projekt nicht wie ursprünglich angenommen eine Weiterentwicklung der bestehenden Mülltonne 1.0, sondern eine koplette Neuplanung der Mülltonne 2.0 erforderte. Das hatte direkte Auswirkungen auf den geplanten Aufwand: 
+
+- Es mussten neue Sensoren, Motoren und weitere Komponenten ausgewählt, bestellt und in das Design integriert werden.
+
+- Durch die Entscheidung für andere Motoren als in der Vorgängerversion musste das gesamte Antriebskonzept neu bewertet werden (Drehmoment, Übersetzung, Stromaufnahme, Kompatibilität mit Motortreibern).
+
+- Das ursprünglich als „Assessment Hardware“ geplante Task entwickelte sich dadurch zu einem deutlich umfangreicheren Hardware-Review, das neben der Analyse des bestehenden Systems auch die komplette Neuauslegung von Antrieb, Sensorik und Energieversorgung umfasste.
+
+Dadurch zogen sich Aufgaben wie die Analyse des Antriebs über den Sprint hinaus, da zunächst das neue grundlegende Konzept der Mülltonne 2.0 erarbeitet werden musste. 
+
+== Sprint 2: Software, Hardware, UI an der Mülltonne, Integration
+
+Sprint 2 war vom 11. Mai 2026 bis 05. Juni 2026 geplant.
+
+Die Aufgaben des zweiten Sprints orientieren sich ebenfalls an den Teams und wurden daher in vier Hauptbereiche gegliedert:
+
+#table(
+  columns: 2,
+  inset: 8pt,
+  stroke: (bottom: 1pt),
+  [**Bereich**], [**Aufgaben in Sprint 2**],
+  [Hardware], [
+    - Korpus der Mülltonne überarbeiten (Ausschneidungen)
+    - CAD-Modelle für Fahrwerk, Elektronik, Sensorik erstellen
+    - Schaltplanvorbereitung / Verdrahtungskonzept
+    - Neue Komponenten montieren
+    - Erweiterung Kettensatz
+    - Montage Antriebssystem
+    - Verkabelung der elektr. Komponenten
+    - Montage der Sensorik
+    - Spannungsteiler löten
+  ],
+  [Software], [
+    - Linienverfolgung überarbeiten
+    - Hinderniserkennung überarbeiten/ergänzen
+    - Motorsteuerung überarbeiten/testen
+    - Verhalten bei Abweichung von der Linie überarbeiten
+    - Zustände überarbeiten
+    - Ansteuerlogik für Schrittmotor/Motortreiber festlegen
+    - Daten an Flottenmanagement-App definieren
+    - Sensorik und Aktorik testen
+    - Klassendiagramme erstellen
+  ],
+  [Flottenmanagement], [
+    - Nutzer definieren
+    - Schnittstellen zwischen Tonne und App definieren
+    - Definition der Positionsbestimmung
+    - Statusweitergabe der Mülltonne an App (Schnittstellen definieren)
+    - Status-Badges für jede Tonne
+    - Filter-/Suchfunktion für Tonnen in der Flotte
+    - Infokarte überarbeiten
+    - Klickdummy weitere Tonnen hinzufügen
+  ],
+  [Sonstige Aufgaben], [
+    - Teststrategie planen
+    - Sprint 3 planen
+    - Videos aufnehmen / Bilddokumentation (fortlaufend)
+    - Dokumentation fortlaufend mitschreiben
+  ],
+)
+
+== Sprint 3: Features, UX/Interaction, Backend/System, Testing
+
+Sprint 3 war vom 06. Juni 2026 bis 26. Juni 2026 geplant.
+
+Der Sprint war in vier Hauptbereiche gegliedert:
+
+- Features: Diebstahlschutz (Magnetkontakt, Nachbarschutz/Alarm), Navigation kontinuierlich verbessern
+- UX/Interaction: UI verbessern, Fehlermeldungen / Feedbacksystem, App-UX verbessern
+- Backend/System: Flottenmanagement erweitern
+- Testing: Usability Tests, Hardware-Tests, Fehleranalyse / Fixes
+
+Hier wurden offene Aufgaben aus Sprint 2 übernommen und weitere Aufgaben hinzugefügt. 
+
+== Sprint 4: Finalisierung, Präsentation, Medien
+
+Sprint 4 sollte ein letzter kurzer Sprint werden, in dem eigentlich nur Bug Fixes sowie die Präsentation und das Teaser-Video anstanden und war daher vom  27. Juni 2026 bis 15. Juli 2026 geplant.
+
+Auch hier wurden alle offnen Aufgaben aus dem vorherigen Sprint übernommen. 
+
+Sprint 4 hat gezeigt, dass die agile Sprintstruktur besonders in der Finalisierungsphase eines interdisziplinären Projekts wertvoll war. Es war zwar nicht ideal, dass zahlreiche Aufgaben aus vorherigen Sprints übernommen und über mehrere Sprints hinweg wiederholt bearbeitet werden mussten. Allerdings konnte das Team aufgrund der flexiblen Sprintplanung gut damit umgehen, indem offene Tasks systematisch erfasst, priorisiert und schrittweise abgeschlossen wurden.
+
+Gleichzeitig ermöglichte die Aufteilung in Finalisierung, Präsentation und Medien, dass parallel zur technischen Fertigstellung auch die Präsentationsvorbereitung vorangetrieben wurden. Die regelmäßige Planung von Zwischen- und Abschlusspräsentationen sowie die fortlaufende Dokumentation stellten sicher, dass das Projekt nicht nur technisch, sondern auch kommunikativ und dokumentarisch abgeschlossen werden konnte.
+
+Die Tatsache, dass viele Aufgaben über mehrere Sprints hinweg wiederholt wurden, war zwar mit zusätzlichem Aufwand verbunden, konnte aber durch die iterative, anpassungsfähige Planung aufgefangen werden, ohne dass das Gesamtprojekt aus dem Ruder lief.
+
 
 = Use Cases und Priorisierung
 
