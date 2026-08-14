@@ -161,14 +161,14 @@
 
 = Einordnung und Übergabe
 
-== Ausgangslage bei Projektübergabe
+== Ausgangslage der Smarten Mülltonne 1.0 bei Projektübergabe
 
 Das Projekt "Smarte Mülltonne" wurde aus einer Vorarbeit des Wintersemesters 2025/26 übernommen. Diese Vorarbeit bildet den technischen Startpunkt, wird in dieser Dokumentation aber nur als Ausgangslage beschrieben. Der Schwerpunkt dieser Dokumentation liegt auf der Weiterentwicklung im aktuellen Semester: bessere Fahreigenschaften, stabilere Mechanik, überarbeitete Sensorik, Energie- und Sicherheitsfunktionen sowie eine ergänzende Flottenmanagement-Web-App.
 
 Bei der Übergabe lag bereits ein funktionsorientierter Prototyp mit Hardware- und Softwareanteilen vor. Die vorhandene Software außerhalb enthielt unter anderem MicroPython-Code für einen Raspberry Pi Pico beziehungsweise Pico 2W, Module für DC-Motoren, Linienverfolgung, Ultraschallmessung, Buttons, Buzzer, LEDs, Netzwerkkommunikation und eine einfache serverseitige Missionslogik. Zusätzlich waren Schaltpläne, 3D-Druckteile, Rechnungen, Fotos, Videos und eine ältere Dokumentation vorhanden.
 
 #infobox[
-  *Kurzfassung des Ist-Zustands:* Die vorherige Gruppe hatte eine einzelne smarte Mülltonne als Prototyp vorbereitet. Die Tonne konnte grundsätzlich fahren und war mit Sensorik, Motorsteuerung und lokalen Zuständen gedacht; softwareseitig existierten Pico-Client-Code und ein einfacher Serveransatz. Offen waren vor allem robuste Fahreigenschaften, zuverlässige Mechanik, verbesserter Antrieb, saubere Integration neuer Hardwarekomponenten, Energie- und Sicherheitskonzept sowie ein modernes Managementsystem für mehrere Tonnen.
+  *Kurzfassung des Ist-Zustands der Mülltonne 1.0:* Die vorherige Gruppe hatte eine einzelne smarte Mülltonne als Prototyp vorbereitet. Die Tonne konnte grundsätzlich fahren und war mit Sensorik, Motorsteuerung und lokalen Zuständen gedacht; softwareseitig existierten Pico-Client-Code und ein einfacher Serveransatz. Offen waren vor allem robuste Fahreigenschaften, zuverlässige Mechanik, verbesserter Antrieb, saubere Integration neuer Hardwarekomponenten, Energie- und Sicherheitskonzept sowie ein modernes Managementsystem für mehrere Tonnen.
 ]
 
 == Abgrenzung dieser Dokumentation
@@ -187,6 +187,8 @@ Die eigene Weiterentwicklung konzentriert sich auf folgende Bereiche:
 - Schnittstellen zwischen Hardware, App, Backend und Simulation
 
 = Zielbild
+
+== Anforderungen an die Smarte Mülltonne 2.0
 
 == Vision Statement
 
@@ -209,13 +211,70 @@ Die Projektvision beschreibt die Transformation einer passiven Mülltonne zu ein
   caption: [Pflichtenheft-Säulen der Smarten Mülltonne 2.0],
 )
 
+== Use Cases
+Die Use-Case-Matrix ordnet die Projektidee in sechs Hauptkategorien:
+
+#figure(
+  table(
+    columns: (0.7fr, 1.7fr, 3fr),
+    [*ID*], [*Kategorie*], [*Ziel*],
+    [UC1], [Autonome Navigation], [Die Mülltonne bewegt sich entlang einer definierten Linie, erkennt Hindernisse und erreicht die Bereitstellungsposition.],
+    [UC2], [Füllstandsüberwachung], [Der Füllstand wird gemessen, in Prozent berechnet und an Anzeige beziehungsweise Server übergeben.],
+    [UC3], [Statusanzeige], [Betriebszustände werden lokal über Touchpanel, Buzzer oder LED und digital in der App sichtbar.],
+    [UC4], [Zentrale Serververwaltung], [Daten werden gespeichert, analysiert und für Routenplanung, Steuerung und Monitoring verwendet.],
+    [UC5], [Diebstahl/Fremdnutzung], [Unberechtigtes Öffnen oder Manipulationen werden erkannt und als Sicherheitsereignis gemeldet.],
+    [UC6], [Aufladen], [Die Tonne soll in eine Ladestation fahren und ohne manuellen Eingriff geladen werden.],
+  ),
+  caption: [Use-Case-Kategorien],
+)
+
+== Priorisierte Funktionen
+
+Aus Sicht der Umsetzung wurden besonders die Funktionen priorisiert, die den Wechsel zum Systemprototyp ermöglichen: autonome Linienfahrt, Hindernisreaktion, Füllstandsmessung, Statusübermittlung, Serverdatenverarbeitung, bidirektionale Kommunikation, Routenplanung nach Füllstand und die Simulation von Abholprozessen.
+
+#figure(
+  table(
+    columns: (0.8fr, 2fr, 1fr, 2.8fr),
+    [*Use Case*], [*Funktion*], [*Priorität*], [*Kerntechnologie*],
+    [1.0], [Autonome Linienfahrt], [1], [IR-Liniensensoren, Motorsteuerung],
+    [1.2], [Dynamische Hindernisumfahrung], [1], [Ultraschallsensoren seitlich],
+    [2.0], [Füllstand erkennen und ausgeben], [1], [Ultraschallsensorik],
+    [3.4], [Zustand an Flottenmanagement-App übermitteln], [1], [API-Integration],
+    [5.0], [Server speichert und analysiert Daten], [1], [Backend, Datenbank],
+    [5.2], [Befehle und Updates], [1], [HTTP oder MQTT],
+    [5.4], [Optimierte Routenplanung], [1], [Algorithmus beziehungsweise LLM-Agent],
+    [6.0], [Docking-Ladestation], [2], [Ladekontakte, präzise Positionierung],
+  ),
+  caption: [Auszug aus der priorisierten Use-Case-Matrix],
+)
+
+== Nutzergruppen und Nutzungsszenarien
+
 == Vom Einzelprototyp zum fahrfähigen System
 
 Der wichtigste konzeptionelle Schritt war nicht nur der Wechsel von einer isolierten Tonne zu einem Flottenmanagement, sondern zuerst die Weiterentwicklung des physischen Prototyps zu einem zuverlässig fahrenden System. Die Mülltonne muss mechanisch stabil, kontrollierbar und wiederholbar fahren, bevor die digitale Steuerung ihren Nutzen vollständig zeigen kann. Die Web-App erweitert diese Hardwarebasis um Monitoring, Planung und Demonstration, ersetzt sie aber nicht.
 
-= Chronologische Projektstruktur
+= Projektstruktur und Organisation
 
-== Sprint 0: Orientierung und Sichtung
+== Interdisziplinäre Projektstruktur
+== Aufgabenverteilung im Team
+
+Die Notion-Koordination teilt das Projekt in vier Arbeitsbereiche:
+
+#figure(
+  table(
+    columns: (1.7fr, 2.4fr, 2fr),
+    [*Team*], [*Aufgaben*], [*Personen laut Board*],
+    [Hardware & Mechanik], [Antrieb, Konstruktion, Sensoren, Akku, Elektronik.], [Jan-Lukas, Theresa, Alaeddine],
+    [Software & System], [Pico-Code, Kommunikation, Backend, Datenverarbeitung, Navigation.], [Jan-Lukas, Jonas, Theresa, Alaeddine],
+    [App & UX/UI], [App-Design, User Flows, Touchpanel, Feedbacksysteme, Usability.], [Fulya, Jonas],
+    [Konzept & Produktstrategie], [Use Cases, Vision, Flottenmanagement-Konzept, Storytelling.], [Fulya, Jonas],
+  ),
+  caption: [Rollenmodell aus dem Notion-Board],
+)
+== Projektorganisation und Arbeitsweise
+
+=== Sprint 0: Orientierung und Sichtung
 
 Sprint 0 diente als Setup- und Alignment-Phase vom 14. April 2026 bis 19. April 2026. In dieser Phase standen die Sichtung der Vorarbeiten des ersten Teils des interdisziplinären Projektes, die Rollenklärung, die Projektvision, die Tool-Auswahl und die Definition erster Use Cases im Vordergrund.
 
@@ -243,7 +302,7 @@ Dabei haben die Teams folgende Aufgaben für die Duchführung des Projektes gepl
 - App und UX/UI: Flottenmanagement-App, Layout, Karte, Visualisierung und Interaktionskonzept.
 - Konzept und Produktstrategie: Vision, Use Cases, Storyline und Priorisierung.
 
-== Sprint 1: Anforderungen, Architektur und Planung
+=== Sprint 1: Anforderungen, Architektur und Planung
 
 Sprint 1 war vom 20. April 2026 bis 10. Mai 2026 geplant. Hier wurden basierend auf den Überlegungen des Projektfokuses erste Themen und Aufgabenpakete definiert. 
 
@@ -261,7 +320,7 @@ In der Umsetzung wurden viele der geplanten Aufgaben bearbeitet, jedoch teilweis
 
 Dadurch zogen sich Aufgaben wie die Analyse des Antriebs über den Sprint hinaus, da zunächst das neue grundlegende Konzept der Mülltonne 2.0 erarbeitet werden musste. 
 
-== Sprint 2: Software, Hardware, UI an der Mülltonne, Integration
+=== Sprint 2: Software, Hardware, UI an der Mülltonne, Integration
 
 Sprint 2 war vom 11. Mai 2026 bis 05. Juni 2026 geplant.
 
@@ -312,7 +371,7 @@ Die Aufgaben des zweiten Sprints orientieren sich ebenfalls an den Teams und wur
   ],
 )
 
-== Sprint 3: Features, UX/Interaction, Backend/System, Testing
+=== Sprint 3: Features, UX/Interaction, Backend/System, Testing
 
 Sprint 3 war vom 06. Juni 2026 bis 26. Juni 2026 geplant.
 
@@ -325,7 +384,7 @@ Der Sprint war in vier Hauptbereiche gegliedert:
 
 Hier wurden offene Aufgaben aus Sprint 2 übernommen und weitere Aufgaben hinzugefügt. 
 
-== Sprint 4: Finalisierung, Präsentation, Medien
+=== Sprint 4: Finalisierung, Präsentation, Medien
 
 Sprint 4 sollte ein letzter kurzer Sprint werden, in dem eigentlich nur Bug Fixes sowie die Präsentation und das Teaser-Video anstanden und war daher vom  27. Juni 2026 bis 15. Juli 2026 geplant.
 
@@ -336,47 +395,6 @@ Sprint 4 hat gezeigt, dass die agile Sprintstruktur besonders in der Finalisieru
 Gleichzeitig ermöglichte die Aufteilung in Finalisierung, Präsentation und Medien, dass parallel zur technischen Fertigstellung auch die Präsentationsvorbereitung vorangetrieben wurden. Die regelmäßige Planung von Zwischen- und Abschlusspräsentationen sowie die fortlaufende Dokumentation stellten sicher, dass das Projekt nicht nur technisch, sondern auch kommunikativ und dokumentarisch abgeschlossen werden konnte.
 
 Die Tatsache, dass viele Aufgaben über mehrere Sprints hinweg wiederholt wurden, war zwar mit zusätzlichem Aufwand verbunden, konnte aber durch die iterative, anpassungsfähige Planung aufgefangen werden, ohne dass das Gesamtprojekt aus dem Ruder lief.
-
-
-= Use Cases und Priorisierung
-
-== Überblick
-
-Die Use-Case-Matrix ordnet die Projektidee in sechs Hauptkategorien:
-
-#figure(
-  table(
-    columns: (0.7fr, 1.7fr, 3fr),
-    [*ID*], [*Kategorie*], [*Ziel*],
-    [UC1], [Autonome Navigation], [Die Mülltonne bewegt sich entlang einer definierten Linie, erkennt Hindernisse und erreicht die Bereitstellungsposition.],
-    [UC2], [Füllstandsüberwachung], [Der Füllstand wird gemessen, in Prozent berechnet und an Anzeige beziehungsweise Server übergeben.],
-    [UC3], [Statusanzeige], [Betriebszustände werden lokal über Touchpanel, Buzzer oder LED und digital in der App sichtbar.],
-    [UC4], [Zentrale Serververwaltung], [Daten werden gespeichert, analysiert und für Routenplanung, Steuerung und Monitoring verwendet.],
-    [UC5], [Diebstahl/Fremdnutzung], [Unberechtigtes Öffnen oder Manipulationen werden erkannt und als Sicherheitsereignis gemeldet.],
-    [UC6], [Aufladen], [Die Tonne soll in eine Ladestation fahren und ohne manuellen Eingriff geladen werden.],
-  ),
-  caption: [Use-Case-Kategorien],
-)
-
-== Priorisierte Funktionen
-
-Aus Sicht der Umsetzung wurden besonders die Funktionen priorisiert, die den Wechsel zum Systemprototyp ermöglichen: autonome Linienfahrt, Hindernisreaktion, Füllstandsmessung, Statusübermittlung, Serverdatenverarbeitung, bidirektionale Kommunikation, Routenplanung nach Füllstand und die Simulation von Abholprozessen.
-
-#figure(
-  table(
-    columns: (0.8fr, 2fr, 1fr, 2.8fr),
-    [*Use Case*], [*Funktion*], [*Priorität*], [*Kerntechnologie*],
-    [1.0], [Autonome Linienfahrt], [1], [IR-Liniensensoren, Motorsteuerung],
-    [1.2], [Dynamische Hindernisumfahrung], [1], [Ultraschallsensoren seitlich],
-    [2.0], [Füllstand erkennen und ausgeben], [1], [Ultraschallsensorik],
-    [3.4], [Zustand an Flottenmanagement-App übermitteln], [1], [API-Integration],
-    [5.0], [Server speichert und analysiert Daten], [1], [Backend, Datenbank],
-    [5.2], [Befehle und Updates], [1], [HTTP oder MQTT],
-    [5.4], [Optimierte Routenplanung], [1], [Algorithmus beziehungsweise LLM-Agent],
-    [6.0], [Docking-Ladestation], [2], [Ladekontakte, präzise Positionierung],
-  ),
-  caption: [Auszug aus der priorisierten Use-Case-Matrix],
-)
 
 = Hardware- und Mechanikentwicklung
 
@@ -442,13 +460,18 @@ Als mögliche Schrittmotor-Optionen wurden ein NEMA17 42BYGHM809 und ein stärke
   caption: [Antriebskomponenten und Rolle im Projekt],
 )
 
-== Sensorik und Bedienung
+== Gehäuse und Bauraum
 
+== Touchdiaplay-Halterung
+
+== Ultraschall-Halterung
+
+= Elektronik und Sensorik
+== Zentrale Steuereinheit
+== Sensoren
 Für die Weiterentwicklung wurden zusätzliche oder überarbeitete Sensorik- und Bedienkomponenten geplant. Dazu gehören Magnetschalter für Deckelöffnung beziehungsweise Fremdnutzung, ein Touchdisplay als lokale Schnittstelle, Not-Aus, Buzzer, ggf. eine Akkuüberwachung, ein Spannungswandler und eine Ladeinfrastruktur.
 
 Die Notion-Materialliste führt außerdem vorhandene Grundkomponenten wie Kettenroboterchassis, Mülltonnenkorpus, Motoren, Motortreiber und Bleiakku. Als Randbedingung wurde unter anderem ein Gesamtbudget und die verfügbare GPIO-Anzahl betrachtet; in der Materialliste ist festgehalten, dass 34 GPIO-Ports benötigt werden.
-
-== Fahrlogik und Regelung
 
 Die mechanische Verbesserung ist eng mit der Fahrlogik gekoppelt. Die vorhandene Software arbeitet mit Linienverfolgung, PD-Regelung, Hinderniserkennung, Pausen- und Startzuständen sowie Netzwerkkommunikation. Für die Weiterentwicklung bedeutet das: Neue Motoren und Räder können nicht isoliert betrachtet werden. Nach mechanischen Änderungen müssen Parameter wie Grundgeschwindigkeit, Regelverstärkung, Trim der beiden Antriebsseiten und Verhalten bei Linienverlust erneut getestet werden.
 
@@ -460,6 +483,8 @@ Die wichtigsten fahrtechnischen Ziele sind:
 - sicherer Stopp bei Hindernissen
 - Wiederfinden der Linie nach Störung oder Ausweichbewegung
 - klare sichere Zustände bei Not-Aus, Sensorfehler oder Kommunikationsverlust
+== Schaltplan und Pinbelegung
+
 
 == Energie, Sicherheit und Elektrik
 
@@ -486,6 +511,22 @@ Die Hardwareentwicklung ist der entscheidende Erfolgsfaktor des Projekts. Routen
 #risk[
   *Technische Risiken:* Die wichtigsten Risiken liegen in der sauberen Linienverfolgung, der Kettenführung, der mechanischen Passung gedruckter Räder, der stabilen Stromversorgung, der Anzahl benötigter GPIOs, der zuverlässigen WLAN-Kommunikation und der Synchronisation zwischen lokaler Fahrlogik und zentralen Serverbefehlen.
 ]
+
+= Softwareentwicklung
+== Softwarestruktur
+Bottom-up Entwicklung
+
+== Motorsteuerung
+== Sensorsteuerung
+=== Ultraschallsensoren
+=== Buzzer
+=== Liniensensoren
+== Touchpanel und Benutzeroberfläche
+== Entwicklungsprozess und KI-Unterstützung
+== Systemarchitektur
+=== Gesamtaufbau
+=== Daten- und Kommunikationsfluss
+=== Global State Machine und Zustände
 
 = Digitale Erweiterung: Flottenmanagement-Web-App 
 
@@ -838,7 +879,10 @@ Die Simulatoren ermöglichen eine vollständige Demo ohne angeschlossene Hardwar
 
 Über `/sim/speed` kann die Demo-Geschwindigkeit zwischen 0,5-fach und 20-fach gesetzt werden. Das Frontend bietet dafür Buttons mit 1x, 5x, 10x und 20x. Die Simulatoren pollen den Wert und passen Tick-Rate beziehungsweise Bewegungsfortschritt an. Damit lassen sich Routen, Füllstandsdynamik und Abholprozesse in kurzer Zeit zeigen.
 
-= Schnittstelle zur Hardware
+= Schnittstelle zur Hardware/Systemintegration
+== Integration der Hardware
+== Integration der Software
+== Mechanischer Zusammenbau
 
 == API-Vertrag
 
@@ -1302,48 +1346,20 @@ Während der weiteren Präsentation wurden in nahezu allen Themenbereichen passe
 
 Den Abschluss bildete das ausführliche Projektvideo. Es zeigte den gesamten Entwicklungsprozess einschließlich Planungsphasen, technischer Arbeiten, erfolgreicher Tests, aufgetretener Fehler und daraus entstandener Verbesserungen. Nach dem Ende der eigentlichen Präsentation konnte dieses Video im Ausstellungsbereich weiter im Hintergrund abgespielt werden. Besucherinnen und Besucher erhielten dadurch die Möglichkeit, den Projektverlauf und zusätzliche Details auch unabhängig vom mündlichen Vortrag nachzuvollziehen.
 
+= Herausforderungen
+== Schrittmotoren
+== Touchdisplay
+== Systemintegration
 
-= Projektorganisation
+= Wirtschaftlichkeit
+== Kosten der Smarten Mülltonne 2.0
+== Skalierung auf größere smarte Mülltonnen
+== Kosten des Leitstands
+== Amortisation
 
-== Teamrollen
-
-Die Notion-Koordination teilt das Projekt in vier Arbeitsbereiche:
-
-#figure(
-  table(
-    columns: (1.7fr, 2.4fr, 2fr),
-    [*Team*], [*Aufgaben*], [*Personen laut Board*],
-    [Hardware & Mechanik], [Antrieb, Konstruktion, Sensoren, Akku, Elektronik.], [Jan-Lukas, Theresa, Alaeddine],
-    [Software & System], [Pico-Code, Kommunikation, Backend, Datenverarbeitung, Navigation.], [Jan-Lukas, Jonas, Theresa, Alaeddine],
-    [App & UX/UI], [App-Design, User Flows, Touchpanel, Feedbacksysteme, Usability.], [Fulya, Jonas],
-    [Konzept & Produktstrategie], [Use Cases, Vision, Flottenmanagement-Konzept, Storytelling.], [Fulya, Jonas],
-  ),
-  caption: [Rollenmodell aus dem Notion-Board],
-)
-
-== Status zum 03. Mai 2026
-
-Zum aktuellen Dokumentationsstand ist die Hardware-Weiterentwicklung inhaltlich klar ausgerichtet: Der vorhandene Prototyp soll mechanisch und fahrdynamisch verbessert werden. Dazu gehören Schrittmotor-Auslegung, neue gedruckte Räder, Anpassung der Ketten, Überarbeitung des Fahrwerks, Sensorintegration, Energieversorgung, Sicherheitskomponenten und spätere Fahrtests. Parallel dazu ist der Software- und App-Prototyp bereits weit konkretisiert: Die Web-App enthält Backend, Frontend, Datenmodell, Live-Kommunikation, Karte, Simulation, Routenplanung und Agenten-Chat.
-
-Der Projektstand ist damit zweigeteilt: Die Hardware bildet den eigentlichen mechatronischen Kern und wird schrittweise stabilisiert; die Web-App ist das digitale Zusatzsystem, mit dem Monitoring, Flottenlogik und Demo-Szenarien sichtbar gemacht werden.
-
-== Nächste Schritte
-
-Die nächsten technisch sinnvollen Schritte ergeben sich direkt aus der Chronologie:
-
-- neue Räder konstruieren, drucken und mechanisch testen.
-- Kettenlänge, Kettenspannung und Kettenführung am Fahrwerk prüfen.
-- Schrittmotoren und Motortreiber elektrisch sowie softwareseitig integrieren.
-- Fahrparameter für Geradeauslauf, Kurvenfahrt und Drehmanöver neu abstimmen.
-- erste strukturierte Fahrtests mit Linienführung und Hindernissen durchführen.
-- Sensorpositionen, Touchpanel, Not-Aus und Magnetschalter am Korpus festlegen.
-- API-Vertrag mit der Hardware final testen.
-- Echte Füllstands- und Akkudaten vom Pico beziehungsweise Gateway an das Backend senden.
-- Sicherheitsereignisse des Magnetschalters integrieren.
-- Command-Queue mit echter Hardware verproben.
-- Routenplanung und Truck-Simulation durch reale Fahrzustände ersetzen oder ergänzen.
-- Usability-Test des Dashboards durchführen.
-- Energie- und Ladezustände mit realen Messwerten validieren.
+= Reflexion und Ausblick
+== Reflexion der Zusammenarbeit
+== Verbesserungsmöglichkeiten
 
 = Zusammenfassung
 
