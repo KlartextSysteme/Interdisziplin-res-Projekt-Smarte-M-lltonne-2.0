@@ -21,6 +21,26 @@ BIN_BODY = color565(104, 106, 102)
 BIN_LABEL = color565(204, 204, 200)
 ASSET_KEY = color565(255, 0, 255)
 
+# Dynamische Diagnose-Werte (Fuellstand %, Hindernis cm) im Mockup-Look.
+# Ziffern-Assets dv_* (weiss auf Panel-Grau) werden rechtsbuendig in die Slots
+# geblittet. Panel-Grau exakt aus diagnose_ok.rle gemessen.
+DIAG_PANEL_BG = color565(66, 65, 66)
+DIAG_VALUE_RIGHT_X = 289
+DIAG_FILL_Y = 88
+DIAG_OBST_Y = 63
+# Zeichen -> (Asset-Name, Breite px), Breiten aus tools/render_diag_digits.py
+DIAG_GLYPHS = {
+    "0": ("dv_0", 10), "1": ("dv_1", 10), "2": ("dv_2", 10), "3": ("dv_3", 10),
+    "4": ("dv_4", 10), "5": ("dv_5", 10), "6": ("dv_6", 10), "7": ("dv_7", 10),
+    "8": ("dv_8", 10), "9": ("dv_9", 10),
+    "%": ("dv_pct", 14), "-": ("dv_dash", 7),
+    "C": ("dv_c", 12), "M": ("dv_m", 14), " ": ("dv_sp", 6),
+}
+
+# Sentinel: erlaubt set_status(obstacle_cm=None) als "kein Hindernis" zu setzen,
+# waehrend weggelassene Parameter den bisherigen Wert behalten.
+_UNSET = object()
+
 
 class Button:
     def __init__(self, x, y, w, h, action):
@@ -57,6 +77,9 @@ class TouchUi:
         self.line_ok = True
         self.obstacle_cm = None
         self.light_mode = False
+        # Zuletzt gezeichnete Diagnose-Werte (fuer partielles Live-Refresh).
+        self._diag_last_fill = None
+        self._diag_last_obstacle = None
 
     def set_status(
         self,
@@ -65,7 +88,7 @@ class TouchUi:
         location=None,
         locked=None,
         line_ok=None,
-        obstacle_cm=None,
+        obstacle_cm=_UNSET,
         status_kind=None,
         light_mode=None,
         **_unused
@@ -80,14 +103,16 @@ class TouchUi:
             self.locked = bool(locked)
         if line_ok is not None:
             self.line_ok = bool(line_ok)
-        if obstacle_cm is not None:
+        if obstacle_cm is not _UNSET:
             self.obstacle_cm = obstacle_cm
         if status_kind is not None:
             self.status_kind = status_kind
         if light_mode is not None:
             self.light_mode = bool(light_mode)
 
-        if self.screen in (SCREEN_STATUS, SCREEN_DIAGNOSE):
+        # Diagnose wird nicht voll neu gemalt (Flackern); tick() macht das
+        # partielle Refresh der beiden Wert-Slots.
+        if self.screen == SCREEN_STATUS:
             self.draw()
 
     def go(self, screen):
@@ -101,6 +126,11 @@ class TouchUi:
             if time.ticks_diff(time.ticks_ms(), self.confirm_until) >= 0:
                 self.confirm_until = 0
                 self.go(self.confirm_return)
+
+        if self.screen == SCREEN_DIAGNOSE:
+            if (self.fill_level != self._diag_last_fill
+                    or self.obstacle_cm != self._diag_last_obstacle):
+                self._draw_diag_values()
 
     def handle_touch(self, x, y):
         if self.screen == SCREEN_CONFIRM:
@@ -307,9 +337,42 @@ class TouchUi:
         self.buttons.append(Button(92, 188, 136, 46, back))
         self.r.draw(self._submenu_asset(self.submenu))
 
+    def _diag_fill_text(self):
+        if self.fill_level is None:
+            return "-"
+        return str(self.fill_level) + "%"
+
+    def _diag_obstacle_text(self):
+        if self.obstacle_cm is None:
+            return "-"
+        return str(int(self.obstacle_cm)) + " CM"
+
+    def _draw_diag_value(self, text, right_x, top_y):
+        # Slot leeren (rechts vom Label, x>=200) und Wert rechtsbuendig blitten.
+        self.d.fill_rect(200, top_y - 1, right_x - 200 + 1, 12, DIAG_PANEL_BG)
+        total = 0
+        for ch in text:
+            g = DIAG_GLYPHS.get(ch)
+            if g:
+                total += g[1]
+        x = right_x - total
+        for ch in text:
+            g = DIAG_GLYPHS.get(ch)
+            if not g:
+                continue
+            self.r.draw_at(g[0], x, top_y)
+            x += g[1]
+
+    def _draw_diag_values(self):
+        self._draw_diag_value(self._diag_obstacle_text(), DIAG_VALUE_RIGHT_X, DIAG_OBST_Y)
+        self._draw_diag_value(self._diag_fill_text(), DIAG_VALUE_RIGHT_X, DIAG_FILL_Y)
+        self._diag_last_fill = self.fill_level
+        self._diag_last_obstacle = self.obstacle_cm
+
     def draw_diagnose(self):
         self.buttons = [Button(92, 188, 136, 46, "menu_2")]
         self.r.draw("diagnose_ok" if self.connected and self.line_ok else "diagnose_alert")
+        self._draw_diag_values()
 
     def draw_confirm(self):
         self.buttons = [Button(0, 0, 320, 240, "confirm_back")]

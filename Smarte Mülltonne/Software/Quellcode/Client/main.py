@@ -46,13 +46,18 @@ BATTERY_R2_OHM = 33000
 BATTERY_MIN_VOLTAGE = 7.827
 BATTERY_MAX_VOLTAGE = 10.072
 
-LEFT_DIR_PIN = 10
-LEFT_STEP_PIN = 11
-LEFT_ENABLE_PIN = 12
+# Motor-Pinsaetze L<->R getauscht: am realen Aufbau (2026-07-04, T1) fuhr die
+# alte Zuordnung 10/11/12=links, 13/8/9=rechts rueckwaerts + spiegelverkehrt.
+# Verifiziert per Referenz-Linienlauf (Position pendelt sauber um 0).
+# MERGE-HINWEIS: origin/main "finale Belegung" hatte den Swap NICHT (LEFT=10/11/12).
+# Hier bewusst unser T1-verifiziertes 13/8/9 belassen -> Verdrahtung gegenpruefen!
+LEFT_DIR_PIN = 13
+LEFT_STEP_PIN = 8
+LEFT_ENABLE_PIN = 9
 
-RIGHT_DIR_PIN = 13
-RIGHT_STEP_PIN = 8
-RIGHT_ENABLE_PIN = 9
+RIGHT_DIR_PIN = 10
+RIGHT_STEP_PIN = 11
+RIGHT_ENABLE_PIN = 12
 
 LEFT_FORWARD_DIR = 1
 RIGHT_FORWARD_DIR = 0
@@ -116,7 +121,7 @@ def create_controller():
         right_step_pin=RIGHT_STEP_PIN,
         right_enable_pin=RIGHT_ENABLE_PIN,
         min_freq=2000,
-        max_freq=4500,
+        max_freq=7000,
         left_forward_dir=LEFT_FORWARD_DIR,
         right_forward_dir=RIGHT_FORWARD_DIR,
         enable_active_value=1,

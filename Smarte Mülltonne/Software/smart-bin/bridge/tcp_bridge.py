@@ -79,7 +79,13 @@ class PicoBridge:
         poll_task = asyncio.create_task(self._poll_commands(writer))
         try:
             while not reader.at_eof():
-                raw = await reader.readline()
+                try:
+                    raw = await reader.readline()
+                except (ConnectionError, OSError) as exc:
+                    # Peer-Reset (z.B. WLAN-Hickup am Nano-Router): sauber beenden
+                    # statt unbehandelter Exception; Pico reconnectet danach.
+                    LOGGER.info("Pico connection lost while reading: %s", exc)
+                    break
                 if not raw:
                     break
                 line = raw.decode(errors="ignore").strip()
@@ -151,11 +157,22 @@ class PicoBridge:
             self.state.sent_command_ids.add(command_id)
             return
 
+        LOGGER.info("backend command #%s %s -> pico %s", command_id, action, pico_cmd)
+        try:
+            writer.write((pico_cmd + "\n").encode())
+            await writer.drain()
+        except (ConnectionError, OSError) as exc:
+            # Verbindung riss beim Senden ab -> NICHT als gesendet markieren,
+            # damit der Befehl beim naechsten Poll / nach Reconnect erneut
+            # zugestellt wird (at-least-once statt stiller Verlust).
+            LOGGER.warning(
+                "send failed for command #%s (%s), retry later: %s",
+                command_id, pico_cmd, exc,
+            )
+            return
+        # Erst nach erfolgreichem Senden als in-flight/gesendet markieren.
         self.state.inflight_by_pico_cmd[pico_cmd] = command_id
         self.state.sent_command_ids.add(command_id)
-        LOGGER.info("backend command #%s %s -> pico %s", command_id, action, pico_cmd)
-        writer.write((pico_cmd + "\n").encode())
-        await writer.drain()
 
     async def _handle_pico_line(self, line: str, writer: asyncio.StreamWriter) -> None:
         LOGGER.info("pico: %s", line)

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
@@ -36,6 +37,15 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+def _iso_utc(value):
+    """Naiv gespeicherte UTC-Zeit -> ISO-8601 mit Z. None bleibt None."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _build_live_payload() -> dict:
     db: Session = SessionLocal()
     try:
@@ -58,7 +68,7 @@ def _build_live_payload() -> dict:
                 for b in bins
             ],
             "alerts": [
-                {"id": e.id, "bin_id": e.bin_id, "event_type": e.event_type, "timestamp": str(e.timestamp)}
+                {"id": e.id, "bin_id": e.bin_id, "event_type": e.event_type, "timestamp": _iso_utc(e.timestamp)}
                 for e in alerts
             ],
             "truck": truck if truck["lat"] is not None else None,
