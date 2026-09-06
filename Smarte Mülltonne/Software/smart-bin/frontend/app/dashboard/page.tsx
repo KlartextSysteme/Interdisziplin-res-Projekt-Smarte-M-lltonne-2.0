@@ -14,6 +14,7 @@ import SecurityPanel from "./components/SecurityPanel";
 import {
   resolveAlert,
   lockBin,
+  unlockBin,
   planRoute,
   getCandidates,
   activateRoute,
@@ -144,11 +145,21 @@ export default function DashboardPage() {
     await lockBin(binId, token);
   }
 
+  async function handleUnlock(binId: number) {
+    const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN ?? "changeme";
+    await unlockBin(binId, token);
+  }
+
   async function handleHardwareCommand(binId: number, action: BinCommandAction) {
     if (hardwareCommandPending) return;
     setHardwareCommandPending({ binId, action });
     try {
       await createBinCommand(binId, action);
+    } catch (err) {
+      // z. B. 409, wenn die Tonne gesperrt ist -> Fahrbefehl blockiert.
+      // Die Fahr-Buttons sind bei gesperrter Tonne ohnehin deaktiviert; hier
+      // nur abfangen, damit kein unbehandelter Fehler in der Konsole landet.
+      console.warn("Hardware-Befehl abgelehnt:", err);
     } finally {
       setHardwareCommandPending(null);
     }
@@ -366,6 +377,8 @@ export default function DashboardPage() {
             onSelectBin={setSelectedBinId}
             onHardwareCommand={handleHardwareCommand}
             hardwareCommandPending={hardwareCommandPending}
+            onLock={handleLock}
+            onUnlock={handleUnlock}
           />
         </div>
 
@@ -412,7 +425,14 @@ export default function DashboardPage() {
             {activeTab === "chat" && <ChatInterface onActionComplete={() => getLatestRoute().then(setActiveRoute)} />}
             {activeTab === "energy" && <EnergyPanel energyData={energyData} />}
             {activeTab === "security" && (
-              <SecurityPanel events={securityEvents} onResolve={handleResolve} onLock={handleLock} />
+              <SecurityPanel
+                events={securityEvents}
+                bins={bins}
+                onResolve={handleResolve}
+                onLock={handleLock}
+                onSelectBin={setSelectedBinId}
+                selectedBinId={selectedBinId}
+              />
             )}
           </div>
         </div>
