@@ -17,8 +17,10 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import os
 import signal
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -30,6 +32,22 @@ DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 50002
 DEFAULT_BACKEND = "http://localhost:8000"
 DEFAULT_POLL_INTERVAL_S = 1.0
+
+# Akku-Messwerte werden hier mitgeschrieben (CSV), damit sie sich spaeter auslesen
+# lassen. Pfad ueber env BATTERY_LOG ueberschreibbar.
+BATTERY_LOG = os.environ.get("BATTERY_LOG", "/tmp/battery_log.csv")
+
+
+def _log_battery(bin_id: int, pct: int) -> None:
+    """timestamp_utc,bin_id,battery_percent an die CSV anhaengen (fehlertolerant)."""
+    try:
+        new = not os.path.exists(BATTERY_LOG) or os.path.getsize(BATTERY_LOG) == 0
+        with open(BATTERY_LOG, "a") as f:
+            if new:
+                f.write("timestamp_utc,bin_id,battery_percent\n")
+            f.write(f"{datetime.now(timezone.utc).isoformat()},{bin_id},{pct}\n")
+    except OSError as exc:
+        LOGGER.warning("battery log write failed: %s", exc)
 
 BACKEND_TO_PICO_COMMAND = {
     "goto_street": "CMD_GOTO_STREET",
@@ -53,6 +71,8 @@ class BridgeState:
     inflight_by_pico_cmd: dict[str, int] = field(default_factory=dict)
     sent_command_ids: set[int] = field(default_factory=set)
     last_disarmed: bool | None = None   # zuletzt an den Pico gesendeter Geofence-Zustand
+    last_battery: int | None = None     # zuletzt vom Pico gemeldeter Akkustand %
+    last_fill: int | None = None        # zuletzt vom Pico gemeldeter Fuellstand %
 
 
 class PicoBridge:
@@ -61,6 +81,13 @@ class PicoBridge:
         self.state = BridgeState(bin_id=bin_id)
         self.poll_interval_s = poll_interval_s
         self.client = httpx.AsyncClient(timeout=5.0)
+        # Nur EINE aktive Pico-Verbindung zulassen. Der Pico reconnectet bei
+        # WLAN-Hickups am Nano-Router, ohne dass die alte TCP-Verbindung sofort
+        # als tot erkannt wird -> mehrere handle_client/Poll-Tasks parallel, die
+        # sich sent_command_ids teilen und Kommandos in halb-offene Sockets
+        # schreiben -> Pico bekommt sie nie, kein ACK, Queue blockiert.
+        self._active_writer: "asyncio.StreamWriter | None" = None
+        self._active_poll_task: "asyncio.Task | None" = None
 
     async def close(self) -> None:
         await self.client.aclose()
@@ -72,11 +99,25 @@ class PicoBridge:
     ) -> None:
         peer = writer.get_extra_info("peername")
         LOGGER.info("Pico connected from %s", peer)
+
+        # Alte (ggf. halb-offene) Verbindung hart schliessen -> deren readline
+        # bricht ab, deren Poll-Task wird gecancelt. So bleibt genau eine aktive
+        # Verbindung; Kommandos gehen nur noch an den aktuellen Socket.
+        old_writer, old_task = self._active_writer, self._active_poll_task
+        if old_task is not None:
+            old_task.cancel()
+        if old_writer is not None and old_writer is not writer:
+            with contextlib.suppress(Exception):
+                old_writer.close()
+            LOGGER.info("closed previous Pico connection (superseded by %s)", peer)
+
         self.state.connected = True
         self.state.inflight_by_pico_cmd.clear()
         self.state.sent_command_ids.clear()
 
         poll_task = asyncio.create_task(self._poll_commands(writer))
+        self._active_writer = writer
+        self._active_poll_task = poll_task
         try:
             while not reader.at_eof():
                 try:
@@ -96,6 +137,9 @@ class PicoBridge:
             with contextlib.suppress(asyncio.CancelledError):
                 await poll_task
             self.state.connected = False
+            if self._active_writer is writer:
+                self._active_writer = None
+                self._active_poll_task = None
             writer.close()
             with contextlib.suppress(Exception):
                 await writer.wait_closed()
@@ -187,6 +231,23 @@ class PicoBridge:
             await self._post_telemetry(state)
             return
 
+        if line.startswith("BATTERY:"):
+            # Cachen (naechster STATUS-Post traegt den Wert mit) + in CSV aufzeichnen.
+            try:
+                self.state.last_battery = max(0, min(100, int(line.split(":", 1)[1].strip())))
+                _log_battery(self.state.bin_id, self.state.last_battery)
+            except ValueError:
+                pass
+            return
+
+        if line.startswith("FILL:"):
+            # Fuellstand cachen; naechster STATUS-Post traegt ihn mit -> bin.fill_level.
+            try:
+                self.state.last_fill = max(0, min(100, int(line.split(":", 1)[1].strip())))
+            except ValueError:
+                pass
+            return
+
         if line.startswith("ARRIVED:"):
             place = line.split(":", 1)[1].strip()
             state = "WAIT_AT_STREET" if place == "STREET" else "STANDBY"
@@ -232,6 +293,10 @@ class PicoBridge:
         payload: dict[str, Any] = {"pico_state": pico_state}
         if target_destination:
             payload["target_destination"] = target_destination
+        if self.state.last_battery is not None:
+            payload["battery"] = self.state.last_battery
+        if self.state.last_fill is not None:
+            payload["fill_level"] = self.state.last_fill
 
         resp = await self.client.post(
             f"{self.backend_url}/bins/{self.state.bin_id}/telemetry",

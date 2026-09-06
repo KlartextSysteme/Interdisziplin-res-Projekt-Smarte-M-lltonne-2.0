@@ -22,6 +22,21 @@ ARRIVAL_THRESHOLD_M = 10.0
 EMPTY_PAUSE_S = 6.0
 BIN_READY_BUFFER_S = 2.5
 BIN_MAX_WAIT_S = 18.0
+
+# Reale (nicht simulierte) Tonne: statt Sim-Marker einen echten goto_street
+# feuern, damit die physische Tonne rechtzeitig vor dem Truck an der Strasse steht.
+# PHYSICAL_DRIVE_S = gemessene Hinfahrt (Richtwert), + Puffer. Nutzt Wanduhr-Zeit
+# -> exakt nur bei 1x Sim-Tempo (beschleunigter Truck wuerde die Tonne ueberholen).
+HARDWARE_BIN_ID = 22
+PHYSICAL_DRIVE_S = 98.0
+HARDWARE_READY_BUFFER_S = 30.0
+# Nach dem Einsammeln faehrt die reale Tonne selbsttaetig heim -> aber erst nach
+# dieser Verzoegerung, damit sie nicht losfaehrt, waehrend sie noch entleert wird.
+HARDWARE_RETURN_DELAY_S = 20.0
+# Timer-Tasks fuer den realen goto_street (analog _bin_move_tasks, cancel-on-reschedule).
+_hw_dispatch_tasks: dict[int, "asyncio.Task"] = {}
+# Timer-Tasks fuer die reale Heimfahrt (getrennt vom goto_street-Task).
+_hw_return_tasks: dict[int, "asyncio.Task"] = {}
 # Gemeinsame Wahrheit mit der Routenplanung (config), damit geplante und
 # gefahrene Route bei Kapazität/Schwelle nicht auseinanderlaufen.
 COLLECT_FILL_THRESHOLD = settings.collect_fill_threshold
@@ -327,6 +342,21 @@ def _schedule_route_bins_to_pickup(
         if not target:
             continue
 
+        if bin_id == HARDWARE_BIN_ID:
+            # Reale (nicht simulierte) Tonne: keinen Sim-Marker bewegen, sondern
+            # rechtzeitig einen echten goto_street feuern, damit sie vor dem Truck
+            # an der Strasse steht. delay in Wanduhr-Zeit (nur bei 1x Sim exakt).
+            need_s = PHYSICAL_DRIVE_S + HARDWARE_READY_BUFFER_S
+            delay_s = max(0.0, truck_eta_s - need_s)
+            if truck_eta_s < need_s:
+                logger.warning(
+                    "real bin %s: Truck-ETA %.0fs < Fahrzeit+Puffer %.0fs -> Tonne evtl. zu spaet "
+                    "(Route so planen, dass Bin %s spaeter dran ist / 1x Tempo)",
+                    bin_id, truck_eta_s, need_s, bin_id,
+                )
+            _schedule_real_goto_street(bin_id, delay_s, truck_eta_s)
+            continue
+
         bin_travel_s = _haversine_m(_bin_current_coords(b), target) / BIN_SPEED_MPS
         delay_s = max(0.0, truck_eta_s - bin_travel_s - BIN_READY_BUFFER_S)
         _schedule_bin_move(bin_id, "pickup", delay_s=delay_s)
@@ -339,6 +369,85 @@ def _schedule_route_bins_to_pickup(
         )
 
     return stop_progress_by_bin
+
+
+def _schedule_real_goto_street(bin_id: int, delay_s: float, truck_eta_s: float) -> "asyncio.Task":
+    old = _hw_dispatch_tasks.get(bin_id)
+    if old and not old.done():
+        old.cancel()
+    task = asyncio.create_task(_fire_real_goto_street(bin_id, delay_s, truck_eta_s))
+    _hw_dispatch_tasks[bin_id] = task
+
+    def _cleanup(done_task: "asyncio.Task", bid: int = bin_id):
+        if _hw_dispatch_tasks.get(bid) is done_task:
+            _hw_dispatch_tasks.pop(bid, None)
+
+    task.add_done_callback(_cleanup)
+    logger.info("real bin %s: goto_street geplant in %.1fs (truck eta %.1fs)", bin_id, delay_s, truck_eta_s)
+    return task
+
+
+async def _fire_real_goto_street(bin_id: int, delay_s: float, truck_eta_s: float):
+    # Wanduhr-Delay (KEIN Sim-Speed-Scaling) -> reale Fahrzeit passt nur bei 1x Tempo.
+    if delay_s > 0:
+        await asyncio.sleep(delay_s)
+
+    from routers.commands import enqueue  # deferred: vermeidet Import-Zyklus
+
+    db = SessionLocal()
+    try:
+        b = db.query(Bin).filter(Bin.id == bin_id).first()
+        if not b:
+            return
+        # Nur feuern, wenn die Tonne zuhause ist (sonst schon unterwegs -> kein Re-Dispatch).
+        if (b.location_state or "home") != "home":
+            logger.info("real bin %s nicht AT_HOME (%s) -> kein goto_street", bin_id, b.location_state)
+            return
+        enqueue(db, bin_id, "goto_street")
+        logger.info(
+            "real bin %s: goto_street ABGESETZT (Hinfahrt ~%.0fs + Puffer %.0fs)",
+            bin_id, PHYSICAL_DRIVE_S, HARDWARE_READY_BUFFER_S,
+        )
+    finally:
+        db.close()
+
+
+def _schedule_real_return_home(bin_id: int, delay_s: float) -> "asyncio.Task":
+    old = _hw_return_tasks.get(bin_id)
+    if old and not old.done():
+        old.cancel()
+    task = asyncio.create_task(_fire_real_return_home(bin_id, delay_s))
+    _hw_return_tasks[bin_id] = task
+
+    def _cleanup(done_task: "asyncio.Task", bid: int = bin_id):
+        if _hw_return_tasks.get(bid) is done_task:
+            _hw_return_tasks.pop(bid, None)
+
+    task.add_done_callback(_cleanup)
+    logger.info("real bin %s: goto_home geplant in %.1fs (nach Entleerung)", bin_id, delay_s)
+    return task
+
+
+async def _fire_real_return_home(bin_id: int, delay_s: float):
+    # Wanduhr-Delay -> die Tonne faehrt erst los, wenn das Entleeren durch ist.
+    if delay_s > 0:
+        await asyncio.sleep(delay_s)
+
+    from routers.commands import enqueue  # deferred: vermeidet Import-Zyklus
+
+    db = SessionLocal()
+    try:
+        b = db.query(Bin).filter(Bin.id == bin_id).first()
+        if not b:
+            return
+        # Nur feuern, wenn die Tonne nicht ohnehin schon zuhause ist.
+        if (b.location_state or "home") == "home":
+            logger.info("real bin %s bereits zuhause -> kein goto_home", bin_id)
+            return
+        enqueue(db, bin_id, "return_home")
+        logger.info("real bin %s: goto_home ABGESETZT (Rueckfahrt ~%.0fs)", bin_id, PHYSICAL_DRIVE_S)
+    finally:
+        db.close()
 
 
 def _collectable_route_waypoints(db: Session, waypoints: list[int]) -> tuple[list[int], list[int]]:
@@ -659,6 +768,12 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
                 await asyncio.sleep(0.5)
                 continue
 
+            # "Route stoppen" mitten in der Fahrt -> Fahrt abbrechen; der Haupt-Loop
+            # despawnt den Truck dann.
+            if not truck_state.is_dispatched():
+                logger.info("truck simulator route %s gestoppt -> despawn", route_id)
+                return pos, load_units
+
             # Wurde währenddessen ein anderer Kandidat aktiviert? Dann diese Fahrt
             # abbrechen — der Haupt-Loop übernimmt die neue aktive Route.
             if not db.query(Route.active).filter(Route.id == route_id).scalar():
@@ -734,7 +849,12 @@ async def _drive_route(route_id: int, pos: tuple[float, float], load_units: floa
                 collected_units = _empty_bin(db, hit_bin)
                 load_units = min(TRUCK_CAPACITY_UNITS, load_units + collected_units)
                 visited.add(hit_bin)
-                _schedule_bin_move(hit_bin, "home", delay_s=2.0)
+                if hit_bin == HARDWARE_BIN_ID:
+                    # Reale Tonne: kein Sim-Marker heim, sondern echtes goto_home
+                    # nach kurzer Verzoegerung (Telemetrie fuehrt den Status nach).
+                    _schedule_real_return_home(hit_bin, HARDWARE_RETURN_DELAY_S)
+                else:
+                    _schedule_bin_move(hit_bin, "home", delay_s=2.0)
                 _post_position(pos, "en_route", None, load_units, progress)
             else:
                 # Rückfahrt = nichts mehr zu sammeln (alle erreichbaren/passenden
@@ -792,10 +912,18 @@ async def _maybe_plan_next_trip(prev_route_id: int):
 async def run_truck_simulator():
     pos = _depot()
     load_units = 0.0
-    _post_position(pos, "idle", None, load_units)
-    logger.info("truck simulator started at depot")
+    truck_state.despawn()  # startet despawnt (nicht auf der Karte) bis "Route starten"
+    logger.info("truck simulator started (idle, not dispatched)")
 
     while True:
+        # Dispatch-Gate: ohne "Route starten" bleibt der Truck despawnt und faehrt nicht.
+        if not truck_state.is_dispatched():
+            truck_state.despawn()
+            pos = _depot()
+            load_units = 0.0
+            await asyncio.sleep(1)
+            continue
+
         db = SessionLocal()
         try:
             route = _latest_active_route(db)
@@ -804,6 +932,7 @@ async def run_truck_simulator():
             db.close()
 
         if route_id is None:
+            # gestartet, aber (noch) keine aktive Route -> am Depot gespawnt, wartet
             _post_position(pos, "idle", None, load_units)
             await asyncio.sleep(3)
             continue

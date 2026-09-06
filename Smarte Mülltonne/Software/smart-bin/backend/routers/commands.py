@@ -15,6 +15,16 @@ class CommandIn(BaseModel):
     params: dict | None = None
 
 
+# Fahr-/Bewegungsbefehle, die eine GESPERRTE Tonne nicht ausfuehren darf.
+# stop bleibt erlaubt (Notaus), lock/unlock laufen ueber /security -> nicht hier.
+# So bedeutet "gesperrt" wirklich: nimmt keine Fahrbefehle an, bis ein Admin
+# entsperrt. Die autonome Truck-Abholung respektiert `locked` bereits separat.
+LOCKED_BLOCKED_ACTIONS = {
+    "goto_street", "go_to_street", "goto_pickup", "go_to_pickup", "start",
+    "return_home", "go_home", "goto_home",
+}
+
+
 class AckIn(BaseModel):
     command_id: int
     success: bool = True
@@ -33,8 +43,14 @@ def enqueue(db: Session, bin_id: int, action: str, params: dict | None = None) -
 
 @router.post("/{bin_id}/command")
 def create_command(bin_id: int, payload: CommandIn, db: Session = Depends(get_db)):
-    if not db.query(Bin).filter(Bin.id == bin_id).first():
+    b = db.query(Bin).filter(Bin.id == bin_id).first()
+    if not b:
         raise HTTPException(status_code=404, detail="Bin not found")
+    if b.locked and payload.action.lower() in LOCKED_BLOCKED_ACTIONS:
+        raise HTTPException(
+            status_code=409,
+            detail="Tonne ist gesperrt – Fahrbefehle sind blockiert. Erst entsperren.",
+        )
     return enqueue(db, bin_id, payload.action, payload.params)
 
 

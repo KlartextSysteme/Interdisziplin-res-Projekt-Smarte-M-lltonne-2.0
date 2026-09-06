@@ -19,6 +19,7 @@ from python_tsp.heuristics import solve_tsp_local_search
 from python_tsp.exact import solve_tsp_dynamic_programming
 from sqlalchemy.orm import Session
 
+import truck_state
 from config import settings
 from database import get_db
 from models.bin import Bin
@@ -192,8 +193,24 @@ def _exact_perm(matrix: np.ndarray) -> tuple[list[int], float]:
 
 @router.post("/plan")
 async def plan_route(db: Session = Depends(get_db)):
-    """Plant mehrere kapazitätsbegrenzte Kandidaten (Default = active + is_default)."""
+    """Plant mehrere kapazitätsbegrenzte Kandidaten (Default = active + is_default).
+    Startet den Truck NICHT — das macht erst /routes/start (Disponent-Flow)."""
     return await generate_route_candidates(db)
+
+
+@router.post("/start")
+def start_route():
+    """Truck entsenden: spawnt am Depot und faehrt die aktive/gewaehlte Route."""
+    truck_state.set_dispatched(True)
+    return {"dispatched": True}
+
+
+@router.post("/stop")
+def stop_route():
+    """Truck stoppen: dispatched aus + despawnen (verschwindet von der Karte)."""
+    truck_state.set_dispatched(False)
+    truck_state.despawn()
+    return {"dispatched": False}
 
 
 async def generate_route_candidates(db: Session) -> list[Route]:

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
-import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Inbox, CircleHelp } from "lucide-react";
+import { Route as RouteIcon, Loader2, Gauge, Play, Pause, Radio, MessageSquare, Battery, Inbox, CircleHelp, Truck, Square } from "lucide-react";
 import { useLiveData } from "@/lib/useWebSocket";
 import AlertBanner from "./components/AlertBanner";
 import OperatorTour from "./components/OperatorTour";
@@ -14,10 +14,13 @@ import SecurityPanel from "./components/SecurityPanel";
 import {
   resolveAlert,
   lockBin,
+  unlockBin,
   planRoute,
   getCandidates,
   activateRoute,
   getLatestRoute,
+  startRoute,
+  stopRoute,
   getPublicConfig,
   getSimSpeed,
   createBinCommand,
@@ -37,6 +40,7 @@ export default function DashboardPage() {
   const [candidates, setCandidates] = useState<Route[]>([]);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [dispatchPending, setDispatchPending] = useState(false);
   const [simSpeed, setSimSpeedState] = useState<number>(1);
   const [simPaused, setSimPausedState] = useState<boolean>(false);
   const [selectedBinId, setSelectedBinId] = useState<number | null>(null);
@@ -87,6 +91,25 @@ export default function DashboardPage() {
   const bins = live?.bins ?? [];
   const alerts = live?.alerts ?? [];
   const truck = live?.truck ?? null;
+  const dispatched = live?.dispatched ?? false;
+  // Route geplant/gewählt, aber Truck noch nicht unterwegs -> "Route starten" hervorheben.
+  const hasPlannedRoute = candidates.length > 0 || !!activeRoute;
+
+  // Truck entsenden / stoppen (entkoppelt von der Planung).
+  async function handleStartStop() {
+    setDispatchPending(true);
+    try {
+      if (dispatched) {
+        await stopRoute();
+      } else {
+        await startRoute();
+      }
+    } catch {
+      // bei Fehler korrigiert der nächste Live-Poll den Zustand
+    } finally {
+      setDispatchPending(false);
+    }
+  }
 
   async function handlePlan() {
     setPlanning(true);
@@ -122,11 +145,21 @@ export default function DashboardPage() {
     await lockBin(binId, token);
   }
 
+  async function handleUnlock(binId: number) {
+    const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN ?? "changeme";
+    await unlockBin(binId, token);
+  }
+
   async function handleHardwareCommand(binId: number, action: BinCommandAction) {
     if (hardwareCommandPending) return;
     setHardwareCommandPending({ binId, action });
     try {
       await createBinCommand(binId, action);
+    } catch (err) {
+      // z. B. 409, wenn die Tonne gesperrt ist -> Fahrbefehl blockiert.
+      // Die Fahr-Buttons sind bei gesperrter Tonne ohnehin deaktiviert; hier
+      // nur abfangen, damit kein unbehandelter Fehler in der Konsole landet.
+      console.warn("Hardware-Befehl abgelehnt:", err);
     } finally {
       setHardwareCommandPending(null);
     }
@@ -282,22 +315,43 @@ export default function DashboardPage() {
           )}
           <button
             onClick={() => setTourOpen(true)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-white/10 bg-[#111214] text-slate-300 transition hover:border-[#f2c94c]/50 hover:text-[#f2c94c] sm:w-auto sm:px-3"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-white/10 bg-[#111214] text-slate-300 transition hover:border-[#f2c94c]/50 hover:text-[#f2c94c]"
             title="Einführung öffnen"
             aria-label="Einführung öffnen"
           >
             <CircleHelp className="h-4 w-4" />
-            <span className="hidden text-xs font-semibold sm:ml-2 sm:inline">Einführung</span>
           </button>
           <button
             data-tour="route-plan"
             onClick={handlePlan}
             disabled={planning}
-            className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded bg-[#f2c94c] text-sm font-semibold text-[#171717] transition hover:bg-[#ffd866] disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto sm:px-4"
-            title="Route planen"
+            className="flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded bg-[#f2c94c] text-sm font-semibold text-[#171717] transition hover:bg-[#ffd866] disabled:bg-slate-600 disabled:text-slate-300 sm:w-auto sm:px-3.5"
+            title="Route planen (nur planen, Truck fährt noch nicht)"
           >
             {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RouteIcon className="w-4 h-4" />}
             <span className="hidden sm:inline">Route planen</span>
+          </button>
+          <button
+            data-tour="route-start"
+            onClick={handleStartStop}
+            disabled={dispatchPending}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded text-sm font-semibold text-white transition disabled:opacity-60 sm:w-auto sm:px-3.5 ${
+              dispatched ? "bg-red-500 hover:bg-red-400" : "bg-emerald-500 hover:bg-emerald-400"
+            } ${
+              hasPlannedRoute && !dispatched && !dispatchPending
+                ? "animate-pulse ring-2 ring-emerald-300/70 shadow-[0_0_18px_rgba(16,185,129,0.7)]"
+                : ""
+            }`}
+            title={dispatched ? "Route stoppen (Müllfahrzeug despawnen)" : "Route starten (Müllfahrzeug entsenden)"}
+          >
+            {dispatchPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : dispatched ? (
+              <Square className="w-4 h-4" />
+            ) : (
+              <Truck className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">{dispatched ? "Route stoppen" : "Route starten"}</span>
           </button>
           <span
             data-tour="live-status"
@@ -323,6 +377,8 @@ export default function DashboardPage() {
             onSelectBin={setSelectedBinId}
             onHardwareCommand={handleHardwareCommand}
             hardwareCommandPending={hardwareCommandPending}
+            onLock={handleLock}
+            onUnlock={handleUnlock}
           />
         </div>
 
@@ -369,7 +425,14 @@ export default function DashboardPage() {
             {activeTab === "chat" && <ChatInterface onActionComplete={() => getLatestRoute().then(setActiveRoute)} />}
             {activeTab === "energy" && <EnergyPanel energyData={energyData} />}
             {activeTab === "security" && (
-              <SecurityPanel events={securityEvents} onResolve={handleResolve} onLock={handleLock} />
+              <SecurityPanel
+                events={securityEvents}
+                bins={bins}
+                onResolve={handleResolve}
+                onLock={handleLock}
+                onSelectBin={setSelectedBinId}
+                selectedBinId={selectedBinId}
+              />
             )}
           </div>
         </div>

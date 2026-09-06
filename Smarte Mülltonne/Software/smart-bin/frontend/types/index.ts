@@ -96,4 +96,5 @@ export interface LiveData {
   bins: Bin[];
   alerts: Pick<SecurityEvent, "id" | "bin_id" | "event_type" | "timestamp">[];
   truck: TruckPosition | null;
+  dispatched?: boolean;
 }

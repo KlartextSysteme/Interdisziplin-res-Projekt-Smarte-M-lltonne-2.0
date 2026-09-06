@@ -91,6 +91,13 @@ class GlobalController:
         self.obstacle_stop_cm = 15
         self.avoid_side = None
 
+        # Nicht-blockierende Entprellung der Front-Hinderniserkennung: Hindernis
+        # muss durchgehend >= _front_obstacle_confirm_ms anliegen, sonst wird ein
+        # einzelnes spurious Kurzecho verworfen. KEINE Forced-Messungen im
+        # Regeltakt (die wuerden die PD-Regelung ausbremsen -> langsam/ruckelig).
+        self._front_obstacle_since_ms = None
+        self._front_obstacle_confirm_ms = 250
+
         self.avoid_speed = 35
         self.avoid_turn_speed = 35
 
@@ -103,7 +110,7 @@ class GlobalController:
 
         # müssen noch angepasst werden
         self.avoid_turn_90_steps = 22000
-        self.turn_home_180_steps = 44000
+        self.turn_home_180_steps = 47000
 
         self.avoid_turn_90_ms = 0
         self.turn_home_180_ms = 0
@@ -145,14 +152,22 @@ class GlobalController:
         self.last_debug_ms = time.ticks_ms()
         self.debug_interval_ms = 250
 
-        # Akku nur im Ruhezustand messen: erst nachdem die Motoren laenger aus
-        # waren, damit nicht der Spannungseinbruch unter Last angezeigt wird.
-        self.battery_idle_delay_ms = 10 * 60 * 1000
-        self.battery_read_interval_ms = 60 * 1000
+        # Akku nur im Ruhezustand messen (nicht den Spannungseinbruch unter Last
+        # anzeigen). Werte fuer Live-Anzeige/Demo verkuerzt: 5 s Settle, dann alle 5 s.
+        self.battery_idle_delay_ms = 5 * 1000
+        self.battery_read_interval_ms = 5 * 1000
         self._last_motor_active_ms = time.ticks_ms()
         self._last_battery_read_ms = 0
         self._last_battery_percent = None
         self._last_battery_voltage = None
+
+        # FILL an die Bridge drosseln: _read_fuellstand_for_status() laeuft im
+        # engen Status-Takt und wuerde sonst dutzende FILL/s ins TCP schieben
+        # (flutet Bridge/Netz). Nur bei relevanter Aenderung oder Heartbeat senden.
+        self._last_fill_sent = None
+        self._last_fill_sent_ms = 0
+        self._fill_send_delta = 2
+        self._fill_send_interval_ms = 3000
 
         # Touchpanel-Tick waehrend der Fahrt drosseln, damit der SPI-Touch-Read
         # die PD-Regelung nicht jeden Zyklus ausbremst (enges Regel-Raster).
@@ -199,7 +214,7 @@ class GlobalController:
         # in der schaerfsten Kurve wird bis auf speed_curve heruntergedrosselt.
         # Adaption neutralisiert: speed_curve == base_speed -> konstantes Tempo.
         # (Beim Tempo-Test nur EINE Variable aendern.)
-        self.speed_curve = 60
+        self.speed_curve = 25
 
         # --- Party-Modus (Easter-Egg via PIN "***") ---
         # Step-basiert: N volle Umdrehungen (360deg = 2x turn_home_180_steps),
@@ -340,6 +355,21 @@ class GlobalController:
             + str(self.fuellstand_sensor.is_deckel_offen())
         )
 
+        # Fuellstand an die Bridge -> Backend (bin.fill_level) -> Web-App/Routenplanung.
+        # Gedrosselt: nur bei >= _fill_send_delta % Aenderung oder als Heartbeat
+        # alle _fill_send_interval_ms, sonst flutet der enge Status-Takt das TCP.
+        if fill_level is not None:
+            now = time.ticks_ms()
+            changed = (
+                self._last_fill_sent is None
+                or abs(fill_level - self._last_fill_sent) >= self._fill_send_delta
+            )
+            heartbeat = time.ticks_diff(now, self._last_fill_sent_ms) >= self._fill_send_interval_ms
+            if changed or heartbeat:
+                self._bridge_send("FILL:" + str(fill_level))
+                self._last_fill_sent = fill_level
+                self._last_fill_sent_ms = now
+
         return fill_level
 
     def _is_motor_activity_state(self):
@@ -389,6 +419,9 @@ class GlobalController:
             + str(self._last_battery_percent)
             + "%"
         )
+
+        # Akkustand an die Bridge -> Backend (bin.battery) -> Leitstand.
+        self._bridge_send("BATTERY:" + str(self._last_battery_percent))
 
         return self._last_battery_percent
 
@@ -840,10 +873,22 @@ class GlobalController:
         if self.obstacle_sensors is not None:
             self.obstacle_sensors.run_front()
 
+            # Nicht-blockierend entprellt: stoppen erst, wenn das Hindernis
+            # durchgehend >= _front_obstacle_confirm_ms anliegt. Einzelne
+            # spurious Kurzechos (nur bis zur naechsten Messung gecacht) erreichen
+            # die Schwelle nie -> keine Fehl-Stopps, aber auch kein Blockieren des
+            # Regeltakts (keine Forced-Messungen).
             if self.obstacle_sensors.front_obstacle_detected():
-                self.motors.stop()
-                self.set_state(self.STATE_OBSTACLE_WAIT)
-                return
+                now = time.ticks_ms()
+                if self._front_obstacle_since_ms is None:
+                    self._front_obstacle_since_ms = now
+                elif time.ticks_diff(now, self._front_obstacle_since_ms) >= self._front_obstacle_confirm_ms:
+                    self.motors.stop()
+                    self.set_state(self.STATE_OBSTACLE_WAIT)
+                    self._front_obstacle_since_ms = None
+                    return
+            else:
+                self._front_obstacle_since_ms = None
 
         position = self.line_sensor.get_position()
 
@@ -1652,7 +1697,7 @@ class GlobalController:
                 self.set_state(self.STATE_AT_HOME)
             return
 
-        self.motors.turn_right(self.avoid_turn_speed)
+        self.motors.turn_left(self.avoid_turn_speed)
 
         self._debug_state(
             "180-Grad-Drehung zuhause Elapsed ms: "
@@ -1679,7 +1724,7 @@ class GlobalController:
 
         elapsed = time.ticks_diff(time.ticks_ms(), self.state_since_ms)
 
-        self.motors.turn_right(self.avoid_turn_speed)
+        self.motors.turn_left(self.avoid_turn_speed)
 
         self._debug_state(
             "180-Grad-Drehung an der Strasse Elapsed ms: "

@@ -102,8 +102,8 @@ class PDController:
         """
         correction = self.calculate(current_position, target_position, now_ms)
 
-        left_speed = base_speed - correction
-        right_speed = base_speed + correction
+        left_speed = base_speed + correction
+        right_speed = base_speed - correction
 
         left_speed = self._clamp(left_speed, min_speed, max_speed)
         right_speed = self._clamp(right_speed, min_speed, max_speed)

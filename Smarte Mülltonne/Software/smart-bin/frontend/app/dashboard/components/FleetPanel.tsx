@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Battery,
@@ -8,6 +8,7 @@ import {
   Home,
   Loader2,
   Lock,
+  LockOpen,
   MapPin,
   Plus,
   Sparkles,
@@ -28,6 +29,8 @@ interface Props {
   onSelectBin?: (id: number | null) => void;
   onHardwareCommand?: (binId: number, action: BinCommandAction) => void | Promise<void>;
   hardwareCommandPending?: { binId: number; action: BinCommandAction } | null;
+  onLock?: (binId: number) => void | Promise<void>;
+  onUnlock?: (binId: number) => void | Promise<void>;
 }
 
 function fillColor(pct: number) {
@@ -65,8 +68,21 @@ export default function FleetPanel({
   onSelectBin,
   onHardwareCommand,
   hardwareCommandPending,
+  onLock,
+  onUnlock,
 }: Props) {
   const [pairingOpen, setPairingOpen] = useState(false);
+
+  // Refs auf die Flotten-Kacheln (nach Bin-ID), damit eine von aussen (z.B.
+  // per Klick auf die Karte) getroffene Auswahl im Panel sichtbar wird.
+  const itemRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+
+  useEffect(() => {
+    if (selectedBinId == null) return;
+    const el = itemRefs.current.get(selectedBinId);
+    el?.scrollIntoView({ behavior: "auto", block: "nearest" });
+  }, [selectedBinId]);
+
   const hardwareActions: { action: BinCommandAction; label: string; icon: LucideIcon }[] = [
     { action: "goto_street", label: "Abholung", icon: MapPin },
     { action: "return_home", label: "Heim", icon: Home },
@@ -101,6 +117,9 @@ export default function FleetPanel({
           return (
             <div
               key={b.id}
+              ref={(el) => {
+                itemRefs.current.set(b.id, el);
+              }}
               role="button"
               tabIndex={0}
               onClick={() => onSelectBin?.(isSelected ? null : b.id)}
@@ -175,29 +194,57 @@ export default function FleetPanel({
                 )}
               </div>
 
-              {isSelected && onHardwareCommand && (
-                <div data-tour="hardware-actions" className="mt-3 grid grid-cols-3 gap-1.5 border-t border-white/10 pt-3">
-                  {hardwareActions.map(({ action, label, icon: Icon }) => {
-                    const isPending =
-                      hardwareCommandPending?.binId === b.id &&
-                      hardwareCommandPending.action === action;
-                    return (
-                      <button
-                        key={action}
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onHardwareCommand(b.id, action);
-                        }}
-                        disabled={Boolean(hardwareCommandPending)}
-                        title={`Hardware-Befehl: ${label}`}
-                        className="flex min-h-8 items-center justify-center gap-1 rounded border border-white/10 bg-[#111214] px-2 text-[11px] font-semibold text-slate-300 transition hover:border-[#f2c94c]/50 hover:text-[#f2c94c] disabled:cursor-wait disabled:opacity-55"
-                      >
-                        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
-                        <span className="truncate">{label}</span>
-                      </button>
-                    );
-                  })}
+              {isSelected && (onHardwareCommand || onLock || onUnlock) && (
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  {onHardwareCommand && (
+                    <div data-tour="hardware-actions" className="grid grid-cols-3 gap-1.5">
+                      {hardwareActions.map(({ action, label, icon: Icon }) => {
+                        const isPending =
+                          hardwareCommandPending?.binId === b.id &&
+                          hardwareCommandPending.action === action;
+                        // Fahrbefehle sind bei gesperrter Tonne blockiert (Backend lehnt
+                        // sie mit 409 ab); Stopp bleibt erlaubt.
+                        const isDrive = action === "goto_street" || action === "return_home";
+                        const blocked = Boolean(b.locked) && isDrive;
+                        return (
+                          <button
+                            key={action}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onHardwareCommand(b.id, action);
+                            }}
+                            disabled={Boolean(hardwareCommandPending) || blocked}
+                            title={blocked ? "Tonne gesperrt – erst entsperren" : `Hardware-Befehl: ${label}`}
+                            className="flex min-h-8 items-center justify-center gap-1 rounded border border-white/10 bg-[#111214] px-2 text-[11px] font-semibold text-slate-300 transition hover:border-[#f2c94c]/50 hover:text-[#f2c94c] disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                            <span className="truncate">{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {(onLock || onUnlock) && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (b.locked) onUnlock?.(b.id);
+                        else onLock?.(b.id);
+                      }}
+                      title={b.locked ? "Tonne entsperren (Admin)" : "Tonne sperren (Sicherheit)"}
+                      className={`mt-1.5 flex min-h-8 w-full items-center justify-center gap-1.5 rounded border px-2 text-[11px] font-semibold transition ${
+                        b.locked
+                          ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                          : "border-red-400/40 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                      }`}
+                    >
+                      {b.locked ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                      <span className="truncate">{b.locked ? "Entsperren" : "Sperren"}</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>

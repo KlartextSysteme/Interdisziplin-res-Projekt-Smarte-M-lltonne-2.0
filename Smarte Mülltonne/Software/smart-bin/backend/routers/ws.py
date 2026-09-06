@@ -72,6 +72,7 @@ def _build_live_payload() -> dict:
                 for e in alerts
             ],
             "truck": truck if truck["lat"] is not None else None,
+            "dispatched": truck_state.is_dispatched(),
         }
     finally:
         db.close()

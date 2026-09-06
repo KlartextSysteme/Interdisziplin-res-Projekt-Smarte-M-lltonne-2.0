@@ -2,15 +2,18 @@
 
 import { ShieldCheck, AlertTriangle, Lock, Check, Sparkles, Wrench } from "lucide-react";
 import { eventTone, securityEventLabel } from "@/lib/labels";
-import type { SecurityEvent } from "@/types";
+import type { Bin, SecurityEvent } from "@/types";
 
 interface Props {
   events: SecurityEvent[];
+  bins: Bin[];
   onResolve: (eventId: number) => void;
   onLock: (binId: number) => void;
+  onSelectBin?: (id: number | null) => void;
+  selectedBinId?: number | null;
 }
 
-export default function SecurityPanel({ events, onResolve, onLock }: Props) {
+export default function SecurityPanel({ events, bins, onResolve, onLock, onSelectBin, selectedBinId }: Props) {
   if (events.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
@@ -43,19 +46,36 @@ export default function SecurityPanel({ events, onResolve, onLock }: Props) {
               ? Lock
               : AlertTriangle;
 
+        // Betroffene Tonne auflösen -> Straße + Hausnummer statt roher ID.
+        const bin = bins.find((b) => b.id === e.bin_id);
+        const title = bin?.name ?? `Tonne ${e.bin_id}`;
+        const isSelected = selectedBinId != null && selectedBinId === e.bin_id;
+
         return (
           <div
             key={e.id}
-            className={`space-y-3 rounded border p-3 ${
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelectBin?.(e.bin_id)}
+            onKeyDown={(ev) => {
+              if (ev.key === "Enter" || ev.key === " ") onSelectBin?.(e.bin_id);
+            }}
+            title={bin ? `${bin.name} anzeigen` : undefined}
+            className={`cursor-pointer space-y-3 rounded border p-3 transition hover:bg-white/[0.04] focus:outline-none focus:ring-1 focus:ring-[#f2c94c]/50 ${
+              isSelected ? "ring-1 ring-[#f2c94c]/70 " : ""
+            }${
               isAmber
                 ? "border-[#f2c94c]/35 bg-[#f2c94c]/10"
                 : "border-red-400/35 bg-red-500/10"
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">Tonne {e.bin_id}</p>
-                <p className={`text-xs ${isAmber ? "text-[#f2c94c]" : "text-red-300"}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{title}</p>
+                {bin?.address && (
+                  <p className="truncate text-xs text-slate-400">{bin.address}</p>
+                )}
+                <p className={`mt-1 text-xs ${isAmber ? "text-[#f2c94c]" : "text-red-300"}`}>
                   {securityEventLabel(e.event_type)}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
@@ -68,14 +88,20 @@ export default function SecurityPanel({ events, onResolve, onLock }: Props) {
             <div className="flex gap-2">
               {!isAmber && (
                 <button
-                  onClick={() => onLock(e.bin_id)}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    onLock(e.bin_id);
+                  }}
                   className="flex h-8 items-center gap-1 rounded bg-red-500 px-2.5 text-xs font-semibold text-white transition hover:bg-red-400"
                 >
                   <Lock className="h-3 w-3" /> Sperren
                 </button>
               )}
               <button
-                onClick={() => onResolve(e.id)}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onResolve(e.id);
+                }}
                 className="flex h-8 items-center gap-1 rounded border border-white/10 bg-white/[0.055] px-2.5 text-xs font-semibold text-slate-200 transition hover:border-[#f2c94c]/40 hover:text-[#f2c94c]"
               >
                 <Check className="h-3 w-3" /> Quittieren

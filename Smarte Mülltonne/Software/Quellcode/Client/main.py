@@ -35,7 +35,9 @@ US_RIGHT_CHANNEL = 6
 # Füllstand hat einen eigenen MUX-Kanal (C8), gemeinsamer Trigger mit den US-Sensoren.
 # Werte nach dem Test am realen Aufbau kalibrieren.
 FUELLSTAND_CHANNEL = 8
-FUELLSTAND_LEER_CM = 40
+# Kalibriert am realen Aufbau (2026-07): leere Tonne misst ~33.6-35.2 cm (Sensor
+# -> Boden). LEER_CM knapp unter die minimale Leer-Distanz -> leer = 0 %.
+FUELLSTAND_LEER_CM = 33
 FUELLSTAND_VOLL_CM = 5
 
 BUZZER_PIN = 0
@@ -46,11 +48,14 @@ BATTERY_R2_OHM = 33000
 BATTERY_MIN_VOLTAGE = 7.827
 BATTERY_MAX_VOLTAGE = 10.072
 
-# Motor-Pinsaetze L<->R getauscht: am realen Aufbau (2026-07-04, T1) fuhr die
-# alte Zuordnung 10/11/12=links, 13/8/9=rechts rueckwaerts + spiegelverkehrt.
-# Verifiziert per Referenz-Linienlauf (Position pendelt sauber um 0).
-# MERGE-HINWEIS: origin/main "finale Belegung" hatte den Swap NICHT (LEFT=10/11/12).
-# Hier bewusst unser T1-verifiziertes 13/8/9 belassen -> Verdrahtung gegenpruefen!
+# Motor-Pinbelegung nach dem Verpol-Blast + Treibertausch (2026-07-11), am
+# realen Aufbau per Fahrtest festgelegt:
+#   LINKS  an 13/8/9     (vorwaerts = DIR 0)
+#   RECHTS an 10/11/12   (vorwaerts = DIR 1)
+# Wichtig: Geradeausfahrt allein zeigt eine vertauschte L/R-Zuordnung NICHT
+# (beide Raeder vorwaerts). Erst die Kurven-Korrektur deckt sie auf: bei
+# vertauschtem L/R lenkt der PD spiegelverkehrt -> Linie geht verloren. Diese
+# Zuordnung gibt korrekte Korrektur. Bei Umverdrahten wieder per Fahrtest pruefen.
 LEFT_DIR_PIN = 13
 LEFT_STEP_PIN = 8
 LEFT_ENABLE_PIN = 9
@@ -59,8 +64,8 @@ RIGHT_DIR_PIN = 10
 RIGHT_STEP_PIN = 11
 RIGHT_ENABLE_PIN = 12
 
-LEFT_FORWARD_DIR = 1
-RIGHT_FORWARD_DIR = 0
+LEFT_FORWARD_DIR = 0
+RIGHT_FORWARD_DIR = 1
 
 
 def create_controller():
@@ -107,10 +112,10 @@ def create_controller():
     )
 
     pd_controller = PDController(
-        kp=32,
+        kp=28,
         kd=2,
         target_position=0,
-        max_correction=60,
+        max_correction=40,
     )
 
     motors = DualStepperMotorPWM(
@@ -120,8 +125,8 @@ def create_controller():
         right_dir_pin=RIGHT_DIR_PIN,
         right_step_pin=RIGHT_STEP_PIN,
         right_enable_pin=RIGHT_ENABLE_PIN,
-        min_freq=2000,
-        max_freq=7000,
+        min_freq=1500,
+        max_freq=4000,
         left_forward_dir=LEFT_FORWARD_DIR,
         right_forward_dir=RIGHT_FORWARD_DIR,
         enable_active_value=1,
@@ -146,9 +151,9 @@ def create_controller():
         fuellstand_sensor=fuellstand_sensor,
         akkustand_sensor=akkustand,
         touchpanel=None,
-        base_speed=60,
-        min_speed=0,
-        max_speed=95,
+        base_speed=45,
+        min_speed=20,
+        max_speed=60,
     )
 
     touchpanel = Touchpanel(action_handler=controller.handle_touch_action)

@@ -223,6 +223,9 @@ class FuellstandSensor:
         voll_abstand_cm=5.0,
         deckel_offen_margin_cm=5.0,
         no_echo_for_deckel_offen=3,
+        near_buffer=12,
+        min_confirm_hits=2,
+        empty_confirm_reads=60,
     ):
         self.us = ultrasonic
         self.leer_abstand_cm = float(leer_abstand_cm)
@@ -235,6 +238,22 @@ class FuellstandSensor:
 
         self._no_echo_count = 0
         self.no_echo_for_deckel_offen = int(no_echo_for_deckel_offen)
+
+        # Halten-mit-Hysterese gegen Flackern. Der US verfehlt weiches/schraeges
+        # Muellgut oft -> der Ping laeuft am Muell vorbei zum Boden -> Fern-Echo
+        # -> faelschlich 0 %. Physik: Muellgut kann die Distanz nur VERKUERZEN,
+        # nie verlaengern, und der Fuellstand aendert sich nur, wenn jemand Muell
+        # rein/raus tut. Darum: eine mehrfach bestaetigte Oberflaeche wird
+        # GEHALTEN; jeder Nah-Treffer setzt den Leer-Zaehler zurueck. Erst nach
+        # vielen Messungen in Folge OHNE jeden Nah-Treffer faellt der Wert auf 0.
+        # Unabhaengig von der Trefferquote: leer -> alle Messungen fern -> 0 in
+        # ~2-3 s; gefuellt -> ein Treffer alle paar Messungen genuegt zum Halten.
+        self._near_buffer = int(near_buffer)
+        self._min_confirm_hits = max(1, int(min_confirm_hits))
+        self._empty_confirm_reads = int(empty_confirm_reads)
+        self._near_window = []   # nur Nah-Distanzen (< leer), begrenzt
+        self._far_streak = 0     # Messungen in Folge ohne Nah-Treffer
+        self._held_percent = 0   # gehaltener Fuellstand
 
     def run(self, force=False):
         """
@@ -252,27 +271,43 @@ class FuellstandSensor:
             if self._no_echo_count >= self.no_echo_for_deckel_offen:
                 self.deckel_offen = True
                 self.fuellstand_prozent = None
+                self._near_window = []
+                self._far_streak = 0
             return
 
-        self.last_distance_cm = distance
-
-        if distance >= self.leer_abstand_cm:
-            self.deckel_offen = False
-            self.fuellstand_prozent = 0
-            self._no_echo_count = 0
-            return
-
+        self.last_distance_cm = distance  # Rohwert (Debug/Diagnose)
         self._no_echo_count = 0
         self.deckel_offen = False
 
-        if distance <= self.voll_abstand_cm:
-            self.fuellstand_prozent = 100
-            return
+        if distance < self.leer_abstand_cm:
+            # Nah-Treffer: moegliche echte Oberflaeche. Leer-Zaehler zuruecksetzen
+            # und die bestaetigte naechste Oberflaeche halten (min_confirm_hits-t-
+            # naechster Nah-Wert -> einzelne Nah-Ausreisser fallen raus).
+            self._far_streak = 0
+            self._near_window.append(distance)
+            if len(self._near_window) > self._near_buffer:
+                self._near_window.pop(0)
+            if len(self._near_window) >= self._min_confirm_hits:
+                ordered = sorted(self._near_window)
+                surface = ordered[self._min_confirm_hits - 1]
+                self._held_percent = self._percent_from_distance(surface)
+        else:
+            # Fern-Messung: meist ein verfehlter Ping. Erst nach vielen Fern-
+            # Messungen in Folge (ohne jeden Nah-Treffer) gilt die Tonne als leer.
+            self._far_streak += 1
+            if self._far_streak >= self._empty_confirm_reads:
+                self._held_percent = 0
+                self._near_window = []
 
+        self.fuellstand_prozent = self._held_percent
+
+    def _percent_from_distance(self, distance):
+        if distance <= self.voll_abstand_cm:
+            return 100
         span = max(0.001, self.leer_abstand_cm - self.voll_abstand_cm)
         ratio = (self.leer_abstand_cm - distance) / span
         ratio = max(0.0, min(1.0, ratio))
-        self.fuellstand_prozent = int(round(ratio * 100))
+        return int(round(ratio * 100))
 
     def get_fuellstand_prozent(self):
         return self.fuellstand_prozent

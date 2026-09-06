@@ -46,6 +46,8 @@ export const planRoute = () => post<Route[]>("/routes/plan");
 export const getCandidates = () => get<Route[]>("/routes/candidates");
 export const activateRoute = (id: number) => post<Route>(`/routes/${id}/activate`);
 export const getLatestRoute = () => get<Route | null>("/routes/latest");
+export const startRoute = () => post<{ dispatched: boolean }>("/routes/start");
+export const stopRoute = () => post<{ dispatched: boolean }>("/routes/stop");
 
 // --- Config ---
 export interface PublicConfig {
