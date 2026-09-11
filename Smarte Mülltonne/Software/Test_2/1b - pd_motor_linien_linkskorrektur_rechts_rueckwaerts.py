@@ -6,6 +6,18 @@ from time import sleep, sleep_ms, sleep_us, ticks_diff, ticks_ms, ticks_us
 # Linienfolger mit PD-Regler
 # Pico + CD74HC4067 Multiplexer + 2 Schrittmotoren per STEP/DIR
 #
+# KOPIE von "1 - pd_motor_linien.py" mit EINER Aenderung:
+#   Sonderfall Linkskorrektur.
+#   Im Ausgangsprogramm gibt es Korrekturen, bei denen NUR der linke Motor
+#   angesteuert wird (rechte Seite auf 0 geklemmt). Der Motortreiber schafft
+#   es jedoch nicht, den linken Motor allein anzutreiben - auch nicht mit den
+#   bereits getesteten VREF-Settings.
+#   Deshalb wird GENAU in diesem Fall stattdessen:
+#       - der linke Motor angehalten (kein Schrittsignal) und
+#       - der rechte Motor rueckwaerts gedreht,
+#   damit die Korrektur trotzdem gefahren werden kann.
+#   ALLE anderen Korrekturen bleiben unveraendert (normale Differenzialfahrt).
+#
 # Motoransteuerung (verifizierte Belegung nach Treibertausch 2026-07-11):
 # links:  DIR GP13, STEP GP8,  ENABLE GP9
 # rechts: DIR GP10, STEP GP11, ENABLE GP12
@@ -224,6 +236,65 @@ class DualStepperMotorPWM:
             + (self.max_freq - self.min_freq) * (adjusted_speed / 100)
         )
 
+    def drive_differential(self, left_speed, right_speed):
+        """
+        Zentraler Einstieg fuer die Differenzialfahrt.
+
+        Sonderfall Linkskorrektur:
+        Wuerde NUR der linke Motor fahren (rechte Seite auf 0), bleibt der
+        linke Motor stehen und der rechte Motor dreht stattdessen rueckwaerts,
+        weil der Treiber den linken Motor allein nicht zum Drehen bekommt.
+        Alle anderen Faelle laufen unveraendert ueber die normale
+        Differenzialfahrt.
+        """
+        left_speed = clamp(left_speed, 0, 100)
+        right_speed = clamp(right_speed, 0, 100)
+
+        if left_speed > 0 and right_speed <= 0:
+            self.left_correction_right_reverse(left_speed)
+        else:
+            self.drive_forward_differential(left_speed, right_speed)
+
+    def left_correction_right_reverse(self, speed):
+        """
+        Sonderfall Linkskorrektur (nur linker Motor wuerde angesteuert):
+        Linker Motor bleibt stehen, rechter Motor dreht rueckwaerts.
+        Als Rueckwaertsgeschwindigkeit wird die Geschwindigkeit verwendet,
+        mit der der linke Motor vorwaerts gefahren waere, damit die
+        Korrekturstaerke erhalten bleibt.
+        """
+        speed = clamp(speed, 0, 100)
+        right_freq = self._speed_to_frequency(speed, self.right_trim_factor)
+
+        if right_freq <= 0:
+            self.stop()
+            return
+
+        self.enable()
+
+        # Linker Motor aus: kein Schrittsignal.
+        self.left_step.duty_u16(0)
+
+        # Rechter Motor rueckwaerts.
+        self.right_dir.value(1 - RIGHT_FORWARD_DIR)
+
+        # Kleine Pause, damit Richtung/Enable sicher gesetzt sind.
+        sleep_ms(2)
+
+        self.right_step.freq(right_freq)
+        self.right_step.duty_u16(32768)
+
+        self.last_left_speed = 0
+        self.last_right_speed = -speed
+
+        if self.debug:
+            print(
+                self.name,
+                "LINKSKORREKTUR links AUS, rechts RUECKWAERTS",
+                round(speed, 1),
+                right_freq,
+            )
+
     def drive_forward_differential(self, left_speed, right_speed):
         left_speed = clamp(left_speed, 0, 100)
         right_speed = clamp(right_speed, 0, 100)
@@ -397,6 +468,7 @@ last_right_speed = BASE_SPEED
 front_distance_cm = None
 
 print("Starte Linienfolger mit PD-Regler und PWM-Schrittmotorsteuerung")
+print("Sonderfall Linkskorrektur: links AUS, rechts RUECKWAERTS")
 print("MUX: S0 GP1, S1 GP2, S2 GP3, S3 GP4, SIG GP5")
 print("Liniensensoren: C0-C4")
 print("Ultraschall vorne: Trigger GP6, Echo C5")
@@ -441,7 +513,7 @@ try:
                 left_speed, right_speed = speeds_from_correction(correction)
                 last_left_speed = left_speed
                 last_right_speed = right_speed
-                motors.drive_forward_differential(left_speed, right_speed)
+                motors.drive_differential(left_speed, right_speed)
 
             else:
                 controller.reset()
@@ -450,7 +522,7 @@ try:
                 if ticks_diff(now_ms, last_line_seen_ms) < LOST_LINE_STOP_MS:
                     left_speed = last_left_speed
                     right_speed = last_right_speed
-                    motors.drive_forward_differential(left_speed, right_speed)
+                    motors.drive_differential(left_speed, right_speed)
                 else:
                     left_speed = 0
                     right_speed = 0
