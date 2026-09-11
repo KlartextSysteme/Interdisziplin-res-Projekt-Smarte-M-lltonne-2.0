@@ -153,7 +153,7 @@ ebenfalls oben in `main.py`.
 
 ### 6.1 Bridge starten (Mac, eigenes Terminal empfohlen!)
 ```bash
-cd ".../Smarte Mülltonne/Software/smart-bin"
+cd ".../Smarte Mülltonne/Software/Flottenmanagement"
 backend/.venv/bin/python bridge/tcp_bridge.py \
   --host 0.0.0.0 --port 50002 --bin-id 22 --backend http://127.0.0.1:8000
 ```

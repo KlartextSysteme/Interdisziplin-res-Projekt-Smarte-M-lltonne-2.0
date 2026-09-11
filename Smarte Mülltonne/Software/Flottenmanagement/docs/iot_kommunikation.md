@@ -2,7 +2,7 @@
 
 > **Zweck:** Vollständige, zeichnungsreife Beschreibung aller Kommunikationswege. Strukturiert für Excalidraw — Boxen für Akteure, beschriftete Pfeile für Protokoll + Takt.
 >
-> **Stand:** Mai 2026, entspricht dem echten Firmware-Code unter `Software/Quellcode/Client/` und der Bridge `smart-bin/bridge/tcp_bridge.py`
+> **Stand:** Mai 2026, entspricht dem echten Firmware-Code unter `Software/Quellcode/Client/` und der Bridge `Flottenmanagement/bridge/tcp_bridge.py`
 
 ---
 
@@ -14,7 +14,7 @@
 - **Sensoren:** Ultraschall-Füllstand, Ultraschall-Hindernis
 - **Bedienung:** 2 Buttons (rot/grün), Buzzer, Status-LEDs
 - **Netzwerk:** TCP-Socket-Client zum Server
-- **Touchpanel (Ziel):** Das Display-UI ist aktuell ein separater Prototyp (`smart-bin/firmware/pico_touchpanel/`), soll aber in dieselbe Firmware integriert werden — **derselbe Pico**, nicht ein zweiter.
+- **Touchpanel (Ziel):** Das Display-UI ist aktuell ein separater Prototyp (`Flottenmanagement/firmware/pico_touchpanel/`), soll aber in dieselbe Firmware integriert werden — **derselbe Pico**, nicht ein zweiter.
 
 **Eine zentrale Besonderheit:** Der Pico ist **nicht durchgehend online**. Während der Fahrt trennt er das WLAN absichtlich (»Hard-Offline-Modus«), weil Netzwerk-Traffic die Echtzeit-Fahrschleife stören würde. Er ist nur an Haltepunkten (Standby, Wartepunkt) verbunden.
 
@@ -304,7 +304,7 @@ Das Touchpanel ist **Teil desselben Pico**, kein eigenes Gerät. Es ist die loka
 
 ### Offene Design-Frage
 
-Das aktuelle Touchpanel-Prototyp-Stub (`smart-bin/firmware/pico_touchpanel/`) ist als HTTP-Direkt-Client gedacht. Der echte Pico nutzt aber TCP + Hard-Offline. Bei der Integration muss entschieden werden:
+Das aktuelle Touchpanel-Prototyp-Stub (`Flottenmanagement/firmware/pico_touchpanel/`) ist als HTTP-Direkt-Client gedacht. Der echte Pico nutzt aber TCP + Hard-Offline. Bei der Integration muss entschieden werden:
 
 - Entweder das Touchpanel nutzt **denselben TCP-Kanal** wie der Antrieb (konsistent, aber nur online an Haltepunkten)
 - Oder Display-Reports werden **lokal gepuffert** und beim nächsten Online-Fenster gesendet

@@ -6,9 +6,9 @@ Sechs unabhängige Punkte über Backend, Frontend und Firmware.
 
 ## Kontext / Betroffene Komponenten
 
-- **Backend** (`smart-bin/backend`): FastAPI, SQLAlchemy/SQLite.
-- **Frontend** (`smart-bin/frontend`): Next.js Leitstand (`app/dashboard`).
-- **Firmware** (`Quellcode/Client` = laufender Stack, `smart-bin/firmware/pico_touchpanel/ui.py` = laufende UI).
+- **Backend** (`Flottenmanagement/backend`): FastAPI, SQLAlchemy/SQLite.
+- **Frontend** (`Flottenmanagement/frontend`): Next.js Leitstand (`app/dashboard`).
+- **Firmware** (`Quellcode/Client` = laufender Stack, `Flottenmanagement/firmware/pico_touchpanel/ui.py` = laufende UI).
 
 Reihenfolge: **A+B (Web, per pytest/Preview testbar)** → **D (Firmware Diagnose-Werte)**
 → **E+F (Hardware-Kalibrierung am Pico, gemeinsame Session)**. (C reklassifiziert →
@@ -112,7 +112,7 @@ UI-Objekt vorhanden, werden aber nicht gerendert.
 - Feed-Kette verifizieren: Controller (`global_controller_test.py`) muss
   `obstacle_cm` und `fill_level` regelmäßig via `set_status` an die UI liefern.
 
-**Betroffene Dateien:** `smart-bin/firmware/pico_touchpanel/ui.py`,
+**Betroffene Dateien:** `Flottenmanagement/firmware/pico_touchpanel/ui.py`,
 ggf. `Quellcode/Client/global_controller_test.py` (Feed).
 
 **Akzeptanz:** Bei geöffnetem Diagnose-Panel ändern sich Füllstand % und Hindernis cm

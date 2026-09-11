@@ -29,7 +29,7 @@ class Liniensensor:
 
         - multiplexer: Instanz der Klasse Multiplexer.
         - channels: Multiplexer-Kanaele der 5 Liniensensoren.
-          Die Demo-Hardware aus Test_2/1 - pd_motor_linien.py verdrahtet
+          Die Demo-Hardware aus Hardwaretests/1 - pd_motor_linien.py verdrahtet
           C0-C4 von rechts nach links.
         - weights: Gewichtung für die Positionsberechnung.
         - line_detected_value: Sensorwert bei erkannter Linie.

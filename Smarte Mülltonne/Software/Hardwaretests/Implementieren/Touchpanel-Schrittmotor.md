@@ -19,7 +19,7 @@ Beim Druecken von `Abholung` startet die Muelltonne die Fahrt zur Strasse mit de
 Aktuelle Touchpanel-Firmware:
 
 ```text
-C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\smart-bin\firmware\pico_touchpanel
+C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\Flottenmanagement\firmware\pico_touchpanel
 ```
 
 Wichtige vorhandene Dateien im Touchpanel-Projekt:
@@ -37,7 +37,7 @@ assets\
 Vorhandener PD-Motorcode als fachliche Grundlage:
 
 ```text
-C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\Test_2\pd_motor_linien.py
+C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\Hardwaretests\pd_motor_linien.py
 ```
 
 ## Heute erzeugte und geaenderte Dateien
@@ -49,7 +49,7 @@ Die aktuelle Touchpanel-`main.py` wurde durch eine integrierte Testversion erset
 Zielpfad:
 
 ```text
-C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\smart-bin\firmware\pico_touchpanel\main.py
+C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\Flottenmanagement\firmware\pico_touchpanel\main.py
 ```
 
 Inhaltlich neu in dieser Datei:
@@ -72,7 +72,7 @@ Inhaltlich neu in dieser Datei:
 Vor dem Ersetzen wurde die bisherige Datei gesichert:
 
 ```text
-C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\smart-bin\firmware\pico_touchpanel\main_backup_before_pd_integration.py
+C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\Flottenmanagement\firmware\pico_touchpanel\main_backup_before_pd_integration.py
 ```
 
 Diese Datei enthaelt die vorherige reine Touchpanel-Startlogik ohne Motorintegration.
@@ -305,7 +305,7 @@ ENABLE_ACTIVE_VALUE pruefen
 Wenn die alte reine Touchpanel-Version wiederhergestellt werden soll:
 
 ```powershell
-python -m mpremote cp "C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\smart-bin\firmware\pico_touchpanel\main_backup_before_pd_integration.py" :main.py
+python -m mpremote cp "C:\Users\tpelz\OneDrive - fhsuedwf\2_Semester\Interdisziplinäres Projekt\Interdisziplin-res-Projekt-Smarte-M-lltonne-2.0\Smarte Mülltonne\Software\Flottenmanagement\firmware\pico_touchpanel\main_backup_before_pd_integration.py" :main.py
 python -m mpremote reset
 ```
 

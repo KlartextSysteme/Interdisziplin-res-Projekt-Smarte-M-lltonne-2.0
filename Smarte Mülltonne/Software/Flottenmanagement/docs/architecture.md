@@ -4,7 +4,7 @@
 > **Software-Lead:** Jonas Wiesner (Backend, LLM-Agent, Dashboard)
 > **Hardware-Lead:** Mech-Team (Antrieb, Sensorik, Tonne-Bau)
 > **Stand:** Mai 2026
-> **Scope:** Software-Komponenten unter `smart-bin/` — Backend, Frontend, Simulatoren, Agent, Pico-W-Touchpanel-Konzept
+> **Scope:** Software-Komponenten unter `Flottenmanagement/` — Backend, Frontend, Simulatoren, Agent, Pico-W-Touchpanel-Konzept
 
 > **Aktueller Agent-Handoff:** siehe `docs/handoff_2026-06-12.md` fuer den
 > neuesten Stand nach Render-Deployment, Groq-Umstellung, Solar-Entfernung aus
@@ -65,7 +65,7 @@ Die Smarte Mülltonne 2.0 ist ein Hardware-/Software-Verbundsystem aus autonomen
 ## 2. Repo-Struktur
 
 ```
-smart-bin/
+Flottenmanagement/
 ├── backend/
 │   ├── main.py                  # FastAPI-Entry, Router-Registrierung, CORS
 │   ├── config.py                # Pydantic-Settings (.env-Loader)

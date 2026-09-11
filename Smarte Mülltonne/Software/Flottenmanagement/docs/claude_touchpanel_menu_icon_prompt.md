@@ -8,7 +8,7 @@ gezielte Ueberarbeitung der Touchpanel-Hauptmenues auf dem Pico-Display.
 Die Touchpanel-Firmware liegt hier:
 
 ```text
-Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/
+Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/
 ```
 
 Die beiden Hauptmenues werden als vorberechnete RLE-Bitmap-Assets angezeigt:
@@ -37,7 +37,7 @@ werden. Die sichtbaren Iconformen stecken in `menu_1.rle` und `menu_2.rle`.
 Lies vor der Umsetzung diese Doku:
 
 ```text
-Smarte Mülltonne/Software/smart-bin/docs/touchpanel_tonnenicon_design_notes.md
+Smarte Mülltonne/Software/Flottenmanagement/docs/touchpanel_tonnenicon_design_notes.md
 ```
 
 Darin stehen die Learnings aus dem letzten fehlgeschlagenen Versuch, der

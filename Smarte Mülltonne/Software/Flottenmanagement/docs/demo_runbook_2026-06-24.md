@@ -129,7 +129,7 @@ Nichts in diesen Fenstern schliessen, solange die Demo laeuft.
 ## Terminal 1: Backend starten
 
 ```bash
-cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/smart-bin/backend"
+cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/Flottenmanagement/backend"
 .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -150,7 +150,7 @@ Erwartet:
 Wichtig: Fuer die FH-Campus-Tonne `--bin-id 22` verwenden.
 
 ```bash
-cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/smart-bin"
+cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/Flottenmanagement"
 python bridge/tcp_bridge.py --host 0.0.0.0 --port 50002 --bin-id 22 --backend http://127.0.0.1:8000
 ```
 
@@ -168,7 +168,7 @@ pico: STATUS:STANDBY
 Für eine stabile Vorführung:
 
 ```bash
-cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/smart-bin/frontend"
+cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/Flottenmanagement/frontend"
 npm run demo
 ```
 
@@ -180,7 +180,7 @@ beenden, `.next` löschen und `npm run demo` neu starten.
 Für Entwicklung mit Hot Reload:
 
 ```bash
-cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/smart-bin/frontend"
+cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/Flottenmanagement/frontend"
 npm run dev -- --hostname 0.0.0.0 --port 3000
 ```
 
@@ -209,14 +209,14 @@ http://127.0.0.1:3001/dashboard
 Testdatei:
 
 ```text
-Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/bridge_command_led_test.py
+Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/bridge_command_led_test.py
 ```
 
 Start:
 
 ```bash
 cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0"
-python -m mpremote connect /dev/cu.usbmodem214301 run "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/bridge_command_led_test.py"
+python -m mpremote connect /dev/cu.usbmodem214301 run "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/bridge_command_led_test.py"
 ```
 
 Der USB-Port kann anders heissen. Suchen mit:
@@ -349,27 +349,27 @@ POST /bins/22/telemetry
 ## Relevante Dateien
 
 - TCP-Bridge:
-  `Smarte Mülltonne/Software/smart-bin/bridge/tcp_bridge.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/bridge/tcp_bridge.py`
 - Laptop/Pico-Simulator:
-  `Smarte Mülltonne/Software/smart-bin/bridge/pico_tcp_simulator.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/bridge/pico_tcp_simulator.py`
 - Test-Pico mit LED-Signal:
-  `Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/bridge_command_led_test.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/bridge_command_led_test.py`
 - Einfacher Netzwerk-/LED-Test:
-  `Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/network_led_test.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/network_led_test.py`
 - Touchpanel-Firmware Config:
-  `Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/config.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/config.py`
 - Pico TCP Client fuer echte Touchpanel-Firmware:
-  `Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/tcp_bridge_client.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/tcp_bridge_client.py`
 - Web-App API Helper:
-  `Smarte Mülltonne/Software/smart-bin/frontend/lib/api.ts`
+  `Smarte Mülltonne/Software/Flottenmanagement/frontend/lib/api.ts`
 - Dashboard-Hardware-Buttons:
-  `Smarte Mülltonne/Software/smart-bin/frontend/app/dashboard/components/FleetPanel.tsx`
+  `Smarte Mülltonne/Software/Flottenmanagement/frontend/app/dashboard/components/FleetPanel.tsx`
 - Operator-Einführung:
-  `Smarte Mülltonne/Software/smart-bin/frontend/app/dashboard/components/OperatorTour.tsx`
+  `Smarte Mülltonne/Software/Flottenmanagement/frontend/app/dashboard/components/OperatorTour.tsx`
 - Admin-Reset-Seite:
-  `Smarte Mülltonne/Software/smart-bin/frontend/app/admin/page.tsx`
+  `Smarte Mülltonne/Software/Flottenmanagement/frontend/app/admin/page.tsx`
 - Admin-Reset-API:
-  `Smarte Mülltonne/Software/smart-bin/backend/routers/admin_demo.py`
+  `Smarte Mülltonne/Software/Flottenmanagement/backend/routers/admin_demo.py`
 
 ## Fallback ohne echten Pico
 
@@ -377,7 +377,7 @@ Falls der Pico oder USB/Serial Stress macht, kann die Bridge gegen den lokalen
 Simulator getestet werden:
 
 ```bash
-cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/smart-bin"
+cd "/Users/jonaswiesner/Documents/GitHub/Interdisziplinäres Projekt: Smarte Mülltonne 2.0/Smarte Mülltonne/Software/Flottenmanagement"
 python bridge/pico_tcp_simulator.py --host 127.0.0.1 --port 50002 --arrival-delay 3
 ```
 

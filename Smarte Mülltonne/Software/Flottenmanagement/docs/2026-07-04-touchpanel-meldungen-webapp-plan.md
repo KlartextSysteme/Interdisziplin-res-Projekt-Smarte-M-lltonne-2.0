@@ -8,7 +8,7 @@
 
 **Tech Stack:** MicroPython (Pico), Python/asyncio + httpx (Bridge), FastAPI + SQLAlchemy (Backend), Next.js/React (Frontend, keine Änderung), Pillow (WF1-Asset-Encoder).
 
-Spec: `smart-bin/docs/2026-07-04-touchpanel-meldungen-webapp-design.md`
+Spec: `Flottenmanagement/docs/2026-07-04-touchpanel-meldungen-webapp-design.md`
 
 ## Global Constraints
 
@@ -18,21 +18,21 @@ Spec: `smart-bin/docs/2026-07-04-touchpanel-meldungen-webapp-design.md`
 - Firmware läuft mit der **firmware-`ui.py`** auf dem Pico; `Quellcode/Client/ui.py` parallel pflegen (Repo-Konsistenz).
 - Keine DB-Migration (SecurityEvent.event_type ist freier String).
 - Commits pro Task. Arbeitsverzeichnis: `Smarte Mülltonne/Software`.
-- pytest liegt in `smart-bin/backend/.venv/bin/pytest`.
+- pytest liegt in `Flottenmanagement/backend/.venv/bin/pytest`.
 
 ---
 
 ### Task 1: Bridge parst REPORT und meldet ans Backend
 
 **Files:**
-- Modify: `smart-bin/bridge/tcp_bridge.py` (`_handle_pico_line`, neue Methode `_post_report`)
-- Test: `smart-bin/bridge/test_report.py`
+- Modify: `Flottenmanagement/bridge/tcp_bridge.py` (`_handle_pico_line`, neue Methode `_post_report`)
+- Test: `Flottenmanagement/bridge/test_report.py`
 
 **Interfaces:**
 - Consumes: `PicoBridge(backend_url, bin_id, poll_interval_s)`, `self.client` (httpx.AsyncClient), `self.state.bin_id`, `self.backend_url`.
 - Produces: `PicoBridge._post_report(event_type: str)`; `_handle_pico_line` erkennt `REPORT:<DAMAGE|HYGIENE>`.
 
-- [ ] **Step 1: Failing test schreiben** — `smart-bin/bridge/test_report.py`
+- [ ] **Step 1: Failing test schreiben** — `Flottenmanagement/bridge/test_report.py`
 
 ```python
 import asyncio
@@ -73,7 +73,7 @@ def test_unknown_report_kind_does_not_post():
 
 - [ ] **Step 2: Test laufen lassen, Fehlschlag bestätigen**
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/bridge" && ../backend/.venv/bin/pytest test_report.py -v`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/bridge" && ../backend/.venv/bin/pytest test_report.py -v`
 Expected: FAIL (REPORT wird noch nicht geparst → `post` nicht aufgerufen / KeyError).
 
 - [ ] **Step 3: Implementierung** — in `tcp_bridge.py` `_handle_pico_line`, direkt vor der abschließenden `LOGGER.debug("ignored pico line: %s", line)`-Zeile einfügen:
@@ -103,13 +103,13 @@ Und als neue Methode (z. B. direkt nach `_post_telemetry`):
 
 - [ ] **Step 4: Tests grün**
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/bridge" && ../backend/.venv/bin/pytest test_report.py -v`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/bridge" && ../backend/.venv/bin/pytest test_report.py -v`
 Expected: 3 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/bridge/tcp_bridge.py" "Smarte Mülltonne/Software/smart-bin/bridge/test_report.py"
+git add "Smarte Mülltonne/Software/Flottenmanagement/bridge/tcp_bridge.py" "Smarte Mülltonne/Software/Flottenmanagement/bridge/test_report.py"
 git commit -m "Bridge: REPORT:DAMAGE/HYGIENE -> POST /security/events"
 ```
 
@@ -118,13 +118,13 @@ git commit -m "Bridge: REPORT:DAMAGE/HYGIENE -> POST /security/events"
 ### Task 2: Backend-Contract-Test (Meldungen fließen in Events + WS)
 
 **Files:**
-- Test: `smart-bin/backend/test_reports.py`
+- Test: `Flottenmanagement/backend/test_reports.py`
 
 **Interfaces:**
 - Consumes: FastAPI `app` (`main.app`), Routen `POST/GET /security/events`, `POST /security/{bin_id}/resolve`, `routers.ws._build_live_payload`.
 - Produces: nichts (Regressionsschutz, sichert die vom Frontend erwarteten event_type-Keys backend-seitig).
 
-- [ ] **Step 1: Test schreiben** — `smart-bin/backend/test_reports.py`
+- [ ] **Step 1: Test schreiben** — `Flottenmanagement/backend/test_reports.py`
 
 ```python
 from fastapi.testclient import TestClient
@@ -152,13 +152,13 @@ def test_report_event_flows_into_events_and_ws():
 
 - [ ] **Step 2: Test laufen lassen (soll direkt grün sein — Backend kann das schon)**
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/backend" && .venv/bin/pytest test_reports.py -v`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/backend" && .venv/bin/pytest test_reports.py -v`
 Expected: PASS. Falls FAIL → Backend-Bug, hier fixen (nicht erwartet).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/backend/test_reports.py"
+git add "Smarte Mülltonne/Software/Flottenmanagement/backend/test_reports.py"
 git commit -m "Backend: Contract-Test fuer damage_report/hygiene_report Events"
 ```
 
@@ -187,7 +187,7 @@ git commit -m "Backend: Contract-Test fuer damage_report/hygiene_report Events"
 
 - [ ] **Step 2: Syntax-Check (MicroPython nicht lokal ausführbar, daher py_compile)**
 
-Run: `cd "Smarte Mülltonne/Software" && smart-bin/backend/.venv/bin/python -m py_compile Quellcode/Client/global_controller_test.py && echo OK`
+Run: `cd "Smarte Mülltonne/Software" && Flottenmanagement/backend/.venv/bin/python -m py_compile Quellcode/Client/global_controller_test.py && echo OK`
 Expected: `OK`
 
 - [ ] **Step 3: Commit**
@@ -204,9 +204,9 @@ git commit -m "Controller: report_damage/report_hygiene -> _bridge_send(REPORT:*
 ### Task 4: WF1-Encoder + Asset „confirm_report.rle" (Meldung gesendet)
 
 **Files:**
-- Create: `smart-bin/firmware/pico_touchpanel/tools/png_to_wf1.py` (Encoder + Decoder-Helfer)
-- Create: `smart-bin/firmware/pico_touchpanel/tools/test_wf1_roundtrip.py`
-- Create: `smart-bin/firmware/pico_touchpanel/assets/confirm_report.rle`
+- Create: `Flottenmanagement/firmware/pico_touchpanel/tools/png_to_wf1.py` (Encoder + Decoder-Helfer)
+- Create: `Flottenmanagement/firmware/pico_touchpanel/tools/test_wf1_roundtrip.py`
+- Create: `Flottenmanagement/firmware/pico_touchpanel/assets/confirm_report.rle`
 - Create: `Quellcode/Client/assets/confirm_report.rle` (Kopie, Repo-Konsistenz)
 
 **Interfaces:**
@@ -215,7 +215,7 @@ git commit -m "Controller: report_damage/report_hygiene -> _bridge_send(REPORT:*
 
 - [ ] **Step 1: Pillow sicherstellen**
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/backend" && .venv/bin/python -c "import PIL; print(PIL.__version__)" || .venv/bin/pip install Pillow`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/backend" && .venv/bin/python -c "import PIL; print(PIL.__version__)" || .venv/bin/pip install Pillow`
 Expected: eine Versionsnummer.
 
 - [ ] **Step 2: Encoder + Decoder schreiben** — `tools/png_to_wf1.py`
@@ -327,12 +327,12 @@ def test_roundtrip_matches_source_in_565():
 
 - [ ] **Step 4: Round-Trip-Test laufen lassen**
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/tools" && ../../../backend/.venv/bin/pytest test_wf1_roundtrip.py -v`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/tools" && ../../../backend/.venv/bin/pytest test_wf1_roundtrip.py -v`
 Expected: PASS. (Sichert, dass der Encoder exakt zum `wireframe.py`-Decoder passt.)
 
 - [ ] **Step 5: Referenzstil aus `confirm_generic.rle` ziehen**
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/tools" && ../../../backend/.venv/bin/python -c "from png_to_wf1 import decode_wf1; from PIL import Image; w,h,rows=decode_wf1('../assets/confirm_generic.rle'); img=Image.new('RGB',(w,h)); [img.putpixel((x,y),rows[y][x]) for y in range(h) for x in range(w)]; img.save('confirm_generic_ref.png'); print(w,h)"`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/tools" && ../../../backend/.venv/bin/python -c "from png_to_wf1 import decode_wf1; from PIL import Image; w,h,rows=decode_wf1('../assets/confirm_generic.rle'); img=Image.new('RGB',(w,h)); [img.putpixel((x,y),rows[y][x]) for y in range(h) for x in range(w)]; img.save('confirm_generic_ref.png'); print(w,h)"`
 Expected: `320 240` + Datei `confirm_generic_ref.png` (Referenz: Hintergrundfarben, gelbes Häkchen-Quadrat, Schriftposition/-farbe von „Auswahl bestätigt").
 
 - [ ] **Step 6: „Meldung gesendet"-PNG rendern** — `tools/render_confirm_report.py`
@@ -368,13 +368,13 @@ img.save("confirm_report.png")
 print("OK")
 ```
 
-Run: `cd "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/tools" && ../../../backend/.venv/bin/python render_confirm_report.py`
+Run: `cd "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/tools" && ../../../backend/.venv/bin/python render_confirm_report.py`
 Expected: `OK` + `confirm_report.png`. **Visuell** gegen `confirm_generic_ref.png` + Operator-Wireframe prüfen und Farben/Positionen/Font iterieren, bis die Anmutung dem „Auswahl bestätigt"-Screen entspricht.
 
 - [ ] **Step 7: Encodieren + in beide assets/ ablegen**
 
 ```bash
-cd "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/tools"
+cd "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/tools"
 ../../../backend/.venv/bin/python -c "from png_to_wf1 import encode_png_to_wf1; encode_png_to_wf1('confirm_report.png','../assets/confirm_report.rle')"
 cp ../assets/confirm_report.rle "../../../../Quellcode/Client/assets/confirm_report.rle"
 ls -l ../assets/confirm_report.rle
@@ -385,7 +385,7 @@ Expected: `confirm_report.rle` in beiden assets/-Ordnern.
 
 ```bash
 cd "Smarte Mülltonne/Software"
-git add smart-bin/firmware/pico_touchpanel/tools/ smart-bin/firmware/pico_touchpanel/assets/confirm_report.rle Quellcode/Client/assets/confirm_report.rle
+git add Flottenmanagement/firmware/pico_touchpanel/tools/ Flottenmanagement/firmware/pico_touchpanel/assets/confirm_report.rle Quellcode/Client/assets/confirm_report.rle
 git commit -m "Touchpanel-Asset: confirm_report.rle (Meldung gesendet) + WF1-Encoder"
 ```
 
@@ -394,7 +394,7 @@ git commit -m "Touchpanel-Asset: confirm_report.rle (Meldung gesendet) + WF1-Enc
 ### Task 5: ui.py zeigt „Meldung gesendet" bei report_*
 
 **Files:**
-- Modify: `smart-bin/firmware/pico_touchpanel/ui.py` (`_perform_action`)
+- Modify: `Flottenmanagement/firmware/pico_touchpanel/ui.py` (`_perform_action`)
 - Modify: `Quellcode/Client/ui.py` (`_perform_action`)
 
 **Interfaces:**
@@ -412,13 +412,13 @@ git commit -m "Touchpanel-Asset: confirm_report.rle (Meldung gesendet) + WF1-Enc
 
 - [ ] **Step 3: Syntax-Check beider Dateien**
 
-Run: `cd "Smarte Mülltonne/Software" && smart-bin/backend/.venv/bin/python -m py_compile smart-bin/firmware/pico_touchpanel/ui.py Quellcode/Client/ui.py && echo OK`
+Run: `cd "Smarte Mülltonne/Software" && Flottenmanagement/backend/.venv/bin/python -m py_compile Flottenmanagement/firmware/pico_touchpanel/ui.py Quellcode/Client/ui.py && echo OK`
 Expected: `OK`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/ui.py" "Smarte Mülltonne/Software/Quellcode/Client/ui.py"
+git add "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/ui.py" "Smarte Mülltonne/Software/Quellcode/Client/ui.py"
 git commit -m "Touchpanel: report_* zeigt confirm_report (Meldung gesendet)"
 ```
 
@@ -437,8 +437,8 @@ cd "Smarte Mülltonne/Software"
 DEV=/dev/cu.usbmodem14301
 pkill -f usbmodem14301; sleep 1
 mpremote connect port:$DEV fs cp Quellcode/Client/global_controller_test.py :global_controller_test.py
-mpremote connect port:$DEV fs cp smart-bin/firmware/pico_touchpanel/ui.py :ui.py
-mpremote connect port:$DEV fs cp smart-bin/firmware/pico_touchpanel/assets/confirm_report.rle :assets/confirm_report.rle
+mpremote connect port:$DEV fs cp Flottenmanagement/firmware/pico_touchpanel/ui.py :ui.py
+mpremote connect port:$DEV fs cp Flottenmanagement/firmware/pico_touchpanel/assets/confirm_report.rle :assets/confirm_report.rle
 mpremote connect port:$DEV reset
 ```
 Expected: keine Fehler; nach Reset `Main gestartet` auf der seriellen Konsole.

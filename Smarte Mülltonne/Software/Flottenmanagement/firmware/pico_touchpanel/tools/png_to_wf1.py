@@ -4,7 +4,7 @@ WF1: b'WF1' | w(2B BE) | h(2B BE) | palette_len(1B) | palette(palette_len * 2B R
      | pro Zeile: row_len(2B BE) + row_len Bytes als (run 1B, palette_index 1B)-Paare.
 run 1..255; sum(runs) je Zeile == w; palette <= 256 Farben (RGB565).
 
-Muss exakt zum Decoder in smart-bin/firmware/pico_touchpanel/wireframe.py passen.
+Muss exakt zum Decoder in Flottenmanagement/firmware/pico_touchpanel/wireframe.py passen.
 """
 from PIL import Image
 

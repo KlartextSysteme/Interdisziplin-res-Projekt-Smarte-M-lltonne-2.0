@@ -13,10 +13,10 @@
 - Spec: `docs/superpowers/specs/2026-07-04-hardware-test-followup-design.md`.
 - Pico-Serial-Port: `/dev/cu.usbmodem114301`. Flashen via `mpremote connect port:$DEV fs cp …`.
 - Serial nicht-invasiv per system-`python3` (pyserial 3.5); **niemals** `mpremote repl`/`fs cat` während laufender Firmware. Nach `reset` ~1,5 s warten.
-- Laufende UI = `smart-bin/firmware/pico_touchpanel/ui.py`. Laufender Controller = `Quellcode/Client/*`.
+- Laufende UI = `Flottenmanagement/firmware/pico_touchpanel/ui.py`. Laufender Controller = `Quellcode/Client/*`.
 - **Linien-Regler-Werte NICHT hochdrehen** (Regressionshistorie): `base_speed≈45–60, max_freq=4500, max_correction=60, kp=32`.
 - **Motor-Pins nicht anfassen** (T1-Fix bereits geflasht): links `DIR13/STEP8/EN9`, rechts `DIR10/STEP11/EN12`.
-- Backend-Tests: aus `smart-bin/backend/` mit `.venv/bin/python -m pytest`.
+- Backend-Tests: aus `Flottenmanagement/backend/` mit `.venv/bin/python -m pytest`.
 - Branch: `hardware-test-followup`.
 
 ---
@@ -24,14 +24,14 @@
 ### Task 1: Backend — Quittieren pro Event (Punkt A)
 
 **Files:**
-- Modify: `smart-bin/backend/routers/security.py` (nach `resolve_events`, ~Zeile 74)
-- Test: `smart-bin/backend/test_reports.py` (neue Testfunktionen anhängen)
+- Modify: `Flottenmanagement/backend/routers/security.py` (nach `resolve_events`, ~Zeile 74)
+- Test: `Flottenmanagement/backend/test_reports.py` (neue Testfunktionen anhängen)
 
 **Interfaces:**
 - Produces: `POST /security/events/{event_id}/resolve` → `{"event_id": int, "resolved": true}`; `404` wenn Event nicht existiert. Setzt nur dieses eine Event auf `resolved=True`.
 - Der bestehende `POST /security/{bin_id}/resolve` bleibt unverändert (Bulk).
 
-- [ ] **Step 1: Failing tests schreiben** — an `smart-bin/backend/test_reports.py` anhängen:
+- [ ] **Step 1: Failing tests schreiben** — an `Flottenmanagement/backend/test_reports.py` anhängen:
 
 ```python
 def test_resolve_single_event_leaves_others():
@@ -56,10 +56,10 @@ def test_resolve_unknown_event_returns_404():
 
 - [ ] **Step 2: Test laufen lassen, Fehlschlag prüfen**
 
-Run: `cd "smart-bin/backend" && .venv/bin/python -m pytest test_reports.py -q`
+Run: `cd "Flottenmanagement/backend" && .venv/bin/python -m pytest test_reports.py -q`
 Expected: FAIL — `test_resolve_single_event_leaves_others` bekommt `404`/`405` auf den neuen Pfad; `test_resolve_unknown_event_returns_404` schlägt fehl (Route existiert noch nicht).
 
-- [ ] **Step 3: Endpoint implementieren** — in `smart-bin/backend/routers/security.py` direkt hinter `resolve_events` (nach ~Zeile 74) einfügen:
+- [ ] **Step 3: Endpoint implementieren** — in `Flottenmanagement/backend/routers/security.py` direkt hinter `resolve_events` (nach ~Zeile 74) einfügen:
 
 ```python
 @router.post("/events/{event_id}/resolve")
@@ -76,13 +76,13 @@ def resolve_event(event_id: int, db: Session = Depends(get_db)):
 
 - [ ] **Step 4: Tests laufen lassen, grün prüfen**
 
-Run: `cd "smart-bin/backend" && .venv/bin/python -m pytest test_reports.py -q`
+Run: `cd "Flottenmanagement/backend" && .venv/bin/python -m pytest test_reports.py -q`
 Expected: PASS (alle Tests, inkl. der alten).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/backend/routers/security.py" "Smarte Mülltonne/Software/smart-bin/backend/test_reports.py"
+git add "Smarte Mülltonne/Software/Flottenmanagement/backend/routers/security.py" "Smarte Mülltonne/Software/Flottenmanagement/backend/test_reports.py"
 git commit -m "feat(security): resolve single event by id (leaves other events of same bin)"
 ```
 
@@ -91,8 +91,8 @@ git commit -m "feat(security): resolve single event by id (leaves other events o
 ### Task 2: Backend — UTC-aware Alert-Timestamp (Punkt B)
 
 **Files:**
-- Modify: `smart-bin/backend/routers/ws.py` (Import + Helper + Alert-Serialisierung ~Zeile 61)
-- Test: `smart-bin/backend/test_reports.py` (neue Testfunktion)
+- Modify: `Flottenmanagement/backend/routers/ws.py` (Import + Helper + Alert-Serialisierung ~Zeile 61)
+- Test: `Flottenmanagement/backend/test_reports.py` (neue Testfunktion)
 
 **Interfaces:**
 - Consumes: `_build_live_payload()` (bereits in `test_reports.py` importiert).
@@ -112,10 +112,10 @@ def test_alert_timestamp_is_utc_z():
 
 - [ ] **Step 2: Test laufen lassen, Fehlschlag prüfen**
 
-Run: `cd "smart-bin/backend" && .venv/bin/python -m pytest test_reports.py::test_alert_timestamp_is_utc_z -q`
+Run: `cd "Flottenmanagement/backend" && .venv/bin/python -m pytest test_reports.py::test_alert_timestamp_is_utc_z -q`
 Expected: FAIL — aktuell ist `timestamp` z.B. `"2026-07-04 13:30:29.204788"` (Space, kein `Z`).
 
-- [ ] **Step 3: Helper + Serialisierung anpassen** — in `smart-bin/backend/routers/ws.py`:
+- [ ] **Step 3: Helper + Serialisierung anpassen** — in `Flottenmanagement/backend/routers/ws.py`:
 
 Import oben ergänzen (zu den bestehenden Imports):
 
@@ -151,13 +151,13 @@ Alert-Zeile (~61) von:
 
 - [ ] **Step 4: Tests laufen lassen, grün prüfen**
 
-Run: `cd "smart-bin/backend" && .venv/bin/python -m pytest test_reports.py -q`
+Run: `cd "Flottenmanagement/backend" && .venv/bin/python -m pytest test_reports.py -q`
 Expected: PASS (alle).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/backend/routers/ws.py" "Smarte Mülltonne/Software/smart-bin/backend/test_reports.py"
+git add "Smarte Mülltonne/Software/Flottenmanagement/backend/routers/ws.py" "Smarte Mülltonne/Software/Flottenmanagement/backend/test_reports.py"
 git commit -m "fix(ws): alert timestamp als UTC-aware ISO (Z) -> Leitstand zeigt korrekte Ortszeit"
 ```
 
@@ -166,15 +166,15 @@ git commit -m "fix(ws): alert timestamp als UTC-aware ISO (Z) -> Leitstand zeigt
 ### Task 3: Frontend — Quittieren pro Event-id verdrahten (Punkt A)
 
 **Files:**
-- Modify: `smart-bin/frontend/lib/api.ts` (neue Funktion bei den Security-Calls, ~Zeile 121)
-- Modify: `smart-bin/frontend/app/dashboard/components/SecurityPanel.tsx` (Props + Button, Zeilen 9, 78)
-- Modify: `smart-bin/frontend/app/dashboard/page.tsx` (Import Zeile 15 + `handleResolve` Zeile 116)
+- Modify: `Flottenmanagement/frontend/lib/api.ts` (neue Funktion bei den Security-Calls, ~Zeile 121)
+- Modify: `Flottenmanagement/frontend/app/dashboard/components/SecurityPanel.tsx` (Props + Button, Zeilen 9, 78)
+- Modify: `Flottenmanagement/frontend/app/dashboard/page.tsx` (Import Zeile 15 + `handleResolve` Zeile 116)
 
 **Interfaces:**
 - Consumes: Backend `POST /security/events/{event_id}/resolve` (Task 1); Event-Feld `e.id` (SecurityEvent-Type).
 - Produces: `resolveAlert(eventId: number)`; `SecurityPanel`-Prop `onResolve: (eventId: number) => void`.
 
-- [ ] **Step 1: API-Funktion ergänzen** — in `smart-bin/frontend/lib/api.ts` direkt nach `resolveAlerts` (~Zeile 122) einfügen:
+- [ ] **Step 1: API-Funktion ergänzen** — in `Flottenmanagement/frontend/lib/api.ts` direkt nach `resolveAlerts` (~Zeile 122) einfügen:
 
 ```ts
 export const resolveAlert = (eventId: number) =>
@@ -217,7 +217,7 @@ zu:
 
 - [ ] **Step 4: Typecheck / Build**
 
-Run: `cd "smart-bin/frontend" && npx tsc --noEmit`
+Run: `cd "Flottenmanagement/frontend" && npx tsc --noEmit`
 Expected: keine Fehler.
 
 - [ ] **Step 5: Live verifizieren** (Backend + Bridge + Pico laufen)
@@ -232,7 +232,7 @@ Im Security-Panel EINE Meldung „Quittieren" → die **andere bleibt** stehen. 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/frontend/lib/api.ts" "Smarte Mülltonne/Software/smart-bin/frontend/app/dashboard/components/SecurityPanel.tsx" "Smarte Mülltonne/Software/smart-bin/frontend/app/dashboard/page.tsx"
+git add "Smarte Mülltonne/Software/Flottenmanagement/frontend/lib/api.ts" "Smarte Mülltonne/Software/Flottenmanagement/frontend/app/dashboard/components/SecurityPanel.tsx" "Smarte Mülltonne/Software/Flottenmanagement/frontend/app/dashboard/page.tsx"
 git commit -m "feat(dashboard): Meldung einzeln quittieren (per Event-id)"
 ```
 
@@ -241,7 +241,7 @@ git commit -m "feat(dashboard): Meldung einzeln quittieren (per Event-id)"
 ### Task 4: Firmware — Diagnose-Panel Live-Werte (Punkt D)
 
 **Files:**
-- Modify: `smart-bin/firmware/pico_touchpanel/ui.py` (`__init__`, `set_status`, `tick`, `draw_diagnose`, neue `_draw_diag_values`)
+- Modify: `Flottenmanagement/firmware/pico_touchpanel/ui.py` (`__init__`, `set_status`, `tick`, `draw_diagnose`, neue `_draw_diag_values`)
 - Modify: `Quellcode/Client/global_controller_test.py` (AT_HOME-Feed, ~Zeile 740–753)
 
 **Interfaces:**
@@ -370,7 +370,7 @@ zu:
 
 Run:
 ```bash
-python3 -c "import ast; ast.parse(open('Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/ui.py').read()); ast.parse(open('Smarte Mülltonne/Software/Quellcode/Client/global_controller_test.py').read()); print('parse OK')"
+python3 -c "import ast; ast.parse(open('Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/ui.py').read()); ast.parse(open('Smarte Mülltonne/Software/Quellcode/Client/global_controller_test.py').read()); print('parse OK')"
 ```
 Expected: `parse OK`.
 
@@ -378,7 +378,7 @@ Expected: `parse OK`.
 
 ```bash
 DEV=/dev/cu.usbmodem114301
-mpremote connect port:$DEV fs cp "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/ui.py" :ui.py
+mpremote connect port:$DEV fs cp "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/ui.py" :ui.py
 mpremote connect port:$DEV fs cp "Smarte Mülltonne/Software/Quellcode/Client/global_controller_test.py" :global_controller_test.py
 mpremote connect port:$DEV reset
 ```
@@ -387,7 +387,7 @@ Am Panel: Menü → Diagnose öffnen. Erwartet: „FUELLSTAND nn%" und „HINDER
 - [ ] **Step 7: Commit**
 
 ```bash
-git add "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/ui.py" "Smarte Mülltonne/Software/Quellcode/Client/global_controller_test.py"
+git add "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/ui.py" "Smarte Mülltonne/Software/Quellcode/Client/global_controller_test.py"
 git commit -m "feat(ui): Diagnose-Panel zeigt Fuellstand % und Hindernis cm live"
 ```
 
@@ -399,7 +399,7 @@ git commit -m "feat(ui): Diagnose-Panel zeigt Fuellstand % und Hindernis cm live
 - Modify: `Quellcode/Client/config.py` (`TOUCH_X_MIN/MAX`, `TOUCH_Y_MIN/MAX`, ggf. `SWAP/INVERT`)
 
 **Interfaces:**
-- Consumes: `smart-bin/firmware/pico_touchpanel/touch_calibrate.py` (5-Punkt-Routine, gibt `RESULT`-Zeilen mit Rohwerten aus).
+- Consumes: `Flottenmanagement/firmware/pico_touchpanel/touch_calibrate.py` (5-Punkt-Routine, gibt `RESULT`-Zeilen mit Rohwerten aus).
 - Produces: aktualisierte Kalibrierkonstanten in `config.py`.
 
 **Hinweis:** Hardware-in-the-loop — Pico per USB, Operator tippt die Kreuze. Kein Unit-Test.
@@ -408,9 +408,9 @@ git commit -m "feat(ui): Diagnose-Panel zeigt Fuellstand % und Hindernis cm live
 
 ```bash
 DEV=/dev/cu.usbmodem114301
-mpremote connect port:$DEV fs cp "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/touch_calibrate.py" :touch_calibrate.py
+mpremote connect port:$DEV fs cp "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/touch_calibrate.py" :touch_calibrate.py
 # im Hintergrund starten und Serial mitlesen; Operator tippt TOP_LEFT..CENTER
-mpremote connect port:$DEV run "Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/touch_calibrate.py" > /tmp/touch_cal.log 2>&1 &
+mpremote connect port:$DEV run "Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/touch_calibrate.py" > /tmp/touch_cal.log 2>&1 &
 ```
 
 - [ ] **Step 2: 5 Kreuze tippen, `RESULT`-Rohwerte sammeln**

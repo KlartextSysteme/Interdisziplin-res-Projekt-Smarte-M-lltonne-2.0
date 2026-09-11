@@ -15,8 +15,8 @@ mpremote connect port:$DEV fs cp Quellcode/Client/global_controller_test.py :glo
 mpremote connect port:$DEV fs cp Quellcode/Client/touchpanel.py :touchpanel.py
 mpremote connect port:$DEV fs cp Quellcode/Client/config.py :config.py
 # Touchpanel-UI + neues Confirm-Asset (laufende ui.py = firmware-Variante):
-mpremote connect port:$DEV fs cp smart-bin/firmware/pico_touchpanel/ui.py :ui.py
-mpremote connect port:$DEV fs cp smart-bin/firmware/pico_touchpanel/assets/confirm_report.rle :assets/confirm_report.rle
+mpremote connect port:$DEV fs cp Flottenmanagement/firmware/pico_touchpanel/ui.py :ui.py
+mpremote connect port:$DEV fs cp Flottenmanagement/firmware/pico_touchpanel/assets/confirm_report.rle :assets/confirm_report.rle
 mpremote connect port:$DEV reset
 ```
 
@@ -32,9 +32,9 @@ Beide **neu starten**, damit die neuen Endpoints/Poller aktiv sind
 
 ```bash
 # Backend (Port 8000)
-cd "Smarte Mülltonne/Software/smart-bin/backend" && .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+cd "Smarte Mülltonne/Software/Flottenmanagement/backend" && .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 # Bridge (Port 50002 -> Backend), in eigenem Terminal:
-cd "Smarte Mülltonne/Software/smart-bin/bridge" && python tcp_bridge.py --backend http://127.0.0.1:8000 --bin-id 22
+cd "Smarte Mülltonne/Software/Flottenmanagement/bridge" && python tcp_bridge.py --backend http://127.0.0.1:8000 --bin-id 22
 ```
 
 ### C) Verbindung prüfen

@@ -11,7 +11,7 @@ Probleme liegen. Es ist als Briefing fuer einen weiteren Coding-Agenten gedacht.
 Die Touchpanel-Firmware liegt hier:
 
 ```text
-Smarte Mülltonne/Software/smart-bin/firmware/pico_touchpanel/
+Smarte Mülltonne/Software/Flottenmanagement/firmware/pico_touchpanel/
 ```
 
 Die sichtbaren Screens werden nicht live aus SVGs gerendert, sondern als

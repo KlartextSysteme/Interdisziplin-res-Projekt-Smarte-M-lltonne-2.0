@@ -4,8 +4,8 @@ services:
     runtime: python
     plan: free
     region: frankfurt
-    buildCommand: cd Smarte*/Software/smart-bin/backend && pip install -r requirements.txt
-    startCommand: cd Smarte*/Software/smart-bin/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: cd Smarte*/Software/Flottenmanagement/backend && pip install -r requirements.txt
+    startCommand: cd Smarte*/Software/Flottenmanagement/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
@@ -33,8 +33,8 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: cd Smarte*/Software/smart-bin/frontend && rm -rf node_modules && npm cache clean --force && npm ci --cache /tmp/npm-cache && mkdir -p node_modules/next/dist/compiled/@next/react-refresh-utils node_modules/next/dist/compiled/@babel/runtime && cp -R node_modules/@next/react-refresh-utils/. node_modules/next/dist/compiled/@next/react-refresh-utils/ && cp -R node_modules/@babel/runtime/. node_modules/next/dist/compiled/@babel/runtime/ && node -e "console.log(require.resolve('next/dist/compiled/@next/react-refresh-utils/dist/runtime')); console.log(require.resolve('next/dist/compiled/@babel/runtime/package.json'))" && npm run build
-    startCommand: cd Smarte*/Software/smart-bin/frontend && npx serve@14 out -l $PORT
+    buildCommand: cd Smarte*/Software/Flottenmanagement/frontend && rm -rf node_modules && npm cache clean --force && npm ci --cache /tmp/npm-cache && mkdir -p node_modules/next/dist/compiled/@next/react-refresh-utils node_modules/next/dist/compiled/@babel/runtime && cp -R node_modules/@next/react-refresh-utils/. node_modules/next/dist/compiled/@next/react-refresh-utils/ && cp -R node_modules/@babel/runtime/. node_modules/next/dist/compiled/@babel/runtime/ && node -e "console.log(require.resolve('next/dist/compiled/@next/react-refresh-utils/dist/runtime')); console.log(require.resolve('next/dist/compiled/@babel/runtime/package.json'))" && npm run build
+    startCommand: cd Smarte*/Software/Flottenmanagement/frontend && npx serve@14 out -l $PORT
     autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION

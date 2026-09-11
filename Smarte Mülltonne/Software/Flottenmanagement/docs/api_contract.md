@@ -38,15 +38,15 @@ Auf dem Server-Laptop:
 
 ```bash
 # Terminal 1
-cd Software/smart-bin/backend
+cd Software/Flottenmanagement/backend
 .venv/bin/uvicorn main:app --port 8000
 
 # Terminal 2
-cd Software/smart-bin
+cd Software/Flottenmanagement
 python bridge/tcp_bridge.py --bin-id 1 --backend http://localhost:8000
 
 # Terminal 3
-cd Software/smart-bin/frontend
+cd Software/Flottenmanagement/frontend
 npm run dev
 ```
 

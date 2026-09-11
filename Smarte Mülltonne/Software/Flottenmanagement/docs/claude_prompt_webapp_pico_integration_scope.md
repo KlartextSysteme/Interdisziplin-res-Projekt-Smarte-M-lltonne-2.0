@@ -3,7 +3,7 @@
 Du arbeitest im Repo der smarten Mülltonne:
 
 ```text
-Smarte Mülltonne/Software/smart-bin
+Smarte Mülltonne/Software/Flottenmanagement
 ```
 
 Bitte lies zuerst diese beiden aktuellen Übergabedokumente:
@@ -212,14 +212,14 @@ Bitte nicht:
 Bitte am Ende ausführen:
 
 ```bash
-cd "Smarte Mülltonne/Software/smart-bin/frontend"
+cd "Smarte Mülltonne/Software/Flottenmanagement/frontend"
 npm run build
 ```
 
 Falls Backend geändert wird:
 
 ```bash
-cd "Smarte Mülltonne/Software/smart-bin/backend"
+cd "Smarte Mülltonne/Software/Flottenmanagement/backend"
 ./.venv/bin/python -m compileall main.py routers services models
 ```
 

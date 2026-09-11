@@ -18,7 +18,7 @@ Vertical Slice über: Touchpanel-Firmware → TCP-Bridge → Backend → Fronten
   gerendert → `handle_action` → `_perform_action(report_*)`, das (a) die Action an
   `action_handler` (= Controller) weiterreicht und (b) `show_confirm(asset)` zeigt.
   **Heute:** Asset = `confirm_generic` („Auswahl bestätigt"), Controller ignoriert die Action.
-- **Zwei `ui.py`-Kopien:** `smart-bin/firmware/pico_touchpanel/ui.py` (läuft auf dem Pico)
+- **Zwei `ui.py`-Kopien:** `Flottenmanagement/firmware/pico_touchpanel/ui.py` (läuft auf dem Pico)
   und `Quellcode/Client/ui.py` (Repo). Beide haben Buttons + Confirm-Mechanik.
 - **Confirm-Screens sind fertige Bild-Assets** im Format `WF1` (RLE, palettenbasiert:
   Magic `WF1`, width/height, Palette, pro Zeile `(run, palette_index)`). Text ist
@@ -74,7 +74,7 @@ Frontend AlertBanner/SecurityPanel: Meldung mit eigenem Icon       [NEU: Icon/La
      pro Zeile `row_len` + `(run, index)`-Bytes).
    - Referenzstil aus `confirm_generic.rle` (Palette/Layout/Schrift) und dem
      vom Operator gelieferten Wireframe. 320×240.
-   - Ablage: `smart-bin/firmware/pico_touchpanel/assets/` (läuft auf Pico) **und**
+   - Ablage: `Flottenmanagement/firmware/pico_touchpanel/assets/` (läuft auf Pico) **und**
      `Quellcode/Client/assets/` (Repo-Konsistenz). Auf den Pico deployen.
 2. **`ui.py` (firmware + Client)** — in `_perform_action`: vor dem `else`
    `report_damage`/`report_hygiene` → `asset = "confirm_report"`. Sonst unverändert
@@ -82,12 +82,12 @@ Frontend AlertBanner/SecurityPanel: Meldung mit eigenem Icon       [NEU: Icon/La
 3. **`Quellcode/Client/global_controller_test.py`** — `handle_touch_action`:
    `report_damage` → `self._bridge_send("REPORT:DAMAGE")`,
    `report_hygiene` → `self._bridge_send("REPORT:HYGIENE")`.
-4. **`smart-bin/bridge/tcp_bridge.py`** — in `_handle_pico_line`: Zweig
+4. **`Flottenmanagement/bridge/tcp_bridge.py`** — in `_handle_pico_line`: Zweig
    `line.startswith("REPORT:")` → kind = Rest (`DAMAGE`|`HYGIENE`) → mappe auf
    `event_type` **`"damage_report"`/`"hygiene_report"`** (exakt die vom Frontend
    erwarteten Keys) → `POST {backend}/security/events {bin_id: self.state.bin_id,
    event_type}`. Fehler tolerieren (loggen, kein Crash).
-5. **`smart-bin/backend/routers/security.py`** — unverändert nutzbar (`event_type`
+5. **`Flottenmanagement/backend/routers/security.py`** — unverändert nutzbar (`event_type`
    frei). Optional (nicht zwingend): das `# TODO`-WS-Push implementieren für sofortige
    Anzeige; ohne das deckt der ~0,35-s-Broadcast es ab.
 6. **Frontend — keine Änderung nötig.** `damage_report`/`hygiene_report` sind in
