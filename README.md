@@ -26,7 +26,6 @@ Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sin
 | `Software/Hardwaretests/` | Einzelne Hardware-Testskripte (Motoren, Sensoren, Multiplexer, Display) aus der Inbetriebnahme. |
 | `Software/Visualisierungen/` | Architektur- und Zustandsdiagramme, Pinout, Schaltpläne. |
 | `Software/Übergabedokument_Smarte_Muelltonne.pdf` | Technisches Übergabedokument zum Client-Server-Quellcode des Pico (Stand April 2026). |
-| `Briefing_Fulya_Wireframes.md` | Briefing für die Wireframes von Web-App und Touchpanel. |
 
 An der Wurzel liegen außerdem `render.yaml` (Deployment-Blueprint für Backend und Web-App auf Render) und `.gitignore`.
 
