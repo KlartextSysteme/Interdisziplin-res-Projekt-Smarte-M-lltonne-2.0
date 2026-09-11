@@ -32,3 +32,9 @@ smart_bin.db
 # Tooling / Build-Artefakte
 .claude/
 *.tsbuildinfo
+
+# Lokale Symlinks / Editor-Marker (Abgabe-Aufraeumen 2026-09)
+__klartext_preview
+.micropico
+*.webloc
+.vercel/
