@@ -82,6 +82,11 @@ def create_controller():
         channels=(0, 1, 2, 3, 4),
         weights=(2, 1, 0, -1, -2),
         line_detected_value=1,
+        # Sensor an C4 ist defekt und abgeklemmt (liest dauerhaft 0, am
+        # 2026-07-11 per MUX-Pulltest verifiziert). Endmarkierung darum ab
+        # 4 aktiven Sensoren, sonst wuerde sie nie erkannt und die Tonne
+        # stoppt/wendet nicht am Ziel. Bei repariertem Sensor entfernen.
+        end_marker_min_active=4,
     )
 
     obstacle_sensors = HindernisSensoren(

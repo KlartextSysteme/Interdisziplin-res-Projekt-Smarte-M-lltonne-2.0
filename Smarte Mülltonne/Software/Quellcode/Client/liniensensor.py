@@ -22,6 +22,7 @@ class Liniensensor:
         samples_per_read=1,
         sample_delay_us=0,
         read_delay_us=300,
+        end_marker_min_active=None,
     ):
         """
         Initialisiert das Liniensensor-Array.
@@ -36,6 +37,10 @@ class Liniensensor:
         - min_read_interval_ms: Cache-Dauer zwischen zwei Hardware-Abfragen.
         - samples_per_read: Anzahl Messungen pro Kanal für Majority Vote.
         - sample_delay_us: Pause zwischen Samples.
+        - end_marker_min_active: Mindestanzahl aktiver Sensoren für die
+          Endmarkierung. Default None = alle 5. Auf 4 setzen, wenn ein
+          Sensor hardwareseitig ausgefallen ist (liest dauerhaft 0) und
+          die Endmarkierung sonst nie erreicht würde.
         """
         if len(channels) != 5:
             raise ValueError("Liniensensor braucht genau 5 Kanäle")
@@ -60,6 +65,10 @@ class Liniensensor:
         self._read_delay_us = int(read_delay_us)
         if self._read_delay_us < 0:
             self._read_delay_us = 0
+
+        if end_marker_min_active is None:
+            end_marker_min_active = len(self.channels)
+        self._end_marker_min_active = int(end_marker_min_active)
 
         self._last_read_ms = 0
         self._cached_values = [0, 0, 0, 0, 0]
@@ -115,7 +124,7 @@ class Liniensensor:
 
         self._cached_values = values
         self._cached_bits = self._values_to_bits(values)
-        self._cached_end_marker_detected = active_count == 5
+        self._cached_end_marker_detected = active_count >= self._end_marker_min_active
 
         if active_count == 0:
             self._cached_position = None
