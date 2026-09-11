@@ -10,7 +10,7 @@ Die Smarte Mülltonne fährt selbstständig entlang einer Bodenlinie von ihrem S
 
 ## Ordnerstruktur
 
-Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sind relativ dazu.
+Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sind relativ dazu. Die Semesterdokumentation und die Abschlusspräsentation sind nicht Teil dieses Repos; sie liegen im Abgabeordner. Der Vorgängerstand (Smarte Mülltonne 1.0, Ordner `Alt/`) und ein früherer Doku-Arbeitsstand wurden für die Abgabe entfernt und sind in der Git-Historie bis Commit `dae74ec9` erhalten.
 
 | Pfad | Inhalt |
 |---|---|
@@ -26,8 +26,6 @@ Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sin
 | `Software/Test_2/` | Einzelne Hardware-Testskripte (Motoren, Sensoren, Multiplexer, Display) aus der Inbetriebnahme. |
 | `Software/Visualisierungen/` | Architektur- und Zustandsdiagramme, Pinout, Schaltpläne. |
 | `Software/Übergabedokument_Smarte_Muelltonne.pdf` | Technisches Übergabedokument zum Client-Server-Quellcode des Pico (Stand April 2026). |
-| `Dokumentation & Präsentation Neu/` | Arbeitsstand von Projektantrag, Dokumentation und Bildmaterial im Repo. Die Abgabefassung der Dokumentation liegt im Abgabeordner, nicht hier. |
-| `Alt/` | Vorgängerstand (Smarte Mülltonne 1.0): STL-Dateien, Teileliste, Schaltplan, alter Client- und Servercode, alte Dokumentation. |
 | `Briefing_Fulya_Wireframes.md` | Briefing für die Wireframes von Web-App und Touchpanel. |
 
 An der Wurzel liegen außerdem `render.yaml` (Deployment-Blueprint für Backend und Web-App auf Render) und `.gitignore`.
