@@ -10,20 +10,20 @@ Die Smarte Mülltonne fährt selbstständig entlang einer Bodenlinie von ihrem S
 
 ## Ordnerstruktur
 
-Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sind relativ dazu. Die Semesterdokumentation und die Abschlusspräsentation sind nicht Teil dieses Repos; sie liegen im Abgabeordner. Der Vorgängerstand (Smarte Mülltonne 1.0, Ordner `Alt/`) und ein früherer Doku-Arbeitsstand wurden für die Abgabe entfernt und sind in der Git-Historie bis Commit `dae74ec9` erhalten.
+Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sind relativ dazu. Für die Abgabe wurden zwei Ordner umbenannt, `smart-bin` heißt jetzt `Flottenmanagement` und `Test_2` heißt `Hardwaretests`; die Dokumentation zitiert noch die alten Namen, siehe Abschnitt „Codeverweise in der Dokumentation". Die Semesterdokumentation und die Abschlusspräsentation sind nicht Teil dieses Repos; sie liegen im Abgabeordner. Der Vorgängerstand (Smarte Mülltonne 1.0, Ordner `Alt/`) und ein früherer Doku-Arbeitsstand wurden für die Abgabe entfernt und sind in der Git-Historie bis Commit `dae74ec9` erhalten.
 
 | Pfad | Inhalt |
 |---|---|
 | `Software/Quellcode/Client/` | MicroPython-Firmware des Pico W in der Tonne: Fahrlogik, Sensorik, Touchpanel-Oberfläche, TCP-Client zur Bridge. `main.py` startet den Controller. |
 | `Software/Quellcode/Client/assets/` | Vorgerenderte Bild-Assets für das Touchdisplay (WF1/RLE-Format). |
-| `Software/Quellcode/Server/` | Früher TCP-Server für die Missionssteuerung auf dem Laptop; im Zielsystem übernimmt die Bridge unter `smart-bin/bridge/` diese Rolle. |
-| `Software/smart-bin/backend/` | FastAPI-Backend mit Datenmodell, Routern, Agent und Truck-Simulator. |
-| `Software/smart-bin/frontend/` | Next.js-Web-App (Leitstand und Admin-Seite). |
-| `Software/smart-bin/bridge/` | TCP-Bridge zwischen Pico und Backend sowie ein Pico-Simulator. |
-| `Software/smart-bin/simulator/` | Skripte, die Füllstände, Energie, Sicherheitsereignisse und LKW-Fahrt simulieren. |
-| `Software/smart-bin/firmware/pico_touchpanel/` | Eigenständige Touchpanel-Firmware mit Kalibrierung, Asset-Werkzeugen und datierten Backups der Display-Stände. |
-| `Software/smart-bin/docs/` | Architektur, API-Vertrag, CI-Vorgaben, Handoffs, Design-Specs und Pläne aus der Entwicklung. |
-| `Software/Test_2/` | Einzelne Hardware-Testskripte (Motoren, Sensoren, Multiplexer, Display) aus der Inbetriebnahme. |
+| `Software/Quellcode/Server/` | Früher TCP-Server für die Missionssteuerung auf dem Laptop; im Zielsystem übernimmt die Bridge unter `Flottenmanagement/bridge/` diese Rolle. |
+| `Software/Flottenmanagement/backend/` | FastAPI-Backend mit Datenmodell, Routern, Agent und Truck-Simulator. |
+| `Software/Flottenmanagement/frontend/` | Next.js-Web-App (Leitstand und Admin-Seite). |
+| `Software/Flottenmanagement/bridge/` | TCP-Bridge zwischen Pico und Backend sowie ein Pico-Simulator. |
+| `Software/Flottenmanagement/simulator/` | Skripte, die Füllstände, Energie, Sicherheitsereignisse und LKW-Fahrt simulieren. |
+| `Software/Flottenmanagement/firmware/pico_touchpanel/` | Eigenständige Touchpanel-Firmware mit Kalibrierung, Asset-Werkzeugen und datierten Backups der Display-Stände. |
+| `Software/Flottenmanagement/docs/` | Architektur, API-Vertrag, CI-Vorgaben, Handoffs, Design-Specs und Pläne aus der Entwicklung. |
+| `Software/Hardwaretests/` | Einzelne Hardware-Testskripte (Motoren, Sensoren, Multiplexer, Display) aus der Inbetriebnahme. |
 | `Software/Visualisierungen/` | Architektur- und Zustandsdiagramme, Pinout, Schaltpläne. |
 | `Software/Übergabedokument_Smarte_Muelltonne.pdf` | Technisches Übergabedokument zum Client-Server-Quellcode des Pico (Stand April 2026). |
 | `Briefing_Fulya_Wireframes.md` | Briefing für die Wireframes von Web-App und Touchpanel. |
@@ -32,7 +32,7 @@ An der Wurzel liegen außerdem `render.yaml` (Deployment-Blueprint für Backend 
 
 ## Stand der Dokumentation
 
-Die Semesterdokumentation bezieht sich auf den Branch `route-start-live-akku` im Stand des Commits `c10b40b` vom 11.07.2026. Dieser Commit ist in `main` enthalten. Um genau diesen Stand zu sehen:
+Die Semesterdokumentation bezieht sich auf den Branch `route-start-live-akku` im Stand des Commits `c10b40b` vom 11.07.2026. Dieser Commit ist in `main` enthalten. In diesem Stand heißen die Ordner noch `smart-bin` und `Test_2`, und die Ordner `Alt/` sowie `Dokumentation & Präsentation Neu/` sind noch vorhanden. Um genau diesen Stand zu sehen:
 
 ```
 git checkout c10b40b
@@ -42,56 +42,44 @@ Zurück zum aktuellen Stand mit `git checkout main`.
 
 ## Codeverweise in der Dokumentation
 
-Die Dokumentation zitiert die folgenden Pfade, alle relativ zu `Smarte Mülltonne/Software/`. Sie existieren bei `c10b40b` und unverändert auf `main`.
+Die Dokumentation zitiert Pfade relativ zu `Smarte Mülltonne/Software/` im Stand `c10b40b`. Nach der Umbenennung für die Abgabe gilt auf `main` die rechte Spalte. Dateien ohne Eintrag in der rechten Spalte haben sich nicht bewegt.
 
-Firmware und Client:
+| Pfad in der Dokumentation (Stand `c10b40b`) | Pfad auf `main` |
+|---|---|
+| `Quellcode/Client/main.py` | unverändert |
+| `Quellcode/Client/ui.py` | unverändert |
+| `Quellcode/Client/ultraschallsensor.py` | unverändert |
+| `Quellcode/Client/global_controller_test.py` | unverändert |
+| `Quellcode/Client/multiplexer.py` | unverändert |
+| `Quellcode/Client/display.py` | unverändert |
+| `Quellcode/Client/touchpanel.py` | unverändert |
+| `Quellcode/Client/wireframe.py` | unverändert |
+| `Quellcode/Client/assets/` | unverändert |
+| `smart-bin/backend/config.py` | `Flottenmanagement/backend/config.py` |
+| `smart-bin/backend/agent/planner.py` | `Flottenmanagement/backend/agent/planner.py` |
+| `smart-bin/backend/agent/tools.py` | `Flottenmanagement/backend/agent/tools.py` |
+| `smart-bin/backend/routers/admin_demo.py` | `Flottenmanagement/backend/routers/admin_demo.py` |
+| `smart-bin/backend/routers/bins.py` | `Flottenmanagement/backend/routers/bins.py` |
+| `smart-bin/backend/routers/commands.py` | `Flottenmanagement/backend/routers/commands.py` |
+| `smart-bin/backend/routers/routes.py` | `Flottenmanagement/backend/routers/routes.py` |
+| `smart-bin/backend/routers/ws.py` | `Flottenmanagement/backend/routers/ws.py` |
+| `smart-bin/frontend/app/admin/page.tsx` | `Flottenmanagement/frontend/app/admin/page.tsx` |
+| `smart-bin/frontend/app/dashboard/components/OperatorTour.tsx` | `Flottenmanagement/frontend/app/dashboard/components/OperatorTour.tsx` |
+| `smart-bin/firmware/pico_touchpanel/touch_calibrate.py` | `Flottenmanagement/firmware/pico_touchpanel/touch_calibrate.py` |
+| `smart-bin/firmware/pico_touchpanel/tools/png_to_wf1.py` | `Flottenmanagement/firmware/pico_touchpanel/tools/png_to_wf1.py` |
+| `smart-bin/firmware/pico_touchpanel/backups/2026-06-11_light_mode_before_icon_shape_fix/` | `Flottenmanagement/firmware/pico_touchpanel/backups/2026-06-11_light_mode_before_icon_shape_fix/` |
+| `smart-bin/docs/api_contract.md` | `Flottenmanagement/docs/api_contract.md` |
+| `smart-bin/docs/ci_farben_typografie.md` | `Flottenmanagement/docs/ci_farben_typografie.md` |
+| `smart-bin/docs/handoff_fahrlogik_2026-06-27.md` | `Flottenmanagement/docs/handoff_fahrlogik_2026-06-27.md` |
+| `smart-bin/docs/touchpanel_tonnenicon_design_notes.md` | `Flottenmanagement/docs/touchpanel_tonnenicon_design_notes.md` |
+| `smart-bin/docs/superpowers/plans/2026-07-04-hardware-test-followup.md` | `Flottenmanagement/docs/superpowers/plans/2026-07-04-hardware-test-followup.md` |
+| `smart-bin/docs/superpowers/specs/2026-07-04-hardware-test-followup-design.md` | `Flottenmanagement/docs/superpowers/specs/2026-07-04-hardware-test-followup-design.md` |
 
-```
-Quellcode/Client/main.py
-Quellcode/Client/ui.py
-Quellcode/Client/ultraschallsensor.py
-Quellcode/Client/global_controller_test.py
-Quellcode/Client/multiplexer.py
-Quellcode/Client/display.py
-Quellcode/Client/touchpanel.py
-Quellcode/Client/wireframe.py
-Quellcode/Client/assets/
-```
-
-Backend, Frontend und Touchpanel-Firmware:
-
-```
-smart-bin/backend/config.py
-smart-bin/backend/agent/planner.py
-smart-bin/backend/agent/tools.py
-smart-bin/backend/routers/admin_demo.py
-smart-bin/backend/routers/bins.py
-smart-bin/backend/routers/commands.py
-smart-bin/backend/routers/routes.py
-smart-bin/backend/routers/ws.py
-smart-bin/frontend/app/admin/page.tsx
-smart-bin/frontend/app/dashboard/components/OperatorTour.tsx
-smart-bin/firmware/pico_touchpanel/touch_calibrate.py
-smart-bin/firmware/pico_touchpanel/tools/png_to_wf1.py
-smart-bin/firmware/pico_touchpanel/backups/2026-06-11_light_mode_before_icon_shape_fix/
-```
-
-Dokumente:
-
-```
-smart-bin/docs/api_contract.md
-smart-bin/docs/ci_farben_typografie.md
-smart-bin/docs/handoff_fahrlogik_2026-06-27.md
-smart-bin/docs/touchpanel_tonnenicon_design_notes.md
-smart-bin/docs/superpowers/plans/2026-07-04-hardware-test-followup.md
-smart-bin/docs/superpowers/specs/2026-07-04-hardware-test-followup-design.md
-```
-
-Die gestalterischen Vorgaben für die Web-App (Farben, Ampelfarben, Schrift, Layout) stehen in `smart-bin/docs/ci_farben_typografie.md`. Die Design-Spezifikationen der Agenten-Aufträge folgen dem Namensschema `<thema>-design.md` in `smart-bin/docs/`.
+Die gestalterischen Vorgaben für die Web-App (Farben, Ampelfarben, Schrift, Layout) stehen in `Flottenmanagement/docs/ci_farben_typografie.md`. Die Design-Spezifikationen der Agenten-Aufträge folgen dem Namensschema `<thema>-design.md` in `Flottenmanagement/docs/`.
 
 ## Starten
 
-Backend (Python 3.12, aus `Smarte Mülltonne/Software/smart-bin/backend/`):
+Backend (Python 3.12, aus `Smarte Mülltonne/Software/Flottenmanagement/backend/`):
 
 ```
 pip install -r requirements.txt
@@ -101,7 +89,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 In `.env` werden Admin-Token, `GROQ_API_KEY` für den Agenten, erlaubte CORS-Origins und die Depot-Koordinaten gesetzt. Die Datenbank `smart_bin.db` wird beim ersten Start angelegt.
 
-Web-App (Node 22, aus `Smarte Mülltonne/Software/smart-bin/frontend/`):
+Web-App (Node 22, aus `Smarte Mülltonne/Software/Flottenmanagement/frontend/`):
 
 ```
 npm ci
@@ -110,7 +98,7 @@ npm run dev
 
 Die App läuft dann auf Port 3000 und erwartet das Backend unter `NEXT_PUBLIC_API_URL` (Standard im Deployment: `http://localhost:8000`) und den Live-Kanal unter `NEXT_PUBLIC_WS_URL` (`ws://localhost:8000/ws/live`). `npm run build` erzeugt den statischen Export nach `out/`.
 
-Bridge zur Tonne (aus `Smarte Mülltonne/Software/smart-bin/`):
+Bridge zur Tonne (aus `Smarte Mülltonne/Software/Flottenmanagement/`):
 
 ```
 python bridge/tcp_bridge.py --bin-id 1 --backend http://localhost:8000
