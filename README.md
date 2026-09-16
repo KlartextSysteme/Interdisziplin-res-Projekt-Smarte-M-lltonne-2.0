@@ -2,7 +2,7 @@
 
 Software-Repository zum Interdisziplinären Projekt (Prüfungsnummer 2220) im Masterstudiengang Digitale Technologien der Fachhochschule Südwestfalen, Sommersemester 2026.
 
-Team: Alaeddine Baghyour, Jan-Lukas Bellenhaus, S. Fulya Bulut, Theresa Pelz, Jonas Wiesner.
+Team: Alaeddine Baghyour, Jan-Lukas Bellenhaus, S. Fulya Bulut, Theresa Pelz, Jonas Wiesner. Hinweis zur Commit-Historie: Die Commits unter dem Konto Klartext-Systeme stammen von Jonas Wiesner und Jan-Lukas Bellenhaus, die über dasselbe Konto gearbeitet haben. Eine Aufteilung der Beiträge nach Personen ist aus der Historie deshalb nicht ablesbar.
 
 ## Was das System tut
 
@@ -10,7 +10,7 @@ Die Smarte Mülltonne fährt selbstständig entlang einer Bodenlinie von ihrem S
 
 ## Ordnerstruktur
 
-Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sind relativ dazu. Für die Abgabe wurden zwei Ordner umbenannt, `smart-bin` heißt jetzt `Flottenmanagement` und `Test_2` heißt `Hardwaretests`; die Dokumentation zitiert noch die alten Namen, siehe Abschnitt „Codeverweise in der Dokumentation". Die Semesterdokumentation und die Abschlusspräsentation sind nicht Teil dieses Repos; sie liegen im Abgabeordner. Der Vorgängerstand (Smarte Mülltonne 1.0, Ordner `Alt/`) und ein früherer Doku-Arbeitsstand wurden für die Abgabe entfernt und sind in der Git-Historie bis Commit `dae74ec9` erhalten.
+Der gesamte Projektinhalt liegt unter `Smarte Mülltonne/`. Alle Pfade unten sind relativ dazu. Für die Abgabe wurden zwei Ordner umbenannt, `smart-bin` heißt jetzt `Flottenmanagement` und `Test_2` heißt `Hardwaretests`; die Dokumentation verwendet die neuen Namen, siehe Abschnitt „Codeverweise in der Dokumentation". Die Semesterdokumentation und die Abschlusspräsentation sind nicht Teil dieses Repos; sie liegen im Abgabeordner. Der Vorgängerstand (Smarte Mülltonne 1.0, Ordner `Alt/`) und ein früherer Doku-Arbeitsstand wurden für die Abgabe entfernt und sind in der Git-Historie bis Commit `dae74ec9` erhalten.
 
 | Pfad | Inhalt |
 |---|---|
